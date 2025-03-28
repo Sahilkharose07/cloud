@@ -3,7 +3,8 @@ const fs = require("fs");
 const path = require("path");
 
 const generatePDFService = async (
-    nameAndLocation,
+    customerName,
+    customerLocation,
     contactPerson,
     contactNumber,
     serviceEngineer,
@@ -17,6 +18,7 @@ const generatePDFService = async (
     serialNumberoftheFaultyNonWorkingInstruments,
     engineerRemarks,
     engineerName,
+    status,
     serviceId
 ) => {
     const doc = new PDFDocument({
@@ -74,11 +76,21 @@ const generatePDFService = async (
         .fillColor('#000')
         .text('Customer Name: ', margin + 10, doc.y, { continued: true });
     doc.font('Helvetica')
-        .text(nameAndLocation)
+        .text(customerName)
+        .moveDown(2);
+
+    // Customer Location
+    doc.y = 250;
+    doc.font('Helvetica-Bold')
+        .fontSize(12)
+        .fillColor('#000')
+        .text('Customer Location: ', margin + 10, doc.y, { continued: true });
+    doc.font('Helvetica')
+        .text(customerLocation)
         .moveDown(2);
 
     // Contact Person
-    doc.y = 250;
+    doc.y = 270;
     doc.font('Helvetica-Bold')
         .fontSize(12)
         .fillColor('#000')
@@ -87,8 +99,21 @@ const generatePDFService = async (
         .text(contactPerson)
         .moveDown(2);
 
+
+    // status 
+
+    doc.y = 290
+    doc.font('Helvetica-Bold')
+        .fontSize(12)
+        .fillColor('#000')
+        .text('Status: ', margin + 10, doc.y, { continued: true });
+    doc.font('Helvetica')
+        .text(status)
+        .moveDown(2);
+
+
     // Contact Number
-    doc.y = 270
+    doc.y = 310
     doc.font('Helvetica-Bold')
         .fontSize(12)
         .fillColor('#000')
@@ -98,7 +123,7 @@ const generatePDFService = async (
         .moveDown(2);
 
     // Service Engineer
-    doc.y = 290
+    doc.y = 330
     doc.font('Helvetica-Bold')
         .fontSize(12)
         .fillColor('#000')
@@ -108,7 +133,7 @@ const generatePDFService = async (
         .moveDown(2);
 
     // Date
-    doc.y = 310
+    doc.y = 350
     doc.font('Helvetica-Bold')
         .fontSize(12)
         .fillColor('#000')
@@ -118,7 +143,7 @@ const generatePDFService = async (
         .moveDown(2);
 
     // Place
-    doc.y = 330
+    doc.y = 370
     doc.font('Helvetica-Bold')
         .fontSize(12)
         .fillColor('#000')
@@ -128,7 +153,7 @@ const generatePDFService = async (
         .moveDown(2);
 
     // Place Options
-    doc.y = 350
+    doc.y = 390
     doc.font('Helvetica-Bold')
         .fontSize(12)
         .fillColor('#000')
@@ -138,7 +163,7 @@ const generatePDFService = async (
         .moveDown(2);
 
     // Nature of Job
-    doc.y = 370
+    doc.y = 410
     doc.font('Helvetica-Bold')
         .fontSize(12)
         .fillColor('#000')
@@ -148,7 +173,7 @@ const generatePDFService = async (
         .moveDown(2);
 
     // Report No.
-    doc.y = 390
+    doc.y = 430
     doc.font('Helvetica-Bold')
         .fontSize(12)
         .fillColor('#000')
@@ -158,7 +183,7 @@ const generatePDFService = async (
         .moveDown(2);
 
     // Make & Model Number
-    doc.y = 410
+    doc.y = 450
     doc.font('Helvetica-Bold')
         .fontSize(12)
         .fillColor('#000')
@@ -192,7 +217,6 @@ const generatePDFService = async (
         .fillColor('#000')
         .text('ENGINEER REMARKS', { align: 'left', underline: true })
         .moveDown(2);
-
 
     const tableTop = doc.y;
     const tableLeft = margin + 10;

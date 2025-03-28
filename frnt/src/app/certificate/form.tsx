@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import axios from "axios";
 
 interface Observation {
@@ -10,18 +10,19 @@ interface Observation {
 }
 
 interface CertificateRequest {
-  certificateNo: String;
-  customerName: String;
-  siteLocation: String;
-  makeModel: String;
-  range: String;
-  serialNo: String;
-  calibrationGas: String;
-  gasCanisterDetails: String;
-  dateOfCalibration: Date;
-  calibrationDueDate: Date;
-  observations: Observation[];
-  engineerName: String;
+  certificateNo: String,
+  customerName: String,
+  siteLocation: String,
+  makeModel: String,
+  range: String,
+  serialNo: String,
+  calibrationGas: String,
+  gasCanisterDetails: String,
+  dateOfCalibration: Date,
+  calibrationDueDate: Date,
+  observations: Observation[],
+  engineerName: String,
+  status: string
 }
 
 interface CertificateResponse {
@@ -30,15 +31,22 @@ interface CertificateResponse {
   downloadUrl: string;
 }
 
-interface Model {
-  model_name: string;
-  range: string;
-}
-
-interface engineer {
-  id: string;
-  name: string;
-}
+const makeModelRanges: { [key: string]: string } = {
+  "GMIleakSurveyor": "0-1000ppm,0-100%LEL,0-100%vol",
+  "GMIGT41Series": "0-1000ppm,0-100%LEL,0-100%vol,0-25%vol",
+  "GMIGT44": "0-1000ppm,0-100%LEL,0-100%vol",
+  "GMIPS200": "0-100%LEL,0-100ppmH2S,0-1000ppmCO,0-25%v0l",
+  "GMIPS221": "0-100%LEL,0-25%vol",
+  "GS700": "0-100ppm,0-100%LEL,0-100%vol,0-25%vol,0-300ppm CO",
+  "HydrocarbonGasDetector": "0-100%LEL",
+  "OldhamVOC": "0-500ppm",
+  "OldhamitransCO": "0-300ppm",
+  "OldhamCl2GastronOtherMake": "0-20ppm",
+  "OldhamGastronOtherMakeAmmonia": "0-1000ppm",
+  "BlacklineSafetyG7c": "0-100%LEL,0-25%vol,0-100ppm VOC ",
+  "Uniphos235237EthyleMercaptanTBMmonitor": "0-20PPM,0-40ppm,0-200ppm",
+  "Uniphos299ppm": "0-10000ppm"
+};
 
 export default function GenerateCertificate() {
   const [formData, setFormData] = useState<CertificateRequest>({
@@ -49,10 +57,11 @@ export default function GenerateCertificate() {
     serialNo: "",
     calibrationGas: "",
     gasCanisterDetails: "",
-    dateOfCalibration: new Date().toISOString().split("T")[0],
-    calibrationDueDate: new Date().toISOString().split("T")[0],
+    dateOfCalibration: new Date().toISOString().split('T')[0],
+    calibrationDueDate: new Date().toISOString().split('T')[0],
     observations: [{ gas: "", before: "", after: "" }],
     engineerName: "",
+    status: ""
   });
   const [certificate, setCertificate] = useState<CertificateResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -61,53 +70,13 @@ export default function GenerateCertificate() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [timePeriod, setTimePeriod] = useState<number | null>(null);
-  const [models, setModels] = useState<Model[]>([]);
-  const [isLoadingModels, setIsLoadingModels] = useState(true);
-  const [engineers, setEngineers] = useState<engineer[]>([]);
-  const [isLoadingEngineers, setIsLoadingEngineers] = useState(true);
-  const [engineerError, setEngineerError] = useState<string | null>(null);
-
-
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await fetch('http://localhost:8000/api/v1/addcategory/getCategories');
-        const data = await response.json();
-        setModels(data);
-      } catch (error) {
-        console.error("Error fetching categories:", error);
-        setError("Failed to load models. Using default options.");
-      } finally {
-        setIsLoadingModels(false);
-      }
-    };
-    fetchCategories();
-  }, []);
-
-
-  useEffect(() => {
-    const fetchEngineers = async () => {
-      try {
-        const response = await fetch("http://localhost:8000/api/v1/engineers/getEngineers");
-        const data = await response.json();
-        setEngineers(data);
-      } catch (error) {
-        console.error("Error fetching engineers:", error);
-        setEngineerError("Failed to load engineers.");
-      } finally {
-        setIsLoadingEngineers(false);
-      }
-    };
-
-    fetchEngineers();
-  }, []);
 
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newStartDate = e.target.value;
     setStartDate(newStartDate);
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
-      dateOfCalibration: new Date(newStartDate),
+      dateOfCalibration: new Date(newStartDate)
     }));
 
     if (timePeriod) {
@@ -115,10 +84,10 @@ export default function GenerateCertificate() {
       startDateObj.setMonth(startDateObj.getMonth() + timePeriod);
       const newEndDate = startDateObj.toISOString().split("T")[0];
       setEndDate(newEndDate);
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
         dateOfCalibration: new Date(newStartDate),
-        calibrationDueDate: startDateObj,
+        calibrationDueDate: startDateObj
       }));
     }
   };
@@ -132,22 +101,37 @@ export default function GenerateCertificate() {
       startDateObj.setMonth(startDateObj.getMonth() + period);
       const newEndDate = startDateObj.toISOString().split("T")[0];
       setEndDate(newEndDate);
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
-        calibrationDueDate: startDateObj,
+        calibrationDueDate: startDateObj
       }));
     }
+  };
+
+  const updateEndDate = (start: string, months: number) => {
+    const startDateObj = new Date(start);
+    startDateObj.setMonth(startDateObj.getMonth() + months);
+    const newEndDate = startDateObj.toISOString().split("T")[0];
+    setEndDate(newEndDate);
+    setFormData(prev => ({
+      ...prev,
+      calibrationDueDate: startDateObj
+    }));
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
 
+    const updatedValue = e.target.type === "date"
+      ? new Date(e.target.value).toISOString().split("T")[0]
+      : value;
+
     let updatedObservations = formData.observations;
     let updatedRange = formData.range;
 
     if (name === "makeModel") {
-      const selectedModel = models.find(m => m.model_name === value);
-      updatedRange = selectedModel ? selectedModel.range : "";
+      // Set the range based on the selected make/model
+      updatedRange = makeModelRanges[value] || "";
 
       switch (value) {
         case "GMIleakSurveyor":
@@ -159,16 +143,55 @@ export default function GenerateCertificate() {
         case "GMIGT44":
           updatedObservations = Array(3).fill({ gas: "", before: "", after: "" });
           break;
+        case "GMIPS200":
+          updatedObservations = Array(4).fill({ gas: "", before: "", after: "" });
+          break;
+        case "GMIPS221":
+          updatedObservations = Array(2).fill({ gas: "", before: "", after: "" });
+          break;
+        case "GS700":
+          updatedObservations = Array(5).fill({ gas: "", before: "", after: "" });
+          break;
+        case "HydrocarbonGasDetector":
+          updatedObservations = Array(1).fill({ gas: "", before: "", after: "" });
+          break;
+        case "OldhamVOC":
+          updatedObservations = Array(1).fill({ gas: "", before: "", after: "" });
+          break;
+        case "OldhamitransCO":
+          updatedObservations = Array(1).fill({ gas: "", before: "", after: "" });
+          break;
+        case "OldhamCl2GastronOtherMake":
+          updatedObservations = Array(1).fill({ gas: "", before: "", after: "" });
+          break;
+        case "OldhamGastronOtherMakeAmmonia":
+          updatedObservations = Array(1).fill({ gas: "", before: "", after: "" });
+          break;
+        case "BlacklineSafetyG7c":
+          updatedObservations = Array(3).fill({ gas: "", before: "", after: "" });
+          break;
+        case "Uniphos235237EthyleMercaptanTBMmonitor":
+          updatedObservations = Array(3).fill({ gas: "", before: "", after: "" });
+          break;
+        case "Uniphos299ppm":
+          updatedObservations = Array(1).fill({ gas: "", before: "", after: "" });
+          break;
         default:
           updatedObservations = [{ gas: "", before: "", after: "" }];
       }
-    }
 
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-      ...(name === "makeModel" && { range: updatedRange, observations: updatedObservations })
-    }));
+      setFormData(prev => ({
+        ...prev,
+        makeModel: value,
+        range: updatedRange,
+        observations: updatedObservations
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: updatedValue
+      }));
+    }
   };
 
   const handleObservationChange = (index: number, field: keyof Observation, value: string) => {
@@ -181,7 +204,7 @@ export default function GenerateCertificate() {
     if (formData.observations.length < 5) {
       setFormData({
         ...formData,
-        observations: [...formData.observations, { gas: "", before: "", after: "" }],
+        observations: [...formData.observations, { gas: "", before: "", after: "" }]
       });
     }
   };
@@ -197,24 +220,25 @@ export default function GenerateCertificate() {
     setLoading(true);
     setError(null);
 
-    console.log("Form data before submission:", formData);
+    console.log('Form data before submission:', formData);
 
     try {
+      // Ensure dates are properly formatted
       const submissionData = {
         ...formData,
         dateOfCalibration: startDate ? new Date(startDate) : null,
-        calibrationDueDate: endDate ? new Date(endDate) : null,
+        calibrationDueDate: endDate ? new Date(endDate) : null
       };
 
-      console.log("Submitting data:", submissionData);
+      console.log('Submitting data:', submissionData);
 
       const response = await axios.post(
-        "http://localhost:8000/api/v1/certificates/generateCertificate",
+        "http://localhost:5000/api/v1/certificates/generateCertificate",
         submissionData
       );
       setCertificate(response.data);
     } catch (err: any) {
-      console.error("Error submitting form:", err);
+      console.error('Error submitting form:', err);
       setError(err.response?.data?.error || "Failed to generate certificate. Please try again.");
     } finally {
       setLoading(false);
@@ -225,12 +249,15 @@ export default function GenerateCertificate() {
     if (!certificate?.downloadUrl) return;
 
     try {
-      const response = await axios.get(`http://localhost:8000${certificate.downloadUrl}`, { responseType: "blob" });
+      const response = await axios.get(
+        `http://localhost:5000${certificate.downloadUrl}`,
+        { responseType: 'blob' }
+      );
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
+      const link = document.createElement('a');
       link.href = url;
-      link.setAttribute("download", `certificate-${certificate.certificateId}.pdf`);
+      link.setAttribute('download', `certificate-${certificate.certificateId}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -242,6 +269,7 @@ export default function GenerateCertificate() {
 
   return (
     <div>
+      {/* <h1 className="text-2xl font-bold mb-4">Generate Your Certificate</h1> */}
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <input
@@ -262,33 +290,30 @@ export default function GenerateCertificate() {
           />
         </div>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+
           <select
             name="makeModel"
             value={formData.makeModel}
             onChange={handleChange}
             className="p-2 border rounded"
-            required
-            disabled={isLoadingModels}
           >
             <option value="">Select Make and Model</option>
-            {isLoadingModels ? (
-              <option value="" disabled>
-                Loading models...
-              </option>
-            ) : models.length > 0 ? (
-              models.map((model) => (
-                <option key={model.model_name} value={model.model_name}>
-                  {model.model_name}
-                </option>
-              ))
-            ) : (
-              <>
-                <option value="GMIleakSurveyor">GMI leak Surveyor</option>
-                <option value="GMIGT41Series">GMI GT 41 Series</option>
-                <option value="GMIGT44">GMI GT 44</option>
-              </>
-            )}
+            <option value="GMIleakSurveyor">GMI leak Surveyor</option>
+            <option value="GMIGT41Series">GMI GT 41 Series</option>
+            <option value="GMIGT44">GMI GT 44</option>
+            <option value="GMIPS200">GMI PS200</option>
+            <option value="GMIPS221">GMI PS221</option>
+            <option value="GS700">GS700</option>
+            <option value="HydrocarbonGasDetector">Hydrocarbon gas detector</option>
+            <option value="OldhamVOC">Oldham VOC</option>
+            <option value="OldhamitransCO">Oldham itrans CO</option>
+            <option value="OldhamCl2GastronOtherMake">Oldham Cl2/Gastron/Other Make</option>
+            <option value="OldhamGastronOtherMakeAmmonia">Oldham/Gastron/Other make Ammonia</option>
+            <option value="BlacklineSafetyG7c">Blackline safety G7c</option>
+            <option value="Uniphos235237EthyleMercaptanTBMmonitor">Uniphos 235/237 Ethyle mercaptan/TBM monitor</option>
+            <option value="Uniphos299ppm">Uniphos 299ppm</option>
           </select>
+
           <input
             type="text"
             name="range"
@@ -300,6 +325,7 @@ export default function GenerateCertificate() {
           />
         </div>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+
           <input
             type="text"
             name="serialNo"
@@ -307,6 +333,7 @@ export default function GenerateCertificate() {
             value={formData.serialNo}
             onChange={handleChange}
             className="p-2 border rounded"
+
           />
           <input
             type="text"
@@ -315,6 +342,7 @@ export default function GenerateCertificate() {
             value={formData.calibrationGas}
             onChange={handleChange}
             className="p-2 border rounded"
+
           />
         </div>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-1">
@@ -324,17 +352,25 @@ export default function GenerateCertificate() {
             value={formData.gasCanisterDetails}
             onChange={handleChange}
             className="p-2 border rounded"
+
           />
         </div>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <input
             type="date"
             name="dateOfCalibration"
+            placeholder="Enter Date of Calibration"
             value={startDate}
             onChange={handleStartDateChange}
             className="p-2 border rounded"
+            data-date-format="DD-MM-YYYY"
+            min="2000-01-01"
+            max="2100-12-31"
           />
-          <select onChange={handleTimePeriodChange} className="border p-2 rounded-md">
+          <select
+            onChange={handleTimePeriodChange}
+            className="border p-2 rounded-md"
+          >
             <option value="">Select Period</option>
             <option value="3">3 Months</option>
             <option value="6">6 Months</option>
@@ -346,37 +382,42 @@ export default function GenerateCertificate() {
           <input
             type="date"
             name="calibrationDueDate"
+            placeholder="Enter Calibration Due Date"
             value={endDate}
             onChange={(e) => {
               setEndDate(e.target.value);
-              setFormData((prev) => ({
+              setFormData(prev => ({
                 ...prev,
-                calibrationDueDate: new Date(e.target.value),
+                calibrationDueDate: new Date(e.target.value)
               }));
             }}
             className="p-2 border rounded"
             disabled={timePeriod !== null}
+            data-date-format="DD-MM-YYYY"
+            min="2000-01-01"
+            max="2100-12-31"
           />
           <select
             name="engineerName"
             value={formData.engineerName}
             onChange={handleChange}
             className="p-2 border rounded"
-            required
-            disabled={isLoadingEngineers}
           >
             <option value="">Select Engineer Name</option>
-            {isLoadingEngineers ? (
-              <option value="" disabled>Loading engineers...</option>
-            ) : engineerError ? (
-              <option value="" disabled>Error loading engineers</option>
-            ) : (
-              engineers.map((engineer) => (
-                <option key={engineer.id} value={engineer.name}>
-                  {engineer.name}
-                </option>
-              ))
-            )}
+            <option value="MR. Pintu Rathod">MR. Pintu Rathod</option>
+            <option value="MR. Vivek">MR. Vivek</option>
+          </select>
+        </div>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <select
+            name="status"
+            value={formData.status}
+            onChange={handleChange}
+            className="p-2 border rounded"
+          >
+            <option value="">Select Status</option>
+            <option value="Checked">Checked</option>
+            <option value="Unchecked">Unchecked</option>
           </select>
         </div>
 
@@ -409,7 +450,7 @@ export default function GenerateCertificate() {
                     type="text"
                     name="gas"
                     value={observation.gas}
-                    onChange={(e) => handleObservationChange(index, "gas", e.target.value)}
+                    onChange={(e) => handleObservationChange(index, 'gas', e.target.value)}
                     className="w-full p-1 border rounded"
                   />
                 </td>
@@ -418,7 +459,7 @@ export default function GenerateCertificate() {
                     type="text"
                     name="before"
                     value={observation.before}
-                    onChange={(e) => handleObservationChange(index, "before", e.target.value)}
+                    onChange={(e) => handleObservationChange(index, 'before', e.target.value)}
                     className="w-full p-1 border rounded"
                   />
                 </td>
@@ -427,7 +468,7 @@ export default function GenerateCertificate() {
                     type="text"
                     name="after"
                     value={observation.after}
-                    onChange={(e) => handleObservationChange(index, "after", e.target.value)}
+                    onChange={(e) => handleObservationChange(index, 'after', e.target.value)}
                     className="w-full p-1 border rounded"
                   />
                 </td>
@@ -443,38 +484,43 @@ export default function GenerateCertificate() {
             ))}
             {formData.observations.length === 0 && (
               <tr>
-                <td colSpan={5} className="border p-2 text-center">
-                  No observations added yet.
+                <td colSpan={5} className="border p-2 text-center text-gray-500">
+                  No observations added yet. Click "Add Observation" to add one.
+                </td>
+              </tr>
+            )}
+            {formData.observations.length >= 5 && (
+              <tr>
+                <td colSpan={5} className="border p-2 text-center text-yellow-600">
+                  Maximum limit of 5 observations reached.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
-        <div className="flex justify-center space-x-4 mt-6">
-          <button
-            type="submit"
-            className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600"
-            disabled={loading}
-          >
-            {loading ? "Submitting..." : "Generate Certificate"}
-          </button>
-        </div>
+
+        <button
+          type="submit"
+          className="bg-blue-950 hover:bg-blue-900 text-white p-2 rounded-md"
+          disabled={loading}
+        >
+          {loading ? "Generating..." : "Generate Certificate"}
+        </button>
       </form>
 
+      {error && <p className="text-red-500 mt-4">{error}</p>}
+
       {certificate && (
-        <div className="mt-6 text-center">
-          <h3 className="text-lg font-bold">Certificate Generated</h3>
-          <p>Certificate ID: {certificate.certificateId}</p>
+        <div className="mt-4 text-center">
+          <p className="text-green-600 mb-2">{certificate.message}</p>
           <button
             onClick={handleDownload}
-            className="bg-green-500 text-white px-6 py-2 rounded mt-4 hover:bg-green-600"
+            className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
           >
             Download Certificate
           </button>
         </div>
       )}
-
-      {error && <p className="text-red-500 text-center">{error}</p>}
     </div>
   );
 }

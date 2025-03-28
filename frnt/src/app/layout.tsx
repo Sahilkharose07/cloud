@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { HeroUIProvider } from "@heroui/react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,7 +26,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html suppressHydrationWarning={true} lang="en"><link rel="shortcut icon" href="/logo.svg" sizes="any"/>
+    <html suppressHydrationWarning={true} lang="en">
+      <head>
+        <link rel="shortcut icon" href="/logo.svg" sizes="any"/>
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <div className="hidden md:block">
@@ -35,10 +39,12 @@ export default function RootLayout({
             defaultTheme="system"   
             enableSystem
             disableTransitionOnChange>
-            {children}
+            <HeroUIProvider>
+              {children}
+            </HeroUIProvider>
         </ThemeProvider>
         <Toaster/>
       </body>
     </html>
   );
-} 
+}

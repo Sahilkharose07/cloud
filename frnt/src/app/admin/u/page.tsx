@@ -1,5 +1,5 @@
 "use client";
-import { AppSidebar } from "@/app/admin/admin - components/app - sidebar";
+import { AppSidebar } from "@/app/admin/admincomponents/page";
 import { ModeToggle } from "@/components/ModeToggle";
 import {
   Breadcrumb,
@@ -159,7 +159,7 @@ export default function Page() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/v1/users/getusers");
+        const response = await fetch("http://localhost:5000/api/v1/users/getusers");
         const data = await response.json();
         setUsers(data);
       } catch (error) {
@@ -172,7 +172,7 @@ export default function Page() {
 
   const handleDelete = async (id: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/users/deleteuser/${id}`, {
+      const response = await fetch(`http://localhost:5000/api/v1/users/deleteuser/${id}`, {
         method: "DELETE",
       });
       if (response.ok) {

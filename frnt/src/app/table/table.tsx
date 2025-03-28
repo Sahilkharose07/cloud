@@ -40,7 +40,7 @@ export default function CertificateTable({ initialData }: CertificateTableProps)
 
   const handleDelete = async (id: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/deleteCertificate/${id}`, {
+      const response = await fetch(`http://localhost:5000/api/v1/deleteCertificate/${id}`, {
         method: 'DELETE',
       });
       const data = await response.json();
@@ -61,7 +61,7 @@ export default function CertificateTable({ initialData }: CertificateTableProps)
   };
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/v1/certificates/getCertificate")
+    fetch("http://localhost:5000/api/v1/certificates/getCertificate")
       .then((res) => res.json())
       .then((data) => {
         if (data.success && Array.isArray(data.data)) {

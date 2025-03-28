@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { ChevronsUpDown, Plus } from "lucide-react"
+import Image from "next/image"
 
 import {
   DropdownMenu,
@@ -24,12 +25,17 @@ export function TeamSwitcher({
 }: {
   teams: {
     name: string
-    logo: React.ElementType
+    logoUrl: string
     plan: string
   }[]
 }) {
   const { isMobile } = useSidebar()
-  const [activeTeam, setActiveTeam] = React.useState(teams[0])
+  const defaultTeams = [{
+    name: "Your Company",
+    logoUrl: "/img/karmen-loh.jpg",
+    plan: "Free"
+  }]
+  const [activeTeam, setActiveTeam] = React.useState(teams[0] || defaultTeams[0])
 
   return (
     <SidebarMenu>
@@ -40,8 +46,17 @@ export function TeamSwitcher({
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <activeTeam.logo className="size-4" />
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground overflow-hidden">
+                <Image 
+                  src={activeTeam.logoUrl}
+                  alt={`${activeTeam.name} logo`}
+                  width={48}
+                  height={48}
+                  className="object-cover w-full h-full"
+                  priority
+                  quality={100}
+                  unoptimized
+                />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">
@@ -67,8 +82,17 @@ export function TeamSwitcher({
                 onClick={() => setActiveTeam(team)}
                 className="gap-2 p-2"
               >
-                <div className="flex size-6 items-center justify-center rounded-sm border">
-                  <team.logo className="size-4 shrink-0" />
+                <div className="flex size-6 items-center justify-center rounded-sm border overflow-hidden">
+                  <Image 
+                    src={team.logoUrl}
+                    alt={`${team.name} logo`}
+                    width={32}
+                    height={32}
+                    className="object-cover w-full h-full"
+                    priority
+                    quality={80}
+                    unoptimized
+                  />
                 </div>
                 {team.name}
                 <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>

@@ -9,13 +9,14 @@ const engineerRemarksSchema = new mongoose.Schema({
 }, { _id: false });
 
 const serviceSchema = new mongoose.Schema({
-    serviceId: { 
-        type: String, 
+    serviceId: {
+        type: String,
         unique: true,
         default: () => `SERV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         index: true
     },
-    nameAndLocation: { type: String, required: true },
+    customerName: { type: String, required: true },
+    customerLocation: { type: String, required: true },
     contactPerson: { type: String, required: true },
     contactNumber: { type: String, required: true },
     serviceEngineer: { type: String, required: true },
@@ -28,7 +29,8 @@ const serviceSchema = new mongoose.Schema({
     serialNumberoftheInstrumentCalibratedOK: { type: String, required: true },
     serialNumberoftheFaultyNonWorkingInstruments: { type: String, required: true },
     engineerRemarks: { type: [engineerRemarksSchema], required: true }, // Now storing multiple observations
-    engineerName: { type: String, required: true }
+    engineerName: { type: String, required: true },
+    status: { type: String, required: true, default: "checked" }
 }, {
     timestamps: true
 });

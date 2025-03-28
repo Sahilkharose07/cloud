@@ -3,7 +3,6 @@
 import { useState } from "react";
 import axios from "axios";
 
-
 interface EngineerRemarks {
     serviceSpares: string;
     partNo: string;
@@ -13,7 +12,8 @@ interface EngineerRemarks {
 }
 
 interface ServiceRequest {
-    nameAndLocation: string;
+    customerName: string;
+    customerLocation: string;
     contactPerson: string;
     contactNumber: string;
     serviceEngineer: string;
@@ -27,8 +27,8 @@ interface ServiceRequest {
     serialNumberoftheFaultyNonWorkingInstruments: string;
     engineerRemarks: EngineerRemarks[];
     engineerName: string;
+    status: string;
 }
-
 
 interface ServiceResponse {
     serviceId: string;
@@ -36,9 +36,12 @@ interface ServiceResponse {
     downloadUrl: string;
 }
 
+
+
 export default function GenerateService() {
     const [formData, setFormData] = useState<ServiceRequest>({
-        nameAndLocation: "",
+        customerName: "",
+        customerLocation: "",
         contactPerson: "",
         contactNumber: "",
         serviceEngineer: "",
@@ -52,24 +55,17 @@ export default function GenerateService() {
         serialNumberoftheFaultyNonWorkingInstruments: "",
         engineerRemarks: [{ serviceSpares: "", partNo: "", rate: "", quantity: "", poNo: "" }],
         engineerName: "",
+        status: ""
     });
     const [service, setService] = useState<ServiceResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const handleChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-
-        const updatedValue = e.target.type === "date"
-            ? new Date(e.target.value).toISOString().split("T")[0]
-            : value;
-
-        let updatedRemarks = formData.engineerRemarks;
-
-        setFormData((prevData) => ({
-            ...prevData,
-            [name]: updatedValue,
-            engineerRemarks: updatedRemarks,
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
         }));
     };
 
@@ -141,9 +137,18 @@ export default function GenerateService() {
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <input
                         type="text"
-                        name="nameAndLocation"
-                        placeholder="Name and Location"
-                        value={formData.nameAndLocation}
+                        name="customerName"
+                        placeholder="Customer Name "
+                        value={formData.customerName}
+                        onChange={handleChange}
+                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+
+                    <input
+                        type="text"
+                        name="customerLocation"
+                        placeholder="Customer Location "
+                        value={formData.customerLocation}
                         onChange={handleChange}
                         className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -157,6 +162,16 @@ export default function GenerateService() {
                         className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
 
+                    <select
+                        name="status"
+                        value={formData.status}
+                        onChange={handleChange}
+                        className="p-2 border rounded"
+                    >
+                        <option value="">Select Status</option>
+                        <option value="Checked">Checked</option>
+                        <option value="Unchecked">Unchecked</option>
+                    </select>
                 </div>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
 
@@ -170,14 +185,16 @@ export default function GenerateService() {
                         className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
 
-                    <input
-                        type="text"
+                    <select
                         name="serviceEngineer"
-                        placeholder="Service Engineer"
                         value={formData.serviceEngineer}
                         onChange={handleChange}
-                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                        className="p-2 border rounded"
+                    >
+                        <option value="">Select Service Engineer</option>
+                        <option value="MR. Pintu Rathod">MR. Pintu Rathod</option>
+                        <option value="MR. Vivek">MR. Vivek</option>
+                    </select>
                 </div>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <input
@@ -186,6 +203,9 @@ export default function GenerateService() {
                         value={formData.date}
                         onChange={handleChange}
                         className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        data-date-format="DD-MM-YYYY"
+                        min="2000-01-01"
+                        max="2100-12-31"
                     />
 
                     <input
@@ -433,4 +453,3 @@ export default function GenerateService() {
         </div>
     );
 }
-

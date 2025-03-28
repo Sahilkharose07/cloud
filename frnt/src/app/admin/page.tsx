@@ -1,4 +1,4 @@
-import { AppSidebar } from "@/app/admin/admin - components/app - sidebar"
+import { AppSidebar } from "@/app/admin/admincomponents/page"
 import { ModeToggle } from "@/components/ModeToggle"
 import { Breadcrumb, BreadcrumbSeparator, BreadcrumbPage, BreadcrumbList, BreadcrumbLink, BreadcrumbItem } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"

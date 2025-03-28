@@ -1,5 +1,4 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import GenerateCertificate from "../certificate/form"
 import {
     SidebarInset,
     SidebarProvider,
@@ -9,6 +8,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 import { ModeToggle } from "@/components/ModeToggle"
+import ServiceTable from "./tableces"
 
 export default function CertificatePage() {
     return (
@@ -29,7 +29,7 @@ export default function CertificatePage() {
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block"/>
                                 <BreadcrumbItem>
-                                    <BreadcrumbPage>Certificate</BreadcrumbPage>
+                                    <BreadcrumbPage>Service</BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>
@@ -38,13 +38,10 @@ export default function CertificatePage() {
                 <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15">
                     <Card className="max-w-7xl mx-auto">
                         <CardHeader>
-                            <CardTitle className="text-3xl font-bold text-center">Certificate</CardTitle>
-                            <CardDescription className="text-center">
-                                Please fill out the form below to generate a new Certificate.
-                            </CardDescription>
+                            <CardTitle className="text-3xl font-bold text-center">Service Table</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <GenerateCertificate />
+                            <ServiceTable />
                         </CardContent>
                     </Card>
                 </div>

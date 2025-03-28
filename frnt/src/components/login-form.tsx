@@ -29,7 +29,7 @@ export function LoginForm() {
       setLoading(true)
 
       // User Login Attempt
-      const userResponse = await fetch("http://localhost:8000/api/v1/users/login", {
+      const userResponse = await fetch("http://localhost:5000/api/v1/users/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -50,7 +50,7 @@ export function LoginForm() {
       }
 
       // Admin Login Attempt (Only if user login fails)
-      const adminResponse = await fetch("http://localhost:8000/api/v1/admin/login", {
+      const adminResponse = await fetch("http://localhost:5000/api/v1/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),

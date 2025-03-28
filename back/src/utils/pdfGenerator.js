@@ -15,7 +15,8 @@ const generatePDF = async (
     endDate,
     certificateId,
     observations,
-    engineerName
+    engineerName,
+    status
 ) => {
     try {
         console.log('Generating PDF with data:', {
@@ -31,7 +32,8 @@ const generatePDF = async (
             endDate,
             certificateId,
             observations,
-            engineerName
+            engineerName,
+            status
         });
 
         const doc = new PDFDocument({
@@ -133,11 +135,12 @@ const generatePDF = async (
             addRow1('Gas Canister Details', ":" + " " + (gasCanisterDetails || 'N/A'), true);
             addRow('Date of Calibration', ":" + " " + formatDate(startDate));
             addRow('Calibration Due Date', ":" + " " + formatDate(endDate));
+            addRow('Status', ":" + " " + (status || 'N/A'));
         } catch (error) {
             console.error('Error adding certificate fields:', error);
         }
 
-        doc.y = 450;
+        doc.y = 490;
         doc.fontSize(10)
             .fillColor('#000')
             .text('OBSERVATIONS', { align: 'left', underline: true })

@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Eye, EyeOff } from "react-feather"; // import icons for view password toggle
+import { Eye, EyeOff } from "react-feather"; 
 
 export function RegisterForm() {
   const [name, setName] = useState("");
@@ -36,7 +36,7 @@ export function RegisterForm() {
 
     try {
       // Adjusted URL to localhost:8000
-      const response = await fetch("http://localhost:8000/api/v1/users/register", {
+      const response = await fetch("http://localhost:5000/api/v1/users/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
