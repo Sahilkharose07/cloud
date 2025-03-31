@@ -3,7 +3,7 @@ require('dotenv').config();
 
 const connectDB = async () => {
     try {
-        const uri = process.env.MONGODB_URI || "mongodb+srv://Eons:abcd1234@cluster0.4hb7y4t.mongodb.net/certificateDB";
+        const uri = process.env.MONGODB_URI || "mongodb+srv://admin:root123@sahil.a6tk6.mongodb.net/certificate";
         const options = {
             useNewUrlParser: true,
             useUnifiedTopology: true

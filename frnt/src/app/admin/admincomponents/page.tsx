@@ -10,6 +10,7 @@ import {
   Settings,
   FolderKanban,
   CircleUser,
+  ListEndIcon
   
 } from "lucide-react";
 
@@ -55,7 +56,7 @@ const data = {
         items: [
           {
             title: "Create user",
-            url: "admin-register",
+            url: "adminregister",
           },
           {
             title: "User details",
@@ -70,9 +71,25 @@ const data = {
       icon: File,
       items: [
         {
-          title: "Certificate",
+          title: "Admin Certificate",
           url: "addcategory",
         },
+        {
+          title: "Admin Service",
+          url: "adminservice",
+        },
+      ],
+    },
+    {
+      title: "Table",
+      url: "#",
+      icon: ListEndIcon,
+      items: [
+        {
+          title: "Admin Service Table",
+          url: "adminservicetable",
+        },
+        
       ],
     },
     {
@@ -82,7 +99,7 @@ const data = {
       items: [
         {
           title: "add model",
-          url: "add-model",
+          url: "addmodel",
         },
         
       ],

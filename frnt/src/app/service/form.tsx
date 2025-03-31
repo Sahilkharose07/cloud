@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 
 interface EngineerRemarks {
@@ -60,6 +60,60 @@ export default function GenerateService() {
     const [service, setService] = useState<ServiceResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [engineers, setEngineers] = useState<{ name: string; id: string }[]>([]);
+    const [selectedEngineer, setSelectedEngineer] = useState('');
+    const [selectedServiceEngineer, setSelectedServiceEngineer] = useState("");
+
+
+    const [serviceEngineerName, setServiceEngineerName] = useState("");
+    const [engineerName, setEngineerName] = useState("");
+
+
+    useEffect(() => {
+        const fetchEngineers = async () => {
+            try {
+                const response = await fetch("http://localhost:5000/api/v1/engineers/getEngineers");
+                const data = await response.json();
+                setEngineers(data);
+            } catch (error) {
+                console.error("Error fetching engineers:", error);
+            }
+        };
+        fetchEngineers();
+    }, []);
+
+    const handleserviceEngineerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const selectedId = e.target.value;
+        setSelectedServiceEngineer(selectedId);
+
+        const selectedEngineerObj = engineers.find(engineer => engineer.id === selectedId);
+        const selectedName = selectedEngineerObj ? selectedEngineerObj.name : '';
+
+        setServiceEngineerName(selectedName);
+
+        setFormData(prev => ({
+            ...prev,
+            serviceEngineer: selectedName
+        }));
+    };
+
+    const handleEngineerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const selectedId = e.target.value;
+        setSelectedEngineer(selectedId);
+
+        const selectedEngineerObj = engineers.find(engineer => engineer.id === selectedId);
+        const selectedName = selectedEngineerObj ? selectedEngineerObj.name : '';
+
+        setEngineerName(selectedName);
+
+        setFormData(prev => ({
+            ...prev,
+            engineerName: selectedName
+        }));
+    };
+
+
+
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -185,15 +239,13 @@ export default function GenerateService() {
                         className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
 
-                    <select
-                        name="serviceEngineer"
-                        value={formData.serviceEngineer}
-                        onChange={handleChange}
-                        className="p-2 border rounded"
-                    >
+                    <select value={selectedServiceEngineer} onChange={handleserviceEngineerChange} className="p-2 border rounded">
                         <option value="">Select Service Engineer</option>
-                        <option value="MR. Pintu Rathod">MR. Pintu Rathod</option>
-                        <option value="MR. Vivek">MR. Vivek</option>
+                        {engineers.map(engineer => (
+                            <option key={engineer.id} value={engineer.id}>
+                                {engineer.name}
+                            </option>
+                        ))}
                     </select>
                 </div>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -292,15 +344,13 @@ export default function GenerateService() {
                         onChange={handleChange}
                         className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <select
-                        name="engineerName"
-                        value={formData.engineerName}
-                        onChange={handleChange}
-                        className="p-2 border rounded"
-                    >
-                        <option value="">Select Engineer Name</option>
-                        <option value="MR. Pintu Rathod">MR. Pintu Rathod</option>
-                        <option value="MR. Vivek">MR. Vivek</option>
+                    <select value={selectedEngineer} onChange={handleEngineerChange} className="p-2 border rounded">
+                        <option value="">Select Engineer</option>
+                        {engineers.map(engineer => (
+                            <option key={engineer.id} value={engineer.id}>
+                                {engineer.name}
+                            </option>
+                        ))} 
                     </select>
                 </div>
                 <div className="flex flex-col gap-4">

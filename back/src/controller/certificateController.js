@@ -20,30 +20,29 @@ const getCertificate = async (req, res) => {
 }
 
 const getCertificatById = async (req, res) => {
-    const { id } = req.params;
-  
+    const { certificateId } = req.params;
     try {
-      const certificate = await Certificate.findById(id);
-  
-      if (!certificate) {
-        return res.status(404).json({
-          success: false,
-          message: "Task not found",
+        const certificate = await Certificate.findById(certificateId);
+        if (!certificate) {
+            return res.status(404).json({
+                success: false,
+                message: "Certificate not found"
+            });
+        }
+        res.status(200).json({
+            success: true,
+            data: certificate,
         });
-      }
-  
-      res.status(200).json({
-        success: true,
-        data: certificate,
-      });
     } catch (error) {
-      console.error("Error fetching Certificate:", error);
-      res.status(500).json({
-        success: false,
-        message: "Internal server error: " + error.message,
-      });
+        console.error("Error fetching Certificate:", error);
+        res.status(500).json({
+            success: false,
+            message: `Internal server error: ${error.message}`,
+        });
     }
-  };
+};
+
+
 
 const createCertificate = async (req, res) => {
     try {
@@ -194,11 +193,11 @@ const downloadCertificate = async (req, res) => {
 
 const updateCertificate = async (req, res) => {
     try {
-        const { id } = req.params;
+        const { certificateId } = req.params;
         const updateData = req.body;
         
         const certificate = await Certificate.findByIdAndUpdate(
-            id,
+            certificateId,
             updateData,
             { new: true }
         );
@@ -225,9 +224,9 @@ const updateCertificate = async (req, res) => {
 
 const deleteCertificate = async (req, res) => {
     try {
-        const { id } = req.params;
+        const { certificateId } = req.params;
         
-        const certificate = await Certificate.findByIdAndDelete(id);
+        const certificate = await Certificate.findByIdAndDelete(certificateId);
 
         if (!certificate) {
             return res.status(404).json({

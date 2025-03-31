@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 
 interface Observation {
@@ -31,22 +31,16 @@ interface CertificateResponse {
   downloadUrl: string;
 }
 
-const makeModelRanges: { [key: string]: string } = {
-  "GMIleakSurveyor": "0-1000ppm,0-100%LEL,0-100%vol",
-  "GMIGT41Series": "0-1000ppm,0-100%LEL,0-100%vol,0-25%vol",
-  "GMIGT44": "0-1000ppm,0-100%LEL,0-100%vol",
-  "GMIPS200": "0-100%LEL,0-100ppmH2S,0-1000ppmCO,0-25%v0l",
-  "GMIPS221": "0-100%LEL,0-25%vol",
-  "GS700": "0-100ppm,0-100%LEL,0-100%vol,0-25%vol,0-300ppm CO",
-  "HydrocarbonGasDetector": "0-100%LEL",
-  "OldhamVOC": "0-500ppm",
-  "OldhamitransCO": "0-300ppm",
-  "OldhamCl2GastronOtherMake": "0-20ppm",
-  "OldhamGastronOtherMakeAmmonia": "0-1000ppm",
-  "BlacklineSafetyG7c": "0-100%LEL,0-25%vol,0-100ppm VOC ",
-  "Uniphos235237EthyleMercaptanTBMmonitor": "0-20PPM,0-40ppm,0-200ppm",
-  "Uniphos299ppm": "0-10000ppm"
-};
+
+interface Model {
+  model_name: string;
+  range: string;
+}
+
+interface engineer {
+  id: string;
+  name: string;
+}
 
 export default function GenerateCertificate() {
   const [formData, setFormData] = useState<CertificateRequest>({
@@ -70,6 +64,45 @@ export default function GenerateCertificate() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [timePeriod, setTimePeriod] = useState<number | null>(null);
+  const [models, setModels] = useState<Model[]>([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(true);
+  const [engineers, setEngineers] = useState<engineer[]>([]);
+  const [isLoadingEngineers, setIsLoadingEngineers] = useState(true);
+  const [engineerError, setEngineerError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/v1/addcategory/getCategories');
+        const data = await response.json();
+        setModels(data);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+        setError("Failed to load models. Using default options.");
+      } finally {
+        setIsLoadingModels(false);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    const fetchEngineers = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/v1/engineers/getEngineers");
+        const data = await response.json();
+        setEngineers(data);
+      } catch (error) {
+        console.error("Error fetching engineers:", error);
+        setEngineerError("Failed to load engineers.");
+      } finally {
+        setIsLoadingEngineers(false);
+      }
+    };
+
+    fetchEngineers();
+  }, []);
+
 
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newStartDate = e.target.value;
@@ -122,16 +155,12 @@ export default function GenerateCertificate() {
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
 
-    const updatedValue = e.target.type === "date"
-      ? new Date(e.target.value).toISOString().split("T")[0]
-      : value;
-
     let updatedObservations = formData.observations;
     let updatedRange = formData.range;
 
     if (name === "makeModel") {
-      // Set the range based on the selected make/model
-      updatedRange = makeModelRanges[value] || "";
+      const selectedModel = models.find(m => m.model_name === value);
+      updatedRange = selectedModel ? selectedModel.range : "";
 
       switch (value) {
         case "GMIleakSurveyor":
@@ -143,55 +172,16 @@ export default function GenerateCertificate() {
         case "GMIGT44":
           updatedObservations = Array(3).fill({ gas: "", before: "", after: "" });
           break;
-        case "GMIPS200":
-          updatedObservations = Array(4).fill({ gas: "", before: "", after: "" });
-          break;
-        case "GMIPS221":
-          updatedObservations = Array(2).fill({ gas: "", before: "", after: "" });
-          break;
-        case "GS700":
-          updatedObservations = Array(5).fill({ gas: "", before: "", after: "" });
-          break;
-        case "HydrocarbonGasDetector":
-          updatedObservations = Array(1).fill({ gas: "", before: "", after: "" });
-          break;
-        case "OldhamVOC":
-          updatedObservations = Array(1).fill({ gas: "", before: "", after: "" });
-          break;
-        case "OldhamitransCO":
-          updatedObservations = Array(1).fill({ gas: "", before: "", after: "" });
-          break;
-        case "OldhamCl2GastronOtherMake":
-          updatedObservations = Array(1).fill({ gas: "", before: "", after: "" });
-          break;
-        case "OldhamGastronOtherMakeAmmonia":
-          updatedObservations = Array(1).fill({ gas: "", before: "", after: "" });
-          break;
-        case "BlacklineSafetyG7c":
-          updatedObservations = Array(3).fill({ gas: "", before: "", after: "" });
-          break;
-        case "Uniphos235237EthyleMercaptanTBMmonitor":
-          updatedObservations = Array(3).fill({ gas: "", before: "", after: "" });
-          break;
-        case "Uniphos299ppm":
-          updatedObservations = Array(1).fill({ gas: "", before: "", after: "" });
-          break;
         default:
           updatedObservations = [{ gas: "", before: "", after: "" }];
       }
-
-      setFormData(prev => ({
-        ...prev,
-        makeModel: value,
-        range: updatedRange,
-        observations: updatedObservations
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: updatedValue
-      }));
     }
+
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+      ...(name === "makeModel" && { range: updatedRange, observations: updatedObservations })
+    }));
   };
 
   const handleObservationChange = (index: number, field: keyof Observation, value: string) => {
@@ -290,30 +280,31 @@ export default function GenerateCertificate() {
           />
         </div>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-
           <select
             name="makeModel"
             value={formData.makeModel}
             onChange={handleChange}
             className="p-2 border rounded"
+            required
+            disabled={isLoadingModels}
           >
             <option value="">Select Make and Model</option>
-            <option value="GMIleakSurveyor">GMI leak Surveyor</option>
-            <option value="GMIGT41Series">GMI GT 41 Series</option>
-            <option value="GMIGT44">GMI GT 44</option>
-            <option value="GMIPS200">GMI PS200</option>
-            <option value="GMIPS221">GMI PS221</option>
-            <option value="GS700">GS700</option>
-            <option value="HydrocarbonGasDetector">Hydrocarbon gas detector</option>
-            <option value="OldhamVOC">Oldham VOC</option>
-            <option value="OldhamitransCO">Oldham itrans CO</option>
-            <option value="OldhamCl2GastronOtherMake">Oldham Cl2/Gastron/Other Make</option>
-            <option value="OldhamGastronOtherMakeAmmonia">Oldham/Gastron/Other make Ammonia</option>
-            <option value="BlacklineSafetyG7c">Blackline safety G7c</option>
-            <option value="Uniphos235237EthyleMercaptanTBMmonitor">Uniphos 235/237 Ethyle mercaptan/TBM monitor</option>
-            <option value="Uniphos299ppm">Uniphos 299ppm</option>
+            {isLoadingModels ? (
+              <option value="" disabled>Loading models...</option>
+            ) : models.length > 0 ? (
+              models.map((model) => (
+                <option key={model.model_name} value={model.model_name}>
+                  {model.model_name}
+                </option>
+              ))
+            ) : (
+              <>
+                <option value="GMIleakSurveyor">GMI leak Surveyor</option>
+                <option value="GMIGT41Series">GMI GT 41 Series</option>
+                <option value="GMIGT44">GMI GT 44</option>
+              </>
+            )}
           </select>
-
           <input
             type="text"
             name="range"
@@ -402,10 +393,21 @@ export default function GenerateCertificate() {
             value={formData.engineerName}
             onChange={handleChange}
             className="p-2 border rounded"
+            required
+            disabled={isLoadingEngineers}
           >
             <option value="">Select Engineer Name</option>
-            <option value="MR. Pintu Rathod">MR. Pintu Rathod</option>
-            <option value="MR. Vivek">MR. Vivek</option>
+            {isLoadingEngineers ? (
+              <option value="" disabled>Loading engineers...</option>
+            ) : engineerError ? (
+              <option value="" disabled>Error loading engineers</option>
+            ) : (
+              engineers.map((engineer) => (
+                <option key={engineer.id} value={engineer.name}>
+                  {engineer.name}
+                </option>
+              ))
+            )}
           </select>
         </div>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">

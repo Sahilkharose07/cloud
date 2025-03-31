@@ -30,12 +30,14 @@ export default function CertificatePage() {
                             <BreadcrumbList>
                                 <BreadcrumbItem className="hidden md:block">
                                     <BreadcrumbLink href="/certificate">
-                                        Documentation
+                                        Certificate
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
                                 <BreadcrumbItem>
-                                    <BreadcrumbPage>Certificate</BreadcrumbPage>
+                                    <BreadcrumbLink href="/certificateTable">
+                                        Certificate Table
+                                    </BreadcrumbLink>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>

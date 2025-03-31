@@ -219,8 +219,14 @@ export default function AddModel() {
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
                                 <BreadcrumbItem>
-                                    <BreadcrumbLink href="add-category">
-                                        <BreadcrumbPage>Certificate</BreadcrumbPage>
+                                    <BreadcrumbLink href="addcategory">
+                                        <BreadcrumbPage>Admin Certificate</BreadcrumbPage>
+                                    </BreadcrumbLink>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator className="hidden md:block" />
+                                <BreadcrumbItem>
+                                    <BreadcrumbLink href="adminservice">
+                                        <BreadcrumbPage>Admin Service</BreadcrumbPage>
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                             </BreadcrumbList>

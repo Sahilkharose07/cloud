@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 
@@ -45,12 +46,16 @@ interface Model {
     range: string;
 }
 
-interface engineer{
-    id:string;
+interface engineer {
+    id: string;
     name: string;
 }
 
 export default function AddCategory() {
+
+    const searchParams = useSearchParams();
+    const certificateId = searchParams.get('id');
+
     const [formData, setFormData] = useState<CertificateRequest>({
         certificateNo: "",
         customerName: "",
@@ -110,6 +115,46 @@ export default function AddCategory() {
 
         fetchEngineers();
     }, []);
+
+    useEffect(() => {
+        if (!certificateId) return;  // No need to fetch if adding new
+
+        const fetchCertificateData = async () => {
+            try {
+                setLoading(true);
+                const response = await axios.get(
+                    `http://localhost:5000/api/v1/certificates/getCertificateByid/${certificateId}`,
+                    { headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` } }
+                );
+
+                const apiData = response.data;
+
+                // Map API response to form structure
+                const transformedData = {
+                    customer: { customerName: apiData.customer?.customerName || "" },
+                    siteLocation: apiData.siteLocation || "",
+                    makeModel: apiData.makeModel || "",
+                    range: apiData.range || "",
+                    serialNo: apiData.serialNo || "",
+                    calibrationGas: apiData.calibrationGas || "",
+                    gasCanisterDetails: apiData.gasCanisterDetails || "",
+                    dateOfCalibration: apiData.dateOfCalibration?.split('T')[0] || new Date().toISOString().split('T')[0],
+                    calibrationDueDate: apiData.calibrationDueDate?.split('T')[0] || new Date().toISOString().split('T')[0],
+                    observations: apiData.observations || [{ gas: "", before: "", after: "" }],
+                    engineerName: apiData.engineerName || ""
+                };
+
+                setFormData(transformedData); 
+            } catch (error) {
+                console.error("Error fetching certificate data:", error);
+                setError("Failed to load certificate data.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchCertificateData();
+    }, [certificateId]);
 
     const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newStartDate = e.target.value;
@@ -257,14 +302,18 @@ export default function AddCategory() {
                         <Breadcrumb>
                             <BreadcrumbList>
                                 <BreadcrumbItem className="hidden md:block">
-                                    <BreadcrumbLink href="u">
-                                        User Details
+                                    <BreadcrumbLink href="addmodel">model</BreadcrumbLink>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator className="hidden md:block" />
+                                <BreadcrumbItem>
+                                    <BreadcrumbLink href="adminservice">
+                                        <BreadcrumbPage>Admin Services</BreadcrumbPage>
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
                                 <BreadcrumbItem>
-                                    <BreadcrumbLink href="admin-register">
-                                        <BreadcrumbPage>User Register</BreadcrumbPage>
+                                    <BreadcrumbLink href="addcategory">
+                                        <BreadcrumbPage>Admin Certificate</BreadcrumbPage>
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
@@ -272,11 +321,11 @@ export default function AddCategory() {
                     </div>
                 </header>
                 <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15">
-                    <Card className="max-w-2xl mx-auto">
+                    <Card className="max-w-6xl mx-auto">
                         <CardHeader>
-                            <CardTitle className="text-3xl font-bold text-center">Certificate</CardTitle>
+                            <CardTitle className="text-3xl font-bold text-center">Admin Certificate</CardTitle>
                             <CardDescription className="text-center">
-                                Please fill out the form below to generate a new User.
+                                Please fill out the form below to generate a new Certificate.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -526,7 +575,7 @@ export default function AddCategory() {
                                 <div className="mt-4 text-center">
                                     <p className="text-green-600 mb-2">{certificate.message}</p>
                                     <Button
-                                        className="w-full"
+                                        className="w-5 h-10 text-sm"
                                         onClick={handleDownload}
                                         disabled={loading}
                                     >

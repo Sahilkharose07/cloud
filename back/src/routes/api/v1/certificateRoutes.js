@@ -22,7 +22,7 @@ router.get(
 );
 
 router.get(
-    "/getCertificateByid/:id", 
+    "/getCertificateByid/:certificateId", 
     CertificateController.getCertificatById
 );
 
@@ -32,12 +32,12 @@ router.get(
 );
 
 router.put(
-    "/updateCertificate/:id", 
+    "/updateCertificate/:certificateId", 
     CertificateController.updateCertificate
 );
 
 router.delete(
-    "/deleteCertificate/:id", 
+    "/deleteCertificate/:certificateId", 
     CertificateController.deleteCertificate
 );
 
