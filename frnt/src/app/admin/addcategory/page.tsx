@@ -1,18 +1,14 @@
 "use client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import {
-    SidebarInset,
-    SidebarProvider,
-    SidebarTrigger,
-} from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/app/admin/admincomponents/page";
 import { Separator } from "@/components/ui/separator";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
+
 
 interface Observation {
     gas: string;
@@ -29,8 +25,8 @@ interface CertificateRequest {
     serialNo: string;
     calibrationGas: string;
     gasCanisterDetails: string;
-    dateOfCalibration: Date | string;
-    calibrationDueDate: Date | string;
+    dateOfCalibration: string;
+    calibrationDueDate: string;
     observations: Observation[];
     engineerName: string;
 }
@@ -46,13 +42,12 @@ interface Model {
     range: string;
 }
 
-interface engineer {
+interface Engineer {
     id: string;
     name: string;
 }
 
 export default function AddCategory() {
-
     const searchParams = useSearchParams();
     const certificateId = searchParams.get('id');
 
@@ -70,6 +65,7 @@ export default function AddCategory() {
         observations: [{ gas: "", before: "", after: "" }],
         engineerName: ""
     });
+
     const [certificate, setCertificate] = useState<CertificateResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -78,11 +74,11 @@ export default function AddCategory() {
     const [timePeriod, setTimePeriod] = useState<number | null>(null);
     const [models, setModels] = useState<Model[]>([]);
     const [isLoadingModels, setIsLoadingModels] = useState(true);
-    const [engineers, setEngineers] = useState<engineer[]>([]);
+    const [engineers, setEngineers] = useState<Engineer[]>([]);
     const [isLoadingEngineers, setIsLoadingEngineers] = useState(true);
     const [engineerError, setEngineerError] = useState<string | null>(null);
 
-
+    // Fetch models and engineers
     useEffect(() => {
         const fetchCategories = async () => {
             try {
@@ -96,10 +92,7 @@ export default function AddCategory() {
                 setIsLoadingModels(false);
             }
         };
-        fetchCategories();
-    }, []);
 
-    useEffect(() => {
         const fetchEngineers = async () => {
             try {
                 const response = await fetch("http://localhost:5000/api/v1/engineers/getEngineers");
@@ -113,49 +106,93 @@ export default function AddCategory() {
             }
         };
 
+        fetchCategories();
         fetchEngineers();
     }, []);
 
+    // Fetch certificate data when editing
     useEffect(() => {
-        if (!certificateId) return;  // No need to fetch if adding new
-
         const fetchCertificateData = async () => {
+            // Initialize with today's date for new certificate
+            const today = new Date().toISOString().split('T')[0];
+            const initialData = {
+                certificateNo: "",
+                customerName: "",
+                siteLocation: "",
+                makeModel: "",
+                range: "",
+                serialNo: "",
+                calibrationGas: "",
+                gasCanisterDetails: "",
+                dateOfCalibration: today,
+                calibrationDueDate: today,
+                observations: [{ gas: "", before: "", after: "" }],
+                engineerName: ""
+            };
+    
+            if (!certificateId) {
+                setFormData(initialData);
+                setStartDate(today);
+                setEndDate(today);
+                return;
+            }
+    
             try {
                 setLoading(true);
+                setError(null);
+    
                 const response = await axios.get(
-                    `http://localhost:5000/api/v1/certificates/getCertificateByid/${certificateId}`,
-                    { headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` } }
+                    `http://localhost:5000/api/v1/certificates/getCertificateByid/${certificateId}`
                 );
-
-                const apiData = response.data;
-
-                // Map API response to form structure
+    
+                if (!response.data) {
+                    throw new Error("No data received from server");
+                }
+    
+                const certificateData = response.data;
+    
+                // Transform API data to match form structure
                 const transformedData = {
-                    customer: { customerName: apiData.customer?.customerName || "" },
-                    siteLocation: apiData.siteLocation || "",
-                    makeModel: apiData.makeModel || "",
-                    range: apiData.range || "",
-                    serialNo: apiData.serialNo || "",
-                    calibrationGas: apiData.calibrationGas || "",
-                    gasCanisterDetails: apiData.gasCanisterDetails || "",
-                    dateOfCalibration: apiData.dateOfCalibration?.split('T')[0] || new Date().toISOString().split('T')[0],
-                    calibrationDueDate: apiData.calibrationDueDate?.split('T')[0] || new Date().toISOString().split('T')[0],
-                    observations: apiData.observations || [{ gas: "", before: "", after: "" }],
-                    engineerName: apiData.engineerName || ""
+                    certificateNo: certificateData.certificateNo || "",
+                    customerName: certificateData.customer?.customerName || 
+                                certificateData.customerName || "",
+                    siteLocation: certificateData.siteLocation || "",
+                    makeModel: certificateData.makeModel || "",
+                    range: certificateData.range || "",
+                    serialNo: certificateData.serialNo || "",
+                    calibrationGas: certificateData.calibrationGas || "",
+                    gasCanisterDetails: certificateData.gasCanisterDetails || "",
+                    dateOfCalibration: certificateData.dateOfCalibration?.split('T')[0] || today,
+                    calibrationDueDate: certificateData.calibrationDueDate?.split('T')[0] || today,
+                    observations: certificateData.observations?.map((obs: any) => ({
+                        gas: obs.gas || "",
+                        before: obs.before || "",
+                        after: obs.after || ""
+                    })) || [{ gas: "", before: "", after: "" }],
+                    engineerName: certificateData.engineerName || ""
                 };
-
-                setFormData(transformedData); 
+    
+                setFormData(transformedData);
+                setStartDate(transformedData.dateOfCalibration);
+                setEndDate(transformedData.calibrationDueDate);
+    
             } catch (error) {
                 console.error("Error fetching certificate data:", error);
-                setError("Failed to load certificate data.");
+                setError("Failed to load certificate data");
+                
+                // Set default data on error
+                setFormData(initialData);
+                setStartDate(today);
+                setEndDate(today);
             } finally {
                 setLoading(false);
             }
         };
-
+    
         fetchCertificateData();
     }, [certificateId]);
 
+    // Date handling functions
     const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newStartDate = e.target.value;
         setStartDate(newStartDate);
@@ -192,6 +229,7 @@ export default function AddCategory() {
         }
     };
 
+    // Form field handlers
     const handleChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
 
@@ -245,37 +283,64 @@ export default function AddCategory() {
         setFormData({ ...formData, observations: updatedObservations });
     };
 
+    // Form submission
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
         try {
-            const submissionData = {
-                ...formData,
-                dateOfCalibration: startDate,
-                calibrationDueDate: endDate
-            };
+            const url = certificateId
+                ? `http://localhost:5000/api/v1/certificates/updateCertificate/${certificateId}`
+                : "http://localhost:5000/api/v1/certificates/generateCertificate";
 
-            const response = await axios.post(
-                "http://localhost:5000/api/v1/certificates/generateCertificate",
-                submissionData
+            const method = certificateId ? 'put' : 'post';
+
+            const response = await axios[method](
+                url,
+                {
+                    ...formData,
+                    dateOfCalibration: startDate,
+                    calibrationDueDate: endDate
+                },
+                { headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` } }
             );
+
             setCertificate(response.data);
+
+            toast({
+                title: "Success",
+                description: certificateId
+                    ? "Certificate updated successfully!"
+                    : "Certificate created successfully!",
+                variant: "default",
+            });
+
         } catch (err: any) {
-            setError(err.response?.data?.error || "Failed to generate certificate. Please try again.");
+            console.error("Submission error:", err);
+            setError(err.response?.data?.error ||
+                (certificateId ? "Failed to update certificate" : "Failed to generate certificate"));
+            toast({
+                title: "Error",
+                description: err.response?.data?.error || "An error occurred",
+                variant: "destructive",
+            });
         } finally {
             setLoading(false);
         }
     };
 
+    // PDF download handler
     const handleDownload = async () => {
         if (!certificate?.downloadUrl) return;
 
         try {
             const response = await axios.get(
                 `http://localhost:5000${certificate.downloadUrl}`,
-                { responseType: 'blob' }
+                {
+                    responseType: 'blob',
+                    headers: { "Authorization": `Bearer ${localStorage.getItem("token")}` }
+                }
             );
 
             const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -287,9 +352,25 @@ export default function AddCategory() {
             link.remove();
             window.URL.revokeObjectURL(url);
         } catch (err) {
+            console.error("Download error:", err);
             setError("Failed to download certificate. Please try again.");
+            toast({
+                title: "Error",
+                description: "Failed to download certificate",
+                variant: "destructive",
+            });
         }
     };
+
+    // Loading state
+    if (loading && certificateId) {
+        return (
+            <div className="flex justify-center items-center h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
+                <span className="ml-4">Loading certificate data...</span>
+            </div>
+        );
+    }
 
     return (
         <SidebarProvider>
@@ -316,6 +397,11 @@ export default function AddCategory() {
                                         <BreadcrumbPage>Admin Certificate</BreadcrumbPage>
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
+                                <BreadcrumbItem>
+                                    <BreadcrumbLink href="admincertificatetable">
+                                        Admin Certificate Table
+                                    </BreadcrumbLink>
+                                </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>
                     </div>
@@ -323,9 +409,13 @@ export default function AddCategory() {
                 <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15">
                     <Card className="max-w-6xl mx-auto">
                         <CardHeader>
-                            <CardTitle className="text-3xl font-bold text-center">Admin Certificate</CardTitle>
+                            <CardTitle className="text-3xl font-bold text-center">
+                                {certificateId ? "Edit Certificate" : "Create New Certificate"}
+                            </CardTitle>
                             <CardDescription className="text-center">
-                                Please fill out the form below to generate a new Certificate.
+                                {certificateId
+                                    ? "Modify the certificate details below"
+                                    : "Fill out the form below to generate a new Certificate"}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -463,17 +553,18 @@ export default function AddCategory() {
                                     >
                                         <option value="">Select Engineer Name</option>
                                         {isLoadingEngineers ? (
-                                            <option value="" disabled>Loading engineers...</option>
+                                            <option>Loading engineers...</option>
                                         ) : engineerError ? (
-                                            <option value="" disabled>Error loading engineers</option>
+                                            <option>Error loading engineers</option>
                                         ) : (
-                                            engineers.map((engineer) => (
-                                                <option key={engineer.id} value={engineer.name}>
+                                            engineers.map((engineer, index) => (
+                                                <option key={engineer.id || index} value={engineer.name}>
                                                     {engineer.name}
                                                 </option>
                                             ))
                                         )}
                                     </select>
+
 
                                 </div>
 
@@ -569,7 +660,7 @@ export default function AddCategory() {
                                 </button>
                             </form>
 
-                            {error && <p className="text-red-500 mt-4">{error}</p>}
+                            {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
 
                             {certificate && (
                                 <div className="mt-4 text-center">
@@ -588,5 +679,5 @@ export default function AddCategory() {
                 </div>
             </SidebarInset>
         </SidebarProvider>
-    )
+    );
 }

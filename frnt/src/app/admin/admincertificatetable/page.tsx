@@ -125,12 +125,10 @@ export default function CertificateTable() {
                 throw new Error('Invalid response format');
             }
 
-            // Ensure certificatesData is an array
             if (!Array.isArray(certificatesData)) {
                 certificatesData = [];
             }
 
-            // Map the data with safe key generation
             const certificatesWithKeys = certificatesData.map((certificate: Certificate) => ({
                 ...certificate,
                 key: certificate._id || generateUniqueId()
@@ -179,9 +177,7 @@ export default function CertificateTable() {
         }
     };
 
-    const handleEdit = (admincertificate: Certificate) => {
-        router.push(`addcategory?certificateId=${admincertificate._id}`);
-    };
+
 
 
     const [filterValue, setFilterValue] = useState("");
@@ -229,6 +225,12 @@ export default function CertificateTable() {
     const [selectedCertificate, setSelectedCertificate] = useState<Certificate | null>(null);
 
     const [isSubmitting, setIsSubmitting] = useState(false)
+
+    const handleEdit = (admincertificate: Certificate) => {
+        router.push(`addcategory?certificateId=${admincertificate._id}`);
+    };
+
+
 
     const handleDownload = async (certificateId: string) => {
         try {
@@ -459,11 +461,11 @@ export default function CertificateTable() {
 
 
                     <Tooltip>
-                        <span
+                    <span
                             className="text-lg text-info cursor-pointer active:opacity-50"
                             onClick={(e) => {
                                 e.preventDefault();
-                                router.push(`admin/addcategory?id=${certificate._id}`); 
+                                router.push(`addcategory?id=${certificate._id}`); 
                             }}
                         >
                             <Edit2Icon className="h-6 w-6" />
@@ -512,11 +514,22 @@ export default function CertificateTable() {
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
+
                                 <BreadcrumbItem>
-                                    <BreadcrumbPage>Admin Certificate</BreadcrumbPage>
+                                    <BreadcrumbLink href="addcategory">
+                                        Admin Certificate
+                                    </BreadcrumbLink>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator className="hidden md:block" />
+
+                                <BreadcrumbItem>
+                                    <BreadcrumbLink href="admincertificatetable">
+                                        Admin Certificate Table
+                                    </BreadcrumbLink>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>
+
                     </div>
                 </header>
                 <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15">

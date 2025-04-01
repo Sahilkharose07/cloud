@@ -47,8 +47,8 @@ export function TeamSwitcher({
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground overflow-hidden">
-                <Image 
-                  src={activeTeam.logoUrl}
+                <Image
+                  src={activeTeam.logoUrl || "/img/default-logo.png"} // Use a default image if logoUrl is empty
                   alt={`${activeTeam.name} logo`}
                   width={48}
                   height={48}
@@ -57,6 +57,7 @@ export function TeamSwitcher({
                   quality={100}
                   unoptimized
                 />
+
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">
@@ -83,7 +84,7 @@ export function TeamSwitcher({
                 className="gap-2 p-2"
               >
                 <div className="flex size-6 items-center justify-center rounded-sm border overflow-hidden">
-                  <Image 
+                  <Image
                     src={team.logoUrl}
                     alt={`${team.name} logo`}
                     width={32}
