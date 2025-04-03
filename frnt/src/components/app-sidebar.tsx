@@ -12,8 +12,8 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail } fr
 
 const data = {
   user: {
-    name: "Admin",
-    email: "admin@admin.com",
+    name: "User",
+    email: "",
     avatar: "",
   },
   teams: [

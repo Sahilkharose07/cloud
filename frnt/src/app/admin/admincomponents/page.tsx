@@ -9,10 +9,11 @@ import {
   Settings,
   CircleUser,
   ListEndIcon,
+  InfoIcon
 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
-import { NavUser } from "@/components/nav-user";
+import { NavUser } from "@/app/admin/adminComponents/nav-admin";
 import { TeamSwitcher } from "@/components/team-switcher";
 import {
   Sidebar,
@@ -25,7 +26,7 @@ import {
 const data = {
   user: {
     name: "Admin",
-    email: "admin@admin.com",
+    email: "",
     avatar: "",
   },
   teams: [
@@ -46,6 +47,22 @@ const data = {
     },
   ],
   navMain: [
+    {
+      title: "Company Info",
+      url: "#",
+      icon: InfoIcon,
+      
+      items: [
+        {
+          title: "Company details",
+          url: "admincompany",
+        },
+        {
+          title: "Contact person",
+          url: "admincustomer",
+        },
+      ],
+    },
     {
       title: "Users",
       url: "#",

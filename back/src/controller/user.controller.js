@@ -153,35 +153,33 @@ const updateUser = async (req, res) => {
 const login = async (req, res) => {
   const { email, password } = req.body;
 
-  console.log('Login attempt with email:', email); // Log email for debugging
+  console.log('Login attempt with email:', email); 
 
   // Validate input
   if (!email || !password) {
     return res.status(400).json({ message: 'Email and password are required' });
   }
 
-  const JWT_SECRET = process.env.JWT_SECRET || "randome#certificate"; // Use environment variable for security
+  const JWT_SECRET = process.env.JWT_SECRET || "randome#certificate"; 
 
   if (loggedInUsersCount >= MAX_LOGINS) {
     return res.status(403).json({ message: 'You have reached the login limit. Try again later.' });
   }
 
   try {
-    // Ensure email is in lowercase to handle case sensitivity issues
+    
     const normalizedEmail = email.toLowerCase();
 
     const user = await Users.findOne({ email: normalizedEmail });
 
-    // Check if user exists
     if (!user) {
-      console.log('User not found with email:', normalizedEmail); // Debugging log
+      console.log('User not found with email:', normalizedEmail); 
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Compare password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      console.log('Invalid password for user:', normalizedEmail); // Debugging log
+      console.log('Invalid password for user:', normalizedEmail); 
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
@@ -189,17 +187,29 @@ const login = async (req, res) => {
     const accessToken = jwt.sign({ userId: user._id }, JWT_SECRET); 
     const refreshToken = jwt.sign({ userId: user._id }, JWT_SECRET); 
 
+    // Store the refresh token in the user record
     user.refreshToken = refreshToken;
     await user.save();
 
     loggedInUsersCount++;
 
-    res.json({ accessToken, refreshToken });
+    // Send the accessToken and refreshToken to the frontend
+    res.json({
+      accessToken,
+      refreshToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        contact: user.contact
+      }
+    });
   } catch (error) {
     console.error('Error during login:', error);
     res.status(500).json({ error: 'Error during login. Please try again.' });
   }
 };
+
 
 
 

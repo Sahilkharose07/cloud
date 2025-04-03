@@ -1,5 +1,5 @@
 "use client";
-import { AppSidebar } from "@/app/admin/admincomponents/page";
+import { AppSidebar } from "@/app/admin/adminComponents/page";
 import { ModeToggle } from "@/components/ModeToggle";
 import {
   Breadcrumb,
