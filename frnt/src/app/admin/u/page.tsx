@@ -37,7 +37,6 @@ import {
   Selection,
   ChipProps,
   SortDescriptor,
-  user,
 } from "@heroui/react";
 
 interface User {
@@ -46,6 +45,8 @@ interface User {
   email: string;
   contact: number;
   password: string;
+  role: string;
+  status: string;
 }
 
 export type IconSvgProps = SVGProps<SVGSVGElement> & {
@@ -55,8 +56,6 @@ export type IconSvgProps = SVGProps<SVGSVGElement> & {
 export function capitalize(s: string) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "";
 }
-
-
 
 export const VerticalDotsIcon = ({ size = 24, width, height, ...props }: IconSvgProps) => {
   return (
@@ -137,12 +136,14 @@ export const columns = [
   { name: "NAME", uid: "name", sortable: true },
   { name: "EMAIL", uid: "email", sortable: true },
   { name: "CONTACT", uid: "contact", sortable: true },
+  { name: "ROLE", uid: "role", sortable: true },
+  { name: "STATUS", uid: "status", sortable: true },
   { name: "ACTIONS", uid: "actions" },
 ];
 
-const INITIAL_VISIBLE_COLUMNS = ["name", "email", "contact", "actions"];
+const INITIAL_VISIBLE_COLUMNS = ["name", "email", "role", "status", "actions"];
 
-export default function Page() {
+export default function UserTable() {
   const [users, setUsers] = useState<User[]>([]);
   const [filterValue, setFilterValue] = useState("");
   const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set([]));
@@ -184,8 +185,10 @@ export default function Page() {
       console.error("Failed to delete user due to error: ", error);
     }
   };
-  
 
+  const handleEdit = (userId: string) => {
+    router.push(`/admin/edit-user?id=${userId}`);
+  };
 
   const hasSearchFilter = Boolean(filterValue);
 
@@ -200,9 +203,9 @@ export default function Page() {
     if (hasSearchFilter) {
       filteredUsers = filteredUsers.filter((user) => {
         const searchableFields = {
-          companyName: user.name,
-          customerName: user.email,
-          emailAddress: user.password,
+          name: user.name,
+          email: user.email,
+          role: user.role,
         };
 
         return Object.values(searchableFields).some(value =>
@@ -238,17 +241,24 @@ export default function Page() {
 
     switch (columnKey) {
       case "name":
-
+        return (
+          <User
+            avatarProps={{ radius: "lg", src: "" }}
+            description={user.email}
+            name={cellValue}
+          >
+            {user.email}
+          </User>
+        );
       case "role":
         return (
           <div className="flex flex-col">
             <p className="text-bold text-small capitalize">{cellValue}</p>
-
           </div>
         );
       case "status":
         return (
-          <Chip className="capitalize" color="success" size="sm" variant="flat">
+          <Chip className="capitalize" color={user.status === "active" ? "success" : "danger"} size="sm" variant="flat">
             {cellValue}
           </Chip>
         );
@@ -262,9 +272,8 @@ export default function Page() {
                 </Button>
               </DropdownTrigger>
               <DropdownMenu>
-                
-
-                <DropdownItem key="delete" className="text-black bg-white" onClick={() => handleDelete(user._id)}>
+                <DropdownItem onClick={() => handleEdit(user._id)}>Edit</DropdownItem>
+                <DropdownItem onClick={() => handleDelete(user._id)} className="text-danger">
                   Delete
                 </DropdownItem>
               </DropdownMenu>
@@ -321,7 +330,6 @@ export default function Page() {
             onValueChange={onSearchChange}
           />
           <div className="flex gap-3">
-
             <Dropdown>
               <DropdownTrigger className="hidden sm:flex">
                 <Button endContent={<ChevronDownIcon className="text-small" />}>
@@ -334,33 +342,26 @@ export default function Page() {
                 closeOnSelect={false}
                 selectedKeys={visibleColumns}
                 selectionMode="multiple"
-                onSelectionChange={(keys) => {
-                  const newKeys = new Set<string>(Array.from(keys as Iterable<string>));
-                  setVisibleColumns(newKeys);
-                }}
-                style={{ backgroundColor: "#f0f0f0", color: "#000000" }}  // Set background and font color
+                onSelectionChange={setVisibleColumns}
               >
                 {columns.map((column) => (
-                  <DropdownItem key={column.uid} className="capitalize" style={{ color: "#000000" }}>
+                  <DropdownItem key={column.uid} className="capitalize">
                     {column.name}
                   </DropdownItem>
                 ))}
               </DropdownMenu>
             </Dropdown>
-
-            <Button color="primary" onClick={() => router.push("./admin-register")}>
+            <Button color="primary" onClick={() => router.push("/admin/add-user")}>
               Add New
-
             </Button>
           </div>
         </div>
-
         <div className="flex justify-between items-center">
-          <span className="text-default-400 text-small">Total {user.length} leads</span>
+          <span className="text-default-400 text-small">Total {users.length} users</span>
           <label className="flex items-center text-default-400 text-small">
             Rows per page:
             <select
-              className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small"
+              className="bg-transparent outline-none text-default-400 text-small"
               onChange={onRowsPerPageChange}
             >
               <option value="5">5</option>
@@ -369,10 +370,9 @@ export default function Page() {
             </select>
           </label>
         </div>
-
       </div>
     );
-  }, [filterValue, onSearchChange, onClear]);
+  }, [filterValue, onSearchChange, onClear, users.length, onRowsPerPageChange]);
 
   const bottomContent = React.useMemo(() => {
     return (
@@ -382,7 +382,6 @@ export default function Page() {
             ? "All items selected"
             : `${selectedKeys.size} of ${filteredItems.length} selected`}
         </span>
-
         <Pagination
           isCompact
           showControls
@@ -392,13 +391,11 @@ export default function Page() {
           total={pages}
           onChange={setPage}
         />
-
         <div className="hidden sm:flex w-[30%] justify-end gap-2">
           <Button
             isDisabled={pages === 1}
             size="sm"
             variant="flat"
-            className="bg-primary text-primary-foreground hover:bg-primary-dark"
             onPress={onPreviousPage}
           >
             Previous
@@ -407,7 +404,6 @@ export default function Page() {
             isDisabled={pages === 1}
             size="sm"
             variant="flat"
-            className="bg-primary text-primary-foreground hover:bg-primary-dark"
             onPress={onNextPage}
           >
             Next
@@ -415,7 +411,7 @@ export default function Page() {
         </div>
       </div>
     );
-  }, [selectedKeys, items.length, page, pages]);
+  }, [selectedKeys, items.length, page, pages, onPreviousPage, onNextPage]);
 
   return (
     <SidebarProvider>
@@ -429,13 +425,11 @@ export default function Page() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="u">User Details</BreadcrumbLink>
+                  <BreadcrumbLink href="/admin">Dashboard</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="admin-register">
-                    <BreadcrumbPage>User Register</BreadcrumbPage>
-                  </BreadcrumbLink>
+                  <BreadcrumbPage>User Management</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
@@ -445,7 +439,7 @@ export default function Page() {
           <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min">
             <Table
               isHeaderSticky
-              aria-label="Example table with custom cells, pagination and sorting"
+              aria-label="User management table"
               bottomContent={bottomContent}
               bottomContentPlacement="outside"
               classNames={{

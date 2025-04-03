@@ -36,8 +36,6 @@ interface ServiceResponse {
     downloadUrl: string;
 }
 
-
-
 export default function GenerateService() {
     const [formData, setFormData] = useState<ServiceRequest>({
         customerName: "",
@@ -47,7 +45,7 @@ export default function GenerateService() {
         serviceEngineer: "",
         date: new Date().toISOString().split('T')[0],
         place: "",
-        placeOptions: "At Site", // Default value
+        placeOptions: "At Site",
         natureOfJob: "AMC",
         reportNo: "",
         makeModelNumberoftheInstrumentQuantity: "",
@@ -61,20 +59,14 @@ export default function GenerateService() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [engineers, setEngineers] = useState<{ name: string; id: string }[]>([]);
-    const [selectedEngineer, setSelectedEngineer] = useState('');
     const [selectedServiceEngineer, setSelectedServiceEngineer] = useState("");
-
-
-    const [serviceEngineerName, setServiceEngineerName] = useState("");
-    const [engineerName, setEngineerName] = useState("");
-
+    const [selectedEngineer, setSelectedEngineer] = useState("");
 
     useEffect(() => {
         const fetchEngineers = async () => {
             try {
-                const response = await fetch("http://localhost:5000/api/v1/engineers/getEngineers");
-                const data = await response.json();
-                setEngineers(data);
+                const response = await axios.get("http://localhost:5000/api/v1/engineers/getEngineers");
+                setEngineers(response.data);
             } catch (error) {
                 console.error("Error fetching engineers:", error);
             }
@@ -82,38 +74,27 @@ export default function GenerateService() {
         fetchEngineers();
     }, []);
 
-    const handleserviceEngineerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const handleServiceEngineerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const selectedId = e.target.value;
         setSelectedServiceEngineer(selectedId);
 
-        const selectedEngineerObj = engineers.find(engineer => engineer.id === selectedId);
-        const selectedName = selectedEngineerObj ? selectedEngineerObj.name : '';
-
-        setServiceEngineerName(selectedName);
-
+        const selectedEngineer = engineers.find(eng => eng.id === selectedId);
         setFormData(prev => ({
             ...prev,
-            serviceEngineer: selectedName
+            serviceEngineer: selectedEngineer?.name || ""
         }));
     };
 
     const handleEngineerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const selectedId = e.target.value;
         setSelectedEngineer(selectedId);
-
         const selectedEngineerObj = engineers.find(engineer => engineer.id === selectedId);
         const selectedName = selectedEngineerObj ? selectedEngineerObj.name : '';
-
-        setEngineerName(selectedName);
-
         setFormData(prev => ({
             ...prev,
             engineerName: selectedName
         }));
     };
-
-
-
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -123,10 +104,10 @@ export default function GenerateService() {
         }));
     };
 
-    const handleengineerRemarksChange = (index: number, field: keyof EngineerRemarks, value: string) => {
-        const updatedengineerRemarks = [...formData.engineerRemarks];
-        updatedengineerRemarks[index] = { ...updatedengineerRemarks[index], [field]: value };
-        setFormData({ ...formData, engineerRemarks: updatedengineerRemarks });
+    const handleEngineerRemarksChange = (index: number, field: keyof EngineerRemarks, value: string) => {
+        const updatedEngineerRemarks = [...formData.engineerRemarks];
+        updatedEngineerRemarks[index] = { ...updatedEngineerRemarks[index], [field]: value };
+        setFormData({ ...formData, engineerRemarks: updatedEngineerRemarks });
     };
 
     const addEngineerRemark = () => {
@@ -144,19 +125,62 @@ export default function GenerateService() {
         setFormData({ ...formData, engineerRemarks: updatedEngineerRemarks });
     };
 
+    const validateForm = () => {
+        const requiredFields = [
+            'customerName', 'customerLocation', 'contactPerson',
+            'contactNumber', 'serviceEngineer', 'date', 'place',
+            'placeOptions', 'natureOfJob', 'reportNo', 'engineerName', 'status'
+        ];
+
+        for (const field of requiredFields) {
+            if (!formData[field as keyof ServiceRequest]?.toString().trim()) {
+                return `Please fill in the ${field.replace(/([A-Z])/g, ' $1').toLowerCase()} field.`;
+            }
+        }
+
+        if (formData.engineerRemarks.length === 0) {
+            return "At least one engineer remark is required.";
+        }
+
+        if (!selectedServiceEngineer || !formData.serviceEngineer.trim()) {
+            return "Please select a service engineer";
+        }
+
+        for (const remark of formData.engineerRemarks) {
+            if (!remark.serviceSpares.trim() || !remark.partNo.trim() ||
+                !remark.rate.trim() || !remark.quantity.trim() || !remark.poNo.trim()) {
+                return "All fields in engineer remarks must be filled.";
+            }
+        }
+
+        return null;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        const validationError = validateForm();
+        if (validationError) {
+            setError(validationError);
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
         try {
             const response = await axios.post(
-                "http://localhost:5000/api/v1/services/generateService",
-                formData
+                `http://localhost:5000/api/v1/services/generateService`,
+                formData,
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
             );
             setService(response.data);
         } catch (err: any) {
             setError(err.response?.data?.error || "Failed to generate service. Please try again.");
+            console.error("API Error:", err.response?.data);
         } finally {
             setLoading(false);
         }
@@ -180,13 +204,20 @@ export default function GenerateService() {
             link.remove();
             window.URL.revokeObjectURL(url);
         } catch (err) {
-            setError("Failed to download certificate. Please try again.");
+            setError("Failed to download service. Please try again.");
         }
     };
 
     return (
-        <div>
-            {/* <h1 className="text-2xl font-bold mb-4">Generate Your Certificate</h1> */}
+        <div className="container mx-auto p-4">
+            <h1 className="text-2xl font-bold mb-6">Generate Service Report</h1>
+
+            {error && (
+                <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                    <p>{error}</p>
+                </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <input
@@ -239,10 +270,17 @@ export default function GenerateService() {
                         className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
 
-                    <select value={selectedServiceEngineer} onChange={handleserviceEngineerChange} className="p-2 border rounded">
+                    <select
+                        value={selectedServiceEngineer}
+                        onChange={handleServiceEngineerChange}
+                        className="p-2 border rounded"
+                    >
                         <option value="">Select Service Engineer</option>
                         {engineers.map(engineer => (
-                            <option key={engineer.id} value={engineer.id}>
+                            <option
+                                key={`service-engineer-${engineer.id}`}  // Fixed: Added unique key prefix
+                                value={engineer.id}
+                            >
                                 {engineer.name}
                             </option>
                         ))}
@@ -344,13 +382,20 @@ export default function GenerateService() {
                         onChange={handleChange}
                         className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    <select value={selectedEngineer} onChange={handleEngineerChange} className="p-2 border rounded">
+                    <select
+                        value={selectedEngineer}
+                        onChange={handleEngineerChange}
+                        className="p-2 border rounded"
+                    >
                         <option value="">Select Engineer</option>
                         {engineers.map(engineer => (
-                            <option key={engineer.id} value={engineer.id}>
+                            <option
+                                key={`engineer-${engineer.id}`}  // Different prefix than service engineer
+                                value={engineer.id}
+                            >
                                 {engineer.name}
                             </option>
-                        ))} 
+                        ))}
                     </select>
                 </div>
                 <div className="flex flex-col gap-4">
@@ -411,7 +456,7 @@ export default function GenerateService() {
                                         type="text"
                                         name="serviceSpares"
                                         value={engineerRemark.serviceSpares}
-                                        onChange={(e) => handleengineerRemarksChange(index, 'serviceSpares', e.target.value)}
+                                        onChange={(e) => handleEngineerRemarksChange(index, 'serviceSpares', e.target.value)}
                                         className="w-full p-1 border rounded"
                                     />
                                 </td>
@@ -420,7 +465,7 @@ export default function GenerateService() {
                                         type="text"
                                         name="partNo"
                                         value={engineerRemark.partNo}
-                                        onChange={(e) => handleengineerRemarksChange(index, 'partNo', e.target.value)}
+                                        onChange={(e) => handleEngineerRemarksChange(index, 'partNo', e.target.value)}
                                         className="w-full p-1 border rounded"
                                     />
                                 </td>
@@ -429,7 +474,7 @@ export default function GenerateService() {
                                         type="text"
                                         name="rate"
                                         value={engineerRemark.rate}
-                                        onChange={(e) => handleengineerRemarksChange(index, 'rate', e.target.value)}
+                                        onChange={(e) => handleEngineerRemarksChange(index, 'rate', e.target.value)}
                                         className="w-full p-1 border rounded"
                                     />
                                 </td>
@@ -438,7 +483,7 @@ export default function GenerateService() {
                                         type="text"
                                         name="quantity"
                                         value={engineerRemark.quantity}
-                                        onChange={(e) => handleengineerRemarksChange(index, 'quantity', e.target.value)}
+                                        onChange={(e) => handleEngineerRemarksChange(index, 'quantity', e.target.value)}
                                         className="w-full p-1 border rounded"
                                     />
                                 </td>
@@ -447,7 +492,7 @@ export default function GenerateService() {
                                         type="text"
                                         name="poNo"
                                         value={engineerRemark.poNo}
-                                        onChange={(e) => handleengineerRemarksChange(index, 'poNo', e.target.value)}
+                                        onChange={(e) => handleEngineerRemarksChange(index, 'poNo', e.target.value)}
                                         className="w-full p-1 border rounded"
                                     />
                                 </td>
@@ -480,23 +525,21 @@ export default function GenerateService() {
 
                 <button
                     type="submit"
-                    className="bg-blue-950 hover:bg-blue-900 text-white p-2 rounded-md"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
                     disabled={loading}
                 >
-                    {loading ? "Generating..." : "Generate Service"}
+                    {loading ? "Generating..." : "Generate Service Report"}
                 </button>
             </form>
 
-            {/* {error && <p className="text-red-500 mt-4">{error}</p>} */}
-
             {service && (
-                <div className="mt-4 text-center">
-                    <p className="text-green-600 mb-2">{service.message}</p>
+                <div className="mt-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+                    <p className="font-bold mb-2">{service.message}</p>
                     <button
                         onClick={handleDownload}
-                        className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
+                        className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
                     >
-                        Download Certificate
+                        Download Service Report
                     </button>
                 </div>
             )}

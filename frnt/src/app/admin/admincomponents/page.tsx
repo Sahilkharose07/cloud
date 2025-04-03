@@ -3,15 +3,12 @@
 import * as React from "react";
 import {
   AudioWaveform,
-  CirclePlay,
   Command,
   File,
   GalleryVerticalEnd,
   Settings,
-  FolderKanban,
   CircleUser,
-  ListEndIcon
-  
+  ListEndIcon,
 } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
@@ -50,21 +47,21 @@ const data = {
   ],
   navMain: [
     {
-        title: "Users",
-        url: "#",
-        icon: CircleUser,
-        items: [
-          {
-            title: "Create user",
-            url: "adminregister",
-          },
-          {
-            title: "User details",
-            url: "u",
-          },
-          
-        ],
-      },
+      title: "Users",
+      url: "#",
+      icon: CircleUser,
+      
+      items: [
+        {
+          title: "Create user",
+          url: "adminregister",
+        },
+        {
+          title: "User details",
+          url: "u",
+        },
+      ],
+    },
     {
       title: "Documentation",
       url: "#",
@@ -86,10 +83,13 @@ const data = {
       icon: ListEndIcon,
       items: [
         {
+          title: "Admin Certificate Table",
+          url: "admincertificatetable",
+        },
+        {
           title: "Admin Service Table",
           url: "adminservicetable",
         },
-        
       ],
     },
     {
@@ -101,36 +101,57 @@ const data = {
           title: "add model",
           url: "addmodel",
         },
-        
       ],
     },
-    
   ],
-  
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [isClient, setIsClient] = React.useState(false);
   const [activePath, setActivePath] = React.useState("");
+  const [activeDropdowns, setActiveDropdowns] = React.useState<{ [key: string]: boolean }>({});
 
-  // Update active state on the client side
+  
   React.useEffect(() => {
-    setIsClient(true); // Ensure this runs only on the client side
+    setIsClient(true);
     setActivePath(window.location.pathname);
+
+    
+    const savedDropdowns = JSON.parse(localStorage.getItem('activeDropdowns') || '{}');
+    setActiveDropdowns(savedDropdowns);
   }, []);
 
-  // Modify navMain items based on the current active path
+  
+  const toggleDropdown = (dropdownTitle: string) => {
+    setActiveDropdowns((prev) => {
+      const updated = { ...prev, [dropdownTitle]: !prev[dropdownTitle] };
+      
+      localStorage.setItem('activeDropdowns', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+
   const updatedNavMain = React.useMemo(
     () =>
-      data.navMain.map((item) => ({
-        ...item,
-        isActive: isClient && activePath === item.items[0].url, // Check active path for the first item
-        items: item.items.map((subItem) => ({
-          ...subItem,
-          isActive: isClient && activePath === subItem.url, // Check active path for sub-items
-        })),
-      })),
-    [isClient, activePath]
+      data.navMain.map((item) => {
+        
+        const isItemActive = item.items.some(
+          (subItem) => isClient && activePath === subItem.url
+        );
+
+        return {
+          ...item,
+          isActive: isItemActive, 
+          isOpen: activeDropdowns[item.title] ?? false,
+          toggleDropdown: () => toggleDropdown(item.title), 
+          items: item.items.map((subItem) => ({
+            ...subItem,
+            isActive: isClient && activePath === subItem.url,   
+          })),
+        };
+      }),
+    [isClient, activePath, activeDropdowns]
   );
 
   return (

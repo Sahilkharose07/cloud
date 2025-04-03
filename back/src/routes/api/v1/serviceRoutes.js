@@ -9,7 +9,7 @@ router.get(
 );
 
 router.post(
-    "/generateService", 
+    "/generateServices", 
     ServiceController.createService
 );
 
@@ -17,5 +17,20 @@ router.get(
     "/download/:serviceId", 
     ServiceController.downloadService
 );
+
+router.put(
+    "/update/:serviceId", 
+    ServiceController.updateService
+);
+
+router.delete(
+    "/deleteService/:serviceId", 
+    ServiceController.deleteService
+);
+
+
+router.get("/getServiceById/:serviceId", 
+    ServiceController.getServiceById);
+
 
 module.exports = router;

@@ -21,6 +21,13 @@ const generatePDFService = async (
     status,
     serviceId
 ) => {
+
+
+    if (!engineerRemarks || !Array.isArray(engineerRemarks)) {
+        engineerRemarks = []; // Default to empty array if invalid
+    }
+
+
     const doc = new PDFDocument({
         layout: 'portrait',
         size: 'A4',

@@ -28,14 +28,12 @@ const serviceSchema = new mongoose.Schema({
     makeModelNumberoftheInstrumentQuantity: { type: String, required: true },
     serialNumberoftheInstrumentCalibratedOK: { type: String, required: true },
     serialNumberoftheFaultyNonWorkingInstruments: { type: String, required: true },
-    engineerRemarks: { type: [engineerRemarksSchema], required: true }, // Now storing multiple observations
+    engineerRemarks: { type: [engineerRemarksSchema], required: true },
     engineerName: { type: String, required: true },
     status: { type: String, required: true, default: "checked" }
 }, {
     timestamps: true
 });
-
-// module.exports = mongoose.model("Services", serviceSchema);
 
 const Service = mongoose.model("Service", serviceSchema);
 

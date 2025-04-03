@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 
 interface Service {
     _id: string;
-    nameAndLocation: string;
+    // nameAndLocation: string;
     contactPerson: string;
     contactNumber: string;
     serviceEngineer: string;
@@ -48,7 +48,7 @@ const formatDate = (dateString: string): string => {
 };
 
 const columns = [
-    { name: "NAME & LOCATION", uid: "nameAndLocation", sortable: true, width: "120px" },
+    // { name: "NAME & LOCATION", uid: "nameAndLocation", sortable: true, width: "120px" },
     { name: "CONTACT PERSON", uid: "contactPerson", sortable: true, width: "120px" },
     { name: "CONTACT NUMBER", uid: "contactNumber", sortable: true, width: "120px" },
     { name: "SERVICE ENGINEER", uid: "serviceEngineer", sortable: true, width: "120px" },
@@ -164,7 +164,7 @@ export default function ServiceTable() {
 
         if (hasSearchFilter) {
             filteredServices = filteredServices.filter((service) =>
-                service.nameAndLocation.toLowerCase().includes(filterValue.toLowerCase()) ||
+                // service.nameAndLocation.toLowerCase().includes(filterValue.toLowerCase()) ||
                 service.contactPerson.toLowerCase().includes(filterValue.toLowerCase())
             );
         }
@@ -263,7 +263,8 @@ export default function ServiceTable() {
             setIsDownloading(null);
         }
     };
-
+     
+    
     const onNextPage = React.useCallback(() => {
         if (page < pages) {
             setPage(page + 1);

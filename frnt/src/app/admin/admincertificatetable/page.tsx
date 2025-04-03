@@ -16,7 +16,7 @@ import {
     SidebarProvider,
     SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppSidebar } from "@/app/admin/admincomponents/page"
 import { Separator } from "@/components/ui/separator"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Selection } from "@heroui/react"
@@ -381,7 +381,7 @@ export default function CertificateTable() {
                 </span>
                 <Pagination
                     isCompact
-                    // showControls
+                    // showControlsf
                     showShadow
                     color="success"
                     page={page}
@@ -448,7 +448,7 @@ export default function CertificateTable() {
                             className="text-lg text-danger cursor-pointer active:opacity-50"
                             onClick={(e) => {
                                 e.preventDefault();
-                                handleDownload(certificate._id); // Download certificate
+                                handleDownload(certificate._id); 
                             }}
                         >
                             {isDownloading === certificate._id ? (
@@ -509,8 +509,8 @@ export default function CertificateTable() {
                         <Breadcrumb>
                             <BreadcrumbList>
                                 <BreadcrumbItem className="hidden md:block">
-                                    <BreadcrumbLink href="adminservice">
-                                        Admin Service
+                                    <BreadcrumbLink href="addmodel">
+                                        Add model
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />

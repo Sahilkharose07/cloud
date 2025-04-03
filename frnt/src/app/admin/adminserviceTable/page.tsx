@@ -1,16 +1,17 @@
+'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     SidebarInset,
     SidebarProvider,
     SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppSidebar } from "@/app/admin/admincomponents/page"
 import { Separator } from "@/components/ui/separator"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 import { ModeToggle } from "@/components/ModeToggle"
 import React, { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Loader2, SearchIcon, FileDown } from "lucide-react"
+import { Loader2, SearchIcon, FileDown,Trash,Edit2Icon } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Selection, ChipProps, Select } from "@heroui/react"
@@ -57,7 +58,6 @@ const formatDate = (dateString: string): string => {
 };
 
 const columns = [
-    { name: "NAME & LOCATION", uid: "nameAndLocation", sortable: true, width: "120px" },
     { name: "CONTACT PERSON", uid: "contactPerson", sortable: true, width: "120px" },
     { name: "CONTACT NUMBER", uid: "contactNumber", sortable: true, width: "120px" },
     { name: "SERVICE ENGINEER", uid: "serviceEngineer", sortable: true, width: "120px" },
@@ -407,6 +407,73 @@ export default function AdminServiceTable() {
         const handleVisibleColumnsChange = (keys: Selection) => {
             setVisibleColumns(keys);
         };
+
+
+        const handleDelete = async (serviceId: string) => {
+            try {
+                console.log("Attempting to delete service ID:", serviceId);
+                
+                const response = await axios.delete(
+                    `http://localhost:5000/api/v1/services/deleteservice/${serviceId}`,
+                    {
+                        headers: {
+                            "Authorization": `Bearer ${localStorage.getItem("token")}`
+                        }
+                    }
+                );
+        
+                console.log("Delete response:", response.data);
+                
+                toast({
+                    title: "Success",
+                    description: response.data.message || "Service deleted successfully",
+                    variant: "default",
+                });
+        
+                // Refresh the services list
+                await fetchServices();
+        
+            } catch (error) {
+                console.error("Full delete error:", error);
+                
+                let errorMessage = "Failed to delete service";
+                if (axios.isAxiosError(error)) {
+                    errorMessage = error.response?.data?.error || 
+                                 error.response?.data?.message || 
+                                 error.message;
+                }
+        
+                toast({
+                    title: "Error",
+                    description: errorMessage,
+                    variant: "destructive",
+                });
+            }
+        };
+        
+            const handleEdit = async (serviceId: string) => {
+                try {
+                    // Fetch the service data you want to edit or open a modal
+                    const response = await axios.get(`http://localhost:5000/api/v1/services/${serviceId}`, {
+                        headers: {
+                            "Authorization": `Bearer ${localStorage.getItem("token")}`,
+                        }
+                    });
+                    const serviceToEdit = response.data;
+                    // Use the service data (for example, to populate a modal or form)
+                    setService({ serviceId: serviceToEdit._id, message: "Service data loaded", downloadUrl: "" });
+                    // Trigger modal open or form field population here
+                } catch (error) {
+                    console.error("Error loading service for edit:", error);
+                    toast({
+                        title: "Error",
+                        description: "Failed to load service for editing.",
+                        variant: "destructive",
+                    });
+                }
+            };
+        
+        
     
         const renderCell = React.useCallback((service: Service, columnKey: string): React.ReactNode => {
             const cellValue = service[columnKey as keyof Service];
@@ -417,23 +484,43 @@ export default function AdminServiceTable() {
     
             if (columnKey === "actions") {
                 return (
-                    <div className="relative flex items-center gap-2">
-                        <Tooltip color="danger" content="Download Service">
-                            <span
-                                className="text-lg text-danger cursor-pointer active:opacity-50"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    handleDownload(service._id);
-                                }}
-                            >
-                                {isDownloading === service._id ? (
-                                    <Loader2 className="h-6 w-6 animate-spin" />
-                                ) : (
-                                    <FileDown className="h-6 w-6" />
-                                )}
-                            </span>
-                        </Tooltip>
-                    </div>
+                     <div className="relative flex items-center gap-2">
+                                        <Tooltip color="danger" >
+                                            <span
+                                                className="text-lg text-danger cursor-pointer active:opacity-50"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    handleDownload(service._id);
+                                                }}
+                                            >
+                                                {isDownloading === service._id ? (
+                                                    <Loader2 className="h-6 w-6 animate-spin" />
+                                                ) : (
+                                                    <FileDown className="h-6 w-6" />
+                                                )}
+                                            </span>
+                                        </Tooltip>
+                                        <Tooltip color="danger" >
+                                            <span
+                                                className="text-lg text-danger cursor-pointer active:opacity-50"
+                                                onClick={() => handleDelete(service._id)}
+                                            >
+                                                <Trash className="h-6 w-6" />
+                                            </span>
+                                        </Tooltip>
+                                        <Tooltip color="danger" >
+                                            <span
+                                                className="text-lg text-info cursor-pointer active:opacity-50"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    router.push(`adminservice?id=${service._id}`); 
+                                                }}
+                                            >
+                                                <Edit2Icon className="h-6 w-6" />
+                                            </span>
+                                        </Tooltip>
+                                    </div>
+                    
                 );
             }
     
@@ -450,15 +537,20 @@ export default function AdminServiceTable() {
                         <Separator orientation="vertical" className="mr-2 h-4"/>
                         <Breadcrumb>
                             <BreadcrumbList>
+                            <BreadcrumbItem className="hidden md:block">
+                                    <BreadcrumbLink href="addmodel" >
+                                     Add Model
+                                    </BreadcrumbLink>
+                                </BreadcrumbItem>
                                 <BreadcrumbItem className="hidden md:block">
-                                    <BreadcrumbLink href="/service" >
-                                        Service
+                                    <BreadcrumbLink href="adminservice" >
+                                        Admin Service
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block"/>
                                 <BreadcrumbItem>
-                                <BreadcrumbLink href="/serviceTable">
-                                        Service Table
+                                <BreadcrumbLink href="adminservicetable">
+                                       Admin Service Table
                                     </BreadcrumbLink>
                                     
                                 </BreadcrumbItem>

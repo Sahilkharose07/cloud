@@ -8,7 +8,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
-
+import {toast} from '@/hooks/use-toast'
 
 interface Observation {
     gas: string;
@@ -110,12 +110,19 @@ export default function AddCategory() {
         fetchEngineers();
     }, []);
 
-    // Fetch certificate data when editing
     useEffect(() => {
-        const fetchCertificateData = async () => {
-            // Initialize with today's date for new certificate
-            const today = new Date().toISOString().split('T')[0];
-            const initialData = {
+        console.log("Current formData:", formData);
+      }, [formData]);
+
+    // Fetch certificate data when editing
+    // In your fetchCertificateData function, replace with this:
+
+useEffect(() => {
+    const fetchCertificateData = async () => {
+        const today = new Date().toISOString().split('T')[0];
+        
+        if (!certificateId) {
+            setFormData({
                 certificateNo: "",
                 customerName: "",
                 siteLocation: "",
@@ -128,69 +135,69 @@ export default function AddCategory() {
                 calibrationDueDate: today,
                 observations: [{ gas: "", before: "", after: "" }],
                 engineerName: ""
-            };
-    
-            if (!certificateId) {
-                setFormData(initialData);
-                setStartDate(today);
-                setEndDate(today);
-                return;
-            }
-    
-            try {
-                setLoading(true);
-                setError(null);
-    
-                const response = await axios.get(
-                    `http://localhost:5000/api/v1/certificates/getCertificateByid/${certificateId}`
-                );
-    
-                if (!response.data) {
-                    throw new Error("No data received from server");
+            });
+            return;
+        }
+
+        try {
+            setLoading(true);
+            setError(null);
+
+            const response = await axios.get(
+                `http://localhost:5000/api/v1/certificates/getCertificateById/${certificateId}`,
+                {
+                    headers: { 
+                        "Authorization": `Bearer ${localStorage.getItem("token")}` 
+                    }
                 }
-    
-                const certificateData = response.data;
-    
-                // Transform API data to match form structure
-                const transformedData = {
-                    certificateNo: certificateData.certificateNo || "",
-                    customerName: certificateData.customer?.customerName || 
-                                certificateData.customerName || "",
-                    siteLocation: certificateData.siteLocation || "",
-                    makeModel: certificateData.makeModel || "",
-                    range: certificateData.range || "",
-                    serialNo: certificateData.serialNo || "",
-                    calibrationGas: certificateData.calibrationGas || "",
-                    gasCanisterDetails: certificateData.gasCanisterDetails || "",
-                    dateOfCalibration: certificateData.dateOfCalibration?.split('T')[0] || today,
-                    calibrationDueDate: certificateData.calibrationDueDate?.split('T')[0] || today,
-                    observations: certificateData.observations?.map((obs: any) => ({
+            );
+
+            console.log("Full API Response:", response);
+
+            if (!response.data.success) {
+                throw new Error(response.data.message || "Failed to fetch certificate");
+            }
+
+            const certificateData = response.data.data;
+
+            // Transform API data to match form structure
+            const transformedData = {
+                certificateNo: certificateData.certificateNo || "",
+                customerName: certificateData.customerName || 
+                            (certificateData.customer?.customerName || ""),
+                siteLocation: certificateData.siteLocation || "",
+                makeModel: certificateData.makeModel || "",
+                range: certificateData.range || "",
+                serialNo: certificateData.serialNo || "",
+                calibrationGas: certificateData.calibrationGas || "",
+                gasCanisterDetails: certificateData.gasCanisterDetails || "",
+                dateOfCalibration: certificateData.dateOfCalibration?.split('T')[0] || today,
+                calibrationDueDate: certificateData.calibrationDueDate?.split('T')[0] || today,
+                observations: Array.isArray(certificateData.observations) 
+                    ? certificateData.observations.map((obs: any) => ({
                         gas: obs.gas || "",
                         before: obs.before || "",
                         after: obs.after || ""
-                    })) || [{ gas: "", before: "", after: "" }],
-                    engineerName: certificateData.engineerName || ""
-                };
-    
-                setFormData(transformedData);
-                setStartDate(transformedData.dateOfCalibration);
-                setEndDate(transformedData.calibrationDueDate);
-    
-            } catch (error) {
-                console.error("Error fetching certificate data:", error);
-                setError("Failed to load certificate data");
-                
-                // Set default data on error
-                setFormData(initialData);
-                setStartDate(today);
-                setEndDate(today);
-            } finally {
-                setLoading(false);
-            }
-        };
-    
-        fetchCertificateData();
-    }, [certificateId]);
+                    })) 
+                    : [{ gas: "", before: "", after: "" }],
+                engineerName: certificateData.engineerName || ""
+            };
+
+            console.log("Transformed Data:", transformedData);
+            setFormData(transformedData);
+            setStartDate(transformedData.dateOfCalibration);
+            setEndDate(transformedData.calibrationDueDate);
+
+        } catch (error) {
+            console.error("Error fetching certificate:", error);
+            setError(error.message || "Failed to load certificate data");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    fetchCertificateData();
+}, [certificateId]);
 
     // Date handling functions
     const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -382,13 +389,11 @@ export default function AddCategory() {
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
-                                <BreadcrumbItem className="hidden md:block">
-                                    <BreadcrumbLink href="addmodel">model</BreadcrumbLink>
-                                </BreadcrumbItem>
+                                
                                 <BreadcrumbSeparator className="hidden md:block" />
                                 <BreadcrumbItem>
-                                    <BreadcrumbLink href="adminservice">
-                                        <BreadcrumbPage>Admin Services</BreadcrumbPage>
+                                    <BreadcrumbLink href="addmodel">
+                                        <BreadcrumbPage>Add  Model</BreadcrumbPage>
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
@@ -397,6 +402,7 @@ export default function AddCategory() {
                                         <BreadcrumbPage>Admin Certificate</BreadcrumbPage>
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
+                                <BreadcrumbSeparator className="hidden md:block" />
                                 <BreadcrumbItem>
                                     <BreadcrumbLink href="admincertificatetable">
                                         Admin Certificate Table
