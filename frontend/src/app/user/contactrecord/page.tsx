@@ -1,5 +1,6 @@
 'use client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     SidebarInset,
     SidebarProvider,
@@ -7,15 +8,13 @@ import {
 } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
-import { ModeToggle } from "@/components/ModeToggle"
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, useCallback, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { Loader2, SearchIcon, Edit2Icon, DeleteIcon } from "lucide-react"
+import { SearchIcon } from "lucide-react"
 import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Selection, SortDescriptor, Pagination, Tooltip } from "@heroui/react"
+import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Selection, SortDescriptor, Pagination } from "@heroui/react"
 import axios from "axios";
-import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 
 interface ContactPerson {
@@ -25,7 +24,6 @@ interface ContactPerson {
     contactNo: string;
     email: string;
     designation: string;
-    company: string;
     _id: string;
     key?: string;
     createdAt?: string;
@@ -33,33 +31,25 @@ interface ContactPerson {
 }
 
 const columns = [
-    { name: "Company", uid: "company", sortable: true, width: "120px" },
     { name: "First Name", uid: "firstName", sortable: true, width: "120px" },
-    { name: "Middle Name", uid: "middleName", sortable: true, width: "120px" },
     { name: "Last Name", uid: "lastName", sortable: true, width: "120px" },
+    { name: "Company Name", uid: "middleName", sortable: true, width: "120px" },
     { name: "Contact Number", uid: "contactNo", sortable: true, width: "120px" },
     { name: "Email Address", uid: "email", sortable: true, width: "120px" },
     { name: "Designation", uid: "designation", sortable: true, width: "120px" },
 ];
 
-const INITIAL_VISIBLE_COLUMNS = ["firstName", "middleName", "lastName","company", "contactNo", "email", "designation"];
-
 export default function AdminContactTable() {
     const [contactPersons, setContactPersons] = useState<ContactPerson[]>([]);
-    const [error, setError] = useState<string | null>(null);
-    const [selectedKeys, setSelectedKeys] = React.useState<Selection>(new Set([]));
-    const [visibleColumns, setVisibleColumns] = React.useState<Selection>(new Set(INITIAL_VISIBLE_COLUMNS));
-    const [statusFilter, setStatusFilter] = React.useState<Selection>("all");
+    const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set([]));
     const [rowsPerPage, setRowsPerPage] = useState(15);
     const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
         column: "createdAt",
-        direction: "descending" as const, // Explicitly type as "descending"
+        direction: "descending",
     });
 
-    const [page, setPage] = React.useState(1);
-    const router = useRouter();
+    const [page, setPage] = useState(1);
     const [filterValue, setFilterValue] = useState("");
-    const [isLoading, setIsLoading] = useState(true);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [contactToDelete, setContactToDelete] = useState<ContactPerson | null>(null);
     const hasSearchFilter = Boolean(filterValue);
@@ -76,9 +66,9 @@ export default function AdminContactTable() {
                 }
             );
 
-            let contactPersonsData = response.data.data || [];
+            const contactPersonsData = response.data.data || [];
 
-            // Sort by createdAt descending (newest first)
+
             contactPersonsData.sort((a: ContactPerson, b: ContactPerson) => {
                 const dateA = new Date(a.createdAt || 0).getTime();
                 const dateB = new Date(b.createdAt || 0).getTime();
@@ -86,10 +76,8 @@ export default function AdminContactTable() {
             });
 
             setContactPersons(contactPersonsData);
-            setError(null);
         } catch (error) {
             console.error("Error fetching contact persons:", error);
-            setError("Failed to fetch contact persons. Please try again.");
             setContactPersons([]);
         }
     };
@@ -97,18 +85,6 @@ export default function AdminContactTable() {
     useEffect(() => {
         fetchContactPersons();
     }, []);
-
-    const handleSelectionChange = (keys: Selection) => {
-        setSelectedKeys(keys);
-    };
-    
-    const handleSortChange = (descriptor: SortDescriptor) => {
-        setSortDescriptor(descriptor);
-    };
-    const handleDeleteClick = (contactPerson: ContactPerson) => {
-        setContactToDelete(contactPerson);
-        setIsDeleteModalOpen(true);
-    };
 
     const handleConfirmDelete = async () => {
         if (!contactToDelete) return;
@@ -152,17 +128,10 @@ export default function AdminContactTable() {
                     </div>
                 </div>
             </div>
-
-
         );
     };
 
-    const headerColumns = React.useMemo(() => {
-        if (visibleColumns === "all") return columns;
-        return columns.filter((column) => Array.from(visibleColumns).includes(column.uid));
-    }, [visibleColumns]);
-
-    const filteredItems = React.useMemo(() => {
+    const filteredItems = useMemo(() => {
         let filteredContacts = [...contactPersons];
 
         if (hasSearchFilter) {
@@ -179,155 +148,128 @@ export default function AdminContactTable() {
         return filteredContacts;
     }, [contactPersons, hasSearchFilter, filterValue]);
 
-    const pages = Math.ceil(filteredItems.length / rowsPerPage);
-
-    const items = React.useMemo(() => {
-        const start = (page - 1) * rowsPerPage;
-        const end = start + rowsPerPage;
-        return filteredItems.slice(start, end);
-    }, [page, filteredItems, rowsPerPage]);
-
-    const sortedItems = React.useMemo(() => {
+    const sortedItems = useMemo(() => {
         return [...filteredItems].sort((a, b) => {
             const first = a[sortDescriptor.column as keyof ContactPerson] || "";
             const second = b[sortDescriptor.column as keyof ContactPerson] || "";
-
-            // Case-insensitive string comparison
             const cmp = String(first).localeCompare(String(second), undefined, { sensitivity: 'base' });
-
             return sortDescriptor.direction === "descending" ? -cmp : cmp;
         });
     }, [filteredItems, sortDescriptor]);
 
-    const onNextPage = React.useCallback(() => {
-        if (page < pages) {
-            setPage(page + 1);
-        }
+    const pages = Math.ceil(filteredItems.length / rowsPerPage);
+
+    const items = useMemo(() => {
+        const start = (page - 1) * rowsPerPage;
+        const end = start + rowsPerPage;
+        return sortedItems.slice(start, end);
+    }, [page, rowsPerPage, sortedItems]);
+
+    const onNextPage = useCallback(() => {
+        if (page < pages) setPage(page + 1);
     }, [page, pages]);
 
-    const onPreviousPage = React.useCallback(() => {
-        if (page > 1) {
-            setPage(page - 1);
-        }
+    const onPreviousPage = useCallback(() => {
+        if (page > 1) setPage(page - 1);
     }, [page]);
 
-    const onRowsPerPageChange = React.useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const onRowsPerPageChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
         setRowsPerPage(Number(e.target.value));
         setPage(1);
     }, []);
 
-    const onClear = React.useCallback(() => {
-        setFilterValue("");
-        setPage(1);
-    }, []);
+    const topContent = useMemo(() => (
+        <div className="flex justify-between gap-3 items-end">
+            <Input
+                isClearable
+                className="w-full max-w-[300px]"
+                placeholder="Search"
+                startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
+                value={filterValue}
+                onChange={(e) => setFilterValue(e.target.value)}
+                onClear={() => setFilterValue("")}
+            />
+            <label className="flex items-center text-default-400 text-small">
+                Rows per page:
+                <select
+                    className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small"
+                    onChange={onRowsPerPageChange}
+                    defaultValue="15"
+                >
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="15">15</option>
+                </select>
+            </label>
+        </div>
+    ), [filterValue, onRowsPerPageChange]);
 
-    const topContent = React.useMemo(() => {
-        return (
-            <div className="flex justify-between gap-3 items-end">
-                <Input
-                    isClearable
-                    className="w-full max-w-[300px]"
-                    placeholder="Search"
-                    startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
-                    value={filterValue}
-                    onChange={(e) => setFilterValue(e.target.value)}
-                    onClear={() => setFilterValue("")}
-                />
-                <label className="flex items-center text-default-400 text-small">
-                    Rows per page:
-                    <select
-                        className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small"
-                        onChange={onRowsPerPageChange}
-                        defaultValue="5"
-                    >
-                        <option value="5">5</option>
-                        <option value="10">10</option>
-                        <option value="15">15</option>
-                    </select>
-                </label>
+    const bottomContent = useMemo(() => (
+        <div className="py-2 px-2 flex justify-between items-center">
+            <span className="text-default-400 text-small">
+                Total {contactPersons.length} contact
+            </span>
+            <Pagination
+                isCompact
+                showShadow
+                color="success"
+                page={page}
+                total={pages}
+                onChange={setPage}
+                classNames={{
+                    cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
+                    item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
+                }}
+            />
+            <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
+                <Button
+                    className="bg-[hsl(339.92deg_91.04%_52.35%)]"
+                    size="sm"
+                    disabled={page === 1}
+                    onClick={onPreviousPage}
+                >
+                    Previous
+                </Button>
+                <Button
+                    className="bg-[hsl(339.92deg_91.04%_52.35%)]"
+                    size="sm"
+                    disabled={page === pages}
+                    onClick={onNextPage}
+                >
+                    Next
+                </Button>
             </div>
-        );
-    }, [filterValue, onRowsPerPageChange, contactPersons.length]);
+        </div>
+    ), [page, pages, onPreviousPage, onNextPage, contactPersons.length]);
 
-    const bottomContent = React.useMemo(() => {
-        return (
-            <div className="py-2 px-2 flex justify-between items-center">
-                <span className="text-default-400 text-small">
-                    Total {contactPersons.length} contact
-                </span>
-                <Pagination
-                    isCompact
-                    showShadow
-                    color="success"
-                    page={page}
-                    total={pages}
-                    onChange={setPage}
-                    classNames={{
-                        cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
-                        item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
-                    }}
-                />
-                <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
-                    <Button
-                        className="bg-[hsl(339.92deg_91.04%_52.35%)]"
-                        variant="default"
-                        size="sm"
-                        disabled={page === 1}
-                        onClick={onPreviousPage}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        className="bg-[hsl(339.92deg_91.04%_52.35%)]"
-                        variant="default"
-                        size="sm"
-                        disabled={page === pages}
-                        onClick={onNextPage}
-                    >
-                        Next
-                    </Button>
-                </div>
-            </div>
-        );
-    }, [page, pages, onPreviousPage, onNextPage]);
-
-    const renderCell = React.useCallback((contact: ContactPerson, columnKey: string): React.ReactNode => {
+    const renderCell = useCallback((contact: ContactPerson, columnKey: string): React.ReactNode => {
         const cellValue = contact[columnKey as keyof ContactPerson];
-
-        switch (columnKey) {
-            case "actions":
-            case "createdAt":
-                return new Date(cellValue as string).toLocaleDateString();
-            default:
-                return cellValue;
+        if (columnKey === "createdAt") {
+            return new Date(cellValue as string).toLocaleDateString();
         }
+        return cellValue;
     }, []);
 
     return (
         <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
-                <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+                <header className="flex h-16 items-center gap-2">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
-                        <ModeToggle />
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
-                                <BreadcrumbLink href="/user/dashboard">
-                                    Dashboard
-                                </BreadcrumbLink>
-                                <BreadcrumbSeparator className="hidden md:block" />
+                                <BreadcrumbLink href="/user/dashboard">Dashboard</BreadcrumbLink>
+                                <BreadcrumbSeparator />
                                 <BreadcrumbItem>
-                                    <BreadcrumbLink href="/user/contactform">
-                                        Create Contact
-                                    </BreadcrumbLink>
+                                    <BreadcrumbLink href="/user/contactform">Create Contact</BreadcrumbLink>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>
                     </div>
                 </header>
-                <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15">
+                <div className="container mx-auto py-10 px-4">
                     <Card className="max-w-7xl mx-auto">
                         <CardHeader>
                             <CardTitle className="text-3xl font-bold text-center">Contact Record</CardTitle>
@@ -335,12 +277,10 @@ export default function AdminContactTable() {
                         <CardContent>
                             <Table
                                 isHeaderSticky
-                                aria-label="Contacts table with custom cells, pagination, and sorting"
+                                aria-label="Contacts table"
                                 bottomContent={bottomContent}
                                 bottomContentPlacement="outside"
-                                classNames={{
-                                    wrapper: "max-h-[382px] overflow-y-auto",
-                                }}
+                                classNames={{ wrapper: "max-h-[382px] overflow-y-auto" }}
                                 selectedKeys={selectedKeys}
                                 sortDescriptor={sortDescriptor}
                                 topContent={topContent}
@@ -374,9 +314,9 @@ export default function AdminContactTable() {
                                     ))}
                                 </TableHeader>
                                 <TableBody emptyContent={"Create contact and add data"}>
-                                    {sortedItems.map((contact) => (
+                                    {items.map((contact) => (
                                         <TableRow key={contact._id}>
-                                            {headerColumns.map((column) => (
+                                            {columns.map((column) => (
                                                 <TableCell key={column.uid}>
                                                     {renderCell(contact, column.uid)}
                                                 </TableCell>
@@ -389,7 +329,6 @@ export default function AdminContactTable() {
                     </Card>
                 </div>
             </SidebarInset>
-
             <ConfirmationDialog
                 isOpen={isDeleteModalOpen}
                 onClose={handleCancelDelete}

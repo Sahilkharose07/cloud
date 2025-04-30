@@ -1,7 +1,6 @@
 'use client';
 
-import { ModeToggle } from "@/components/ModeToggle"
-import { Breadcrumb, BreadcrumbSeparator, BreadcrumbPage, BreadcrumbList, BreadcrumbLink, BreadcrumbItem } from "@/components/ui/breadcrumb"
+import { Breadcrumb, BreadcrumbPage, BreadcrumbList, BreadcrumbItem } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import {
     SidebarInset,
@@ -9,15 +8,14 @@ import {
     SidebarTrigger,
 } from "@/components/ui/sidebar"
 
-import React, { useEffect, useState } from "react"
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useState, useCallback } from "react"
 import 'react-toastify/dist/ReactToastify.css';
 import { Button } from "@/components/ui/button"
 import { SearchIcon } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Selection, ChipProps } from "@heroui/react"
+import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Selection } from "@heroui/react"
 import { Pagination } from "@heroui/react"
 import { AdminSidebar } from "@/components/admin-sidebar";
 
@@ -52,6 +50,7 @@ interface Service {
     serialNumberoftheInstrumentCalibratedOK: string;
     serialNumberoftheFaultyNonWorkingInstruments: string;
     engineerName: string;
+    [key: string]: string;
 }
 
 interface User {
@@ -66,34 +65,12 @@ type SortDescriptor = {
     direction: 'ascending' | 'descending';
 }
 
-type sortDescriptorService = {
-    column: string;
-    direction: 'ascending' | 'descending';
-}
-
-interface CertificateResponse {
-    certificateId: string;
-    message: string;
-    downloadUrl: string;
-}
-
-interface ServiceResponse {
-    serviceId: string;
-    message: string;
-    downloadUrl: string;
-}
-
 const generateUniqueId = () => {
     return Math.random().toString(36).substring(2) + Date.now().toString(36);
 };
 
 const generateUniqueIdService = () => {
     return Math.random().toString(36).substring(2) + Date.now().toString(36);
-};
-
-const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toISOString().split("T")[0];
 };
 
 const columns = [
@@ -112,50 +89,30 @@ const columnsservice = [
     { name: "Report Number", uid: "reportNo", sortable: true, width: "120px" },
 ];
 
-export const statusOptions = [
-    { name: "Paused", uid: "paused" },
-    { name: "Vacation", uid: "vacation" },
-];
-
-const statusColorMap: Record<string, ChipProps["color"]> = {
-    active: "success",
-    paused: "danger",
-    vacation: "warning",
-};
-
 export default function Page() {
     const [certificates, setCertificates] = useState<Certificate[]>([]);
-    const [certificate, setCertificate] = useState<CertificateResponse | null>(null);
-    const [error, setError] = useState<string | null>(null);
+    const [services, setServices] = useState<Service[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const [selectedKeys, setSelectedKeys] = React.useState<Set<string>>(new Set([]));
-    const [visibleColumns, setVisibleColumns] = React.useState<Selection>(new Set(columns.map(column => column.uid)));
-    const [statusFilter, setStatusFilter] = React.useState<Selection>("all");
+    const [selectedKeysService, setSelectedKeysService] = React.useState<Set<string>>(new Set([]));
     const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [rowsPerPageService, setRowsPerPageService] = useState(10);
+    const [filterValue, setFilterValue] = useState("");
+    const [filterValueservice, setFilterValueservice] = useState("");
+    const [page, setPage] = React.useState(1);
+    const [pageService, setPageService] = React.useState(1);
+    
     const [sortDescriptor, setSortDescriptor] = React.useState<SortDescriptor>({
         column: "certificateNo",
         direction: "ascending",
     });
-    const [page, setPage] = React.useState(1);
-    const router = useRouter();
-    const [isDownloading, setIsDownloading] = useState<string | null>(null);
 
-    const [services, setServices] = useState<Service[]>([]);
-    const [service, setService] = useState<ServiceResponse | null>(null);
-    const [errorService, setErrorService] = useState<string | null>(null);
-    const [selectedKeysService, setSelectedKeysService] = React.useState<Set<string>>(new Set([]));
-    const [visibleColumnsService, setVisibleColumnsService] = React.useState<Selection>(new Set(columnsservice.map(column => column.uid)));
-    const [statusFilterService, setStatusFilterService] = React.useState<Selection>("all");
-    const [rowsPerPageService, setRowsPerPageService] = useState(10);
-    const [sortDescriptorService, setSortDescriptorService] = React.useState<sortDescriptorService>({
+    const [sortDescriptorService, setSortDescriptorService] = React.useState<SortDescriptor>({
         column: "nameAndLocation",
         direction: "ascending",
     });
-    const [pageService, setPageService] = React.useState(1);
-    const routerService = useRouter();
-    const [isDownloadingService, setIsDownloadingService] = useState<string | null>(null);
-    const [users, setUsers] = useState<User[]>([]);
 
-    const fetchCertificates = async () => {
+    const fetchCertificates = useCallback(async () => {
         try {
             const response = await axios.get(
                 "http://localhost:5000/api/v1/certificates/getCertificate",
@@ -167,53 +124,28 @@ export default function Page() {
                 }
             );
 
-            // Log the response structure
-            console.log('Full API Response:', {
-                status: response.status,
-                data: response.data,
-                type: typeof response.data,
-                hasData: 'data' in response.data
-            });
-
-            // Handle the response based on its structure
             let certificatesData;
             if (typeof response.data === 'object' && 'data' in response.data) {
-                // Response format: { data: [...certificates] }
                 certificatesData = response.data.data;
             } else if (Array.isArray(response.data)) {
-                // Response format: [...certificates]
                 certificatesData = response.data;
             } else {
-                console.error('Unexpected response format:', response.data);
                 throw new Error('Invalid response format');
             }
 
-            if (!Array.isArray(certificatesData)) {
-                certificatesData = [];
-            }
-
-            const certificatesWithKeys = certificatesData.map((certificate: Certificate) => ({
+            const certificatesWithKeys = (certificatesData || []).map((certificate: Certificate) => ({
                 ...certificate,
                 key: certificate._id || generateUniqueId()
             }));
 
             setCertificates(certificatesWithKeys);
-            setError(null); // Clear any previous errors
         } catch (error) {
-            console.error("Error fetching leads:", error);
-            if (axios.isAxiosError(error)) {
-                setError(`Failed to fetch leads: ${error.response?.data?.message || error.message}`);
-            } else {
-                setError("Failed to fetch leads.");
-            }
-            setCertificates([]); // Set empty array on error
+            console.error("Error fetching certificates:", error);
+            setCertificates([]);
         }
-    };
-    useEffect(() => {
-        fetchCertificates();
     }, []);
 
-    const fetchServices = async () => {
+    const fetchServices = useCallback(async () => {
         try {
             const response = await axios.get(
                 "http://localhost:5000/api/v1/services/getServices",
@@ -225,55 +157,28 @@ export default function Page() {
                 }
             );
 
-            // Log the response structure
-            console.log('Full API Response:', {
-                status: response.status,
-                data: response.data,
-                type: typeof response.data,
-                hasData: 'data' in response.data
-            });
-
-            // Handle the response based on its structure
             let servicesData;
             if (typeof response.data === 'object' && 'data' in response.data) {
-                // Response format: { data: [...services] }
                 servicesData = response.data.data;
             } else if (Array.isArray(response.data)) {
-                // Response format: [...services]
                 servicesData = response.data;
             } else {
-                console.error('Unexpected response format:', response.data);
                 throw new Error('Invalid response format');
             }
 
-            // Ensure servicesData is an array
-            if (!Array.isArray(servicesData)) {
-                servicesData = [];
-            }
-
-            // Map the data with safe key generation
-            const servicesWithKeys = servicesData.map((service: Service) => ({
+            const servicesWithKeys = (servicesData || []).map((service: Service) => ({
                 ...service,
                 key: service._id || generateUniqueIdService()
             }));
 
             setServices(servicesWithKeys);
-            setError(null); // Clear any previous errors
         } catch (error) {
-            console.error("Error fetching leads:", error);
-            if (axios.isAxiosError(error)) {
-                setError(`Failed to fetch leads: ${error.response?.data?.message || error.message}`);
-            } else {
-                setError("Failed to fetch leads.");
-            }
-            setServices([]); // Set empty array on error
+            console.error("Error fetching services:", error);
+            setServices([]);
         }
-    };
-    useEffect(() => {
-        fetchServices();
     }, []);
 
-    const fetchUsers = async () => {
+    const fetchUsers = useCallback(async () => {
         try {
             const response = await axios.get(
                 "http://localhost:5000/api/v1/users/getusers",
@@ -291,88 +196,77 @@ export default function Page() {
             } else if (Array.isArray(response.data)) {
                 usersData = response.data;
             } else {
-                console.error('Unexpected response format:', response.data);
                 throw new Error('Invalid response format');
             }
 
-            if (!Array.isArray(usersData)) {
-                usersData = [];
-            }
-
-            setUsers(usersData);
+            setUsers(usersData || []);
         } catch (error) {
             console.error("Error fetching users:", error);
             setUsers([]);
         }
-    };
-    useEffect(() => {
-        fetchUsers();
     }, []);
 
-    const [filterValue, setFilterValue] = useState("");
-    const [filterValueservice, setFilterValueservice] = useState("");
+    useEffect(() => {
+        fetchCertificates();
+        fetchServices();
+        fetchUsers();
+    }, [fetchCertificates, fetchServices, fetchUsers]);
+
     const hasSearchFilter = Boolean(filterValue);
     const hasSearchFilterservice = Boolean(filterValueservice);
 
     const headerColumns = React.useMemo(() => {
-        if (visibleColumns === "all") return columns;
-
-        return columns.filter((column) => Array.from(visibleColumns).includes(column.uid));
-    }, [visibleColumns]);
+        return columns.filter((column) => column.uid !== "actions");
+    }, []);
 
     const headerColumnsservice = React.useMemo(() => {
-        if (visibleColumnsService === "all") return columnsservice;
-
-        return columnsservice.filter((column) => Array.from(visibleColumnsService).includes(column.uid));
-    }, [visibleColumnsService]);
+        return columnsservice.filter((column) => column.uid !== "actions");
+    }, []);
 
     const filteredItems = React.useMemo(() => {
         let filteredCertificates = [...certificates];
 
         if (hasSearchFilter) {
             filteredCertificates = filteredCertificates.filter((certificate) =>
-                certificate.certificateNo.toLowerCase().includes(filterValue.toLowerCase()) ||
-                certificate.customerName.toLowerCase().includes(filterValue.toLowerCase()) ||
-                certificate.siteLocation.toLowerCase().includes(filterValue.toLowerCase()) ||
-                certificate.makeModel.toLowerCase().includes(filterValue.toLowerCase()) ||
-                certificate.serialNo.toLowerCase().includes(filterValue.toLowerCase()) ||
-                certificate.engineerName.toLowerCase().includes(filterValue.toLowerCase())
+                Object.values(certificate).some(
+                    (value) => 
+                        typeof value === 'string' && 
+                        value.toLowerCase().includes(filterValue.toLowerCase())
+                )
             );
         }
 
         return filteredCertificates;
-    }, [certificates, hasSearchFilter, filterValue]);
+    }, [certificates, filterValue, hasSearchFilter]);
 
     const filteredItemsservice = React.useMemo(() => {
         let filteredServices = [...services];
 
         if (hasSearchFilterservice) {
             filteredServices = filteredServices.filter((service) =>
-                service.contactPerson.toLowerCase().includes(filterValueservice.toLowerCase()) ||
-                service.contactNumber.toLowerCase().includes(filterValueservice.toLowerCase()) ||
-                service.serviceEngineer.toLowerCase().includes(filterValueservice.toLowerCase()) ||
-                service.reportNo.toLowerCase().includes(filterValueservice.toLowerCase())
+                Object.values(service).some(
+                    (value) => 
+                        typeof value === 'string' && 
+                        value.toLowerCase().includes(filterValueservice.toLowerCase())
+                )
             );
         }
 
         return filteredServices;
-    }, [services, hasSearchFilterservice, filterValueservice]);
+    }, [services, filterValueservice, hasSearchFilterservice]);
 
     const pages = Math.ceil(filteredItems.length / rowsPerPage);
-
     const pageservices = Math.ceil(filteredItemsservice.length / rowsPerPageService);
 
     const items = React.useMemo(() => {
         const start = (page - 1) * rowsPerPage;
         const end = start + rowsPerPage;
-
         return filteredItems.slice(start, end);
     }, [page, filteredItems, rowsPerPage]);
 
     const itemsservice = React.useMemo(() => {
         const start = (pageService - 1) * rowsPerPageService;
         const end = start + rowsPerPageService;
-
         return filteredItemsservice.slice(start, end);
     }, [pageService, filteredItemsservice, rowsPerPageService]);
 
@@ -381,7 +275,6 @@ export default function Page() {
             const first = a[sortDescriptor.column as keyof Certificate];
             const second = b[sortDescriptor.column as keyof Certificate];
             const cmp = first < second ? -1 : first > second ? 1 : 0;
-
             return sortDescriptor.direction === "descending" ? -cmp : cmp;
         });
     }, [sortDescriptor, items]);
@@ -391,7 +284,6 @@ export default function Page() {
             const first = a[sortDescriptorService.column as keyof Service];
             const second = b[sortDescriptorService.column as keyof Service];
             const cmp = first < second ? -1 : first > second ? 1 : 0;
-
             return sortDescriptorService.direction === "descending" ? -cmp : cmp;
         });
     }, [sortDescriptorService, itemsservice]);
@@ -402,17 +294,17 @@ export default function Page() {
         }
     }, [page, pages]);
 
-    const onNextPageservice = React.useCallback(() => {
-        if (pageService < pageservices) {
-            setPageService(pageService + 1);
-        }
-    }, [pageService, pageservices]);
-
     const onPreviousPage = React.useCallback(() => {
         if (page > 1) {
             setPage(page - 1);
         }
     }, [page]);
+
+    const onNextPageservice = React.useCallback(() => {
+        if (pageService < pageservices) {
+            setPageService(pageService + 1);
+        }
+    }, [pageService, pageservices]);
 
     const onPreviousPageService = React.useCallback(() => {
         if (pageService > 1) {
@@ -421,108 +313,93 @@ export default function Page() {
     }, [pageService]);
 
     const onRowsPerPageChange = React.useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        setRowsPerPage(Number(e.target.value));
-        setPage(1);
-    }, []);
+    setRowsPerPage(Number(e.target.value));
+    setPage(1);
+}, []);
 
-    const onRowsPerPageChangeservice = React.useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        setRowsPerPageService(Number(e.target.value));
-        setPageService(1);
-    }, []);
+const onRowsPerPageChangeservice = React.useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setRowsPerPageService(Number(e.target.value));
+    setPageService(1);
+}, []);
 
-    const onSearchChange = React.useCallback((value: string) => {
-        if (value) {
-            setFilterValue(value);
-            setPage(1);
-        } else {
-            setFilterValue("");
-        }
-    }, []);
+const onSearchChange = React.useCallback((value: string) => {
+    setFilterValue(value);
+    setPage(1);
+}, []);
 
-    const onSearchChangeservice = React.useCallback((value: string) => {
-        if (value) {
-            setFilterValueservice(value);
-            setPageService(1);
-        } else {
-            setFilterValueservice("");
-        }
-    }, []);
+const onSearchChangeservice = React.useCallback((value: string) => {
+    setFilterValueservice(value);
+    setPageService(1);
+}, []);
 
-    const topContent = React.useMemo(() => {
-        return (
-            <div className="flex flex-col gap-4">
-                <div className="flex flex-col sm:flex-row justify-between gap-3 items-end">
-                    <div className="relative w-full sm:max-w-[20%]">
-                        <Input
-                            isClearable
-                            className="w-full pr-12 sm:pr-14 pl-12"
-                            startContent={<SearchIcon className="h-4 w-5 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />}
-                            placeholder="Search"
-                            value={filterValue}
-                            onChange={(e) => setFilterValue(e.target.value)}
-                            onClear={() => setFilterValue("")}
-                        />
-                    </div>
+
+   const topContent = React.useMemo(() => {
+    return (
+        <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row justify-between gap-3 items-end">
+                <div className="relative w-full sm:max-w-[20%]">
+                    <Input
+                        isClearable
+                        className="w-full pr-12 sm:pr-14 pl-12"
+                        startContent={<SearchIcon className="h-4 w-5 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />}
+                        placeholder="Search"
+                        value={filterValue}
+                        onChange={(e) => onSearchChange(e.target.value)}
+                        onClear={() => onSearchChange("")}
+                    />
                 </div>
+                <select value={rowsPerPage} onChange={onRowsPerPageChange} className="border rounded px-2 py-1">
+                    <option value={5}>5 per page</option>
+                    <option value={10}>10 per page</option>
+                    <option value={20}>20 per page</option>
+                </select>
             </div>
-        );
-    }, [
-        filterValue,
-        statusFilter,
-        visibleColumns,
-        onRowsPerPageChange,
-        certificates.length,
-        onSearchChange,
-    ]);
+        </div>
+    );
+}, [filterValue, onSearchChange, onRowsPerPageChange, rowsPerPage]);
 
-    const topContentservice = React.useMemo(() => {
-        return (
-            <div className="flex flex-col gap-4">
-                <div className="flex flex-col sm:flex-row justify-between gap-3 items-end">
-                    <div className="relative w-full sm:max-w-[20%]">
-                        <Input
-                            isClearable
-                            className="w-full pr-12 sm:pr-14 pl-12"
-                            placeholder="Search"
-                            startContent={<SearchIcon className="h-4 w-5 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />}
-                            value={filterValueservice}
-                            onChange={(e) => setFilterValueservice(e.target.value)}
-                            onClear={() => setFilterValueservice("")}
-                        />
-                    </div>
+const topContentservice = React.useMemo(() => {
+    return (
+        <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row justify-between gap-3 items-end">
+                <div className="relative w-full sm:max-w-[20%]">
+                    <Input
+                        isClearable
+                        className="w-full pr-12 sm:pr-14 pl-12"
+                        placeholder="Search"
+                        startContent={<SearchIcon className="h-4 w-5 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />}
+                        value={filterValueservice}
+                        onChange={(e) => onSearchChangeservice(e.target.value)}
+                        onClear={() => onSearchChangeservice("")}
+                    />
                 </div>
+                <select value={rowsPerPageService} onChange={onRowsPerPageChangeservice} className="border rounded px-2 py-1">
+                    <option value={5}>5 per page</option>
+                    <option value={10}>10 per page</option>
+                    <option value={20}>20 per page</option>
+                </select>
             </div>
-        );
-    }, [
-        filterValueservice,
-        statusFilterService,
-        visibleColumnsService,
-        onRowsPerPageChangeservice,
-        services.length,
-        onSearchChangeservice,
-    ]);
+        </div>
+    );
+}, [filterValueservice, onSearchChangeservice, onRowsPerPageChangeservice, rowsPerPageService]);
+
 
     const bottomContent = React.useMemo(() => {
         return (
             <div className="py-2 px-2 flex justify-between items-center">
-                <span className="w-[30%] text-small text-default-400">
-
-                </span>
+                <span className="w-[30%] text-small text-default-400"></span>
                 <Pagination
                     isCompact
-                    // showControlsf
                     showShadow
                     color="success"
                     page={page}
                     total={pages}
                     onChange={setPage}
                     classNames={{
-                        // base: "gap-2 rounded-2xl shadow-lg p-2 dark:bg-default-100",
                         cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
                         item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
                     }}
                 />
-
                 <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
                     <Button
                         className="bg-[hsl(339.92deg_91.04%_52.35%)]"
@@ -533,7 +410,6 @@ export default function Page() {
                     >
                         Previous
                     </Button>
-
                     <Button
                         className="bg-[hsl(339.92deg_91.04%_52.35%)]"
                         variant="default"
@@ -543,29 +419,23 @@ export default function Page() {
                     >
                         Next
                     </Button>
-
-
                 </div>
             </div>
         );
-    }, [selectedKeys, items.length, page, pages, hasSearchFilter]);
+    }, [page, pages, onNextPage, onPreviousPage]);
 
     const bottomContentservice = React.useMemo(() => {
         return (
             <div className="py-2 px-2 flex justify-between items-center">
-                <span className="w-[30%] text-small text-default-400">
-
-                </span>
+                <span className="w-[30%] text-small text-default-400"></span>
                 <Pagination
                     isCompact
-                    // showControlsf
                     showShadow
                     color="success"
                     page={pageService}
                     total={pageservices}
                     onChange={setPageService}
                     classNames={{
-                        // base: "gap-2 rounded-2xl shadow-lg p-2 dark:bg-default-100",
                         cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
                         item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
                     }}
@@ -580,7 +450,6 @@ export default function Page() {
                     >
                         Previous
                     </Button>
-
                     <Button
                         className="bg-[hsl(339.92deg_91.04%_52.35%)]"
                         variant="default"
@@ -593,43 +462,23 @@ export default function Page() {
                 </div>
             </div>
         );
-    }, [selectedKeys, items.length, pageService, pageservices, hasSearchFilterservice]);
+    }, [pageService, pageservices, onNextPageservice, onPreviousPageService]);
 
     const handleSelectionChange = (keys: Selection) => {
-        if (keys === "all") {
-            setSelectedKeys(new Set(certificates.map(cert => cert._id)));
-        } else {
-            setSelectedKeys(keys as Set<string>);
-        }
+        setSelectedKeys(keys as Set<string>);
     };
 
     const handleSelectionChangeservice = (keys: Selection) => {
-        if (keys === "all") {
-            setSelectedKeysService(new Set(services.map(service => service._id)));
-        } else {
-            setSelectedKeysService(keys as Set<string>);
-        }
-    }
+        setSelectedKeysService(keys as Set<string>);
+    };
 
-    const renderCell = React.useCallback((certificate: Certificate, columnKey: string): React.ReactNode => {
-        const cellValue = certificate[columnKey];
+    const renderCell = React.useCallback((item: Certificate, columnKey: string) => {
+        return item[columnKey];
+    }, []);
 
-        if ((columnKey === "dateOfCalibration" || columnKey === "calibrationDueDate") && cellValue) {
-            return formatDate(cellValue);
-        }
-
-        return cellValue;
-    }, [isDownloading]);
-
-    const renderCellservice = React.useCallback((service: Service, columnKey: string): React.ReactNode => {
-        const cellValue = service[columnKey as keyof Service];
-
-        if ((columnKey === "dateOfCalibration" || columnKey === "calibrationDueDate") && cellValue) {
-            return formatDate(cellValue);
-        }
-
-        return cellValue;
-    }, [isDownloadingService]);
+    const renderCellservice = React.useCallback((item: Service, columnKey: string) => {
+        return item[columnKey];
+    }, []);
 
     return (
         <SidebarProvider>
@@ -638,7 +487,6 @@ export default function Page() {
                 <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
-                        <ModeToggle />
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
@@ -651,7 +499,7 @@ export default function Page() {
                         </Breadcrumb>
                     </div>
                 </header>
-                <div className="flex flex-1 flex-col p-4 ">
+                <div className="flex-1 flex flex-col p-4">
                     <div className="grid p-2 auto-rows-min gap-4 md:grid-cols-3">
                         <Card className="rounded-lg border shadow-sm">
                             <CardHeader className="pb-2">
@@ -693,11 +541,11 @@ export default function Page() {
                                 <CardContent>
                                     <Table
                                         isHeaderSticky
-                                        aria-label="Leads table with custom cells, pagination and sorting"
+                                        aria-label="Certificates table"
                                         bottomContent={bottomContent}
                                         bottomContentPlacement="outside"
                                         classNames={{
-                                            wrapper: "max-h-[382px] ower-flow-y-auto",
+                                            wrapper: "max-h-[382px] overflow-y-auto",
                                         }}
                                         selectedKeys={selectedKeys}
                                         sortDescriptor={sortDescriptor}
@@ -715,7 +563,7 @@ export default function Page() {
                                             {(column) => (
                                                 <TableColumn
                                                     key={column.uid}
-                                                    align={column.uid === "actions" ? "center" : "start"}
+                                                    align="start"
                                                     allowsSorting={column.sortable}
                                                 >
                                                     {column.name}
@@ -725,7 +573,7 @@ export default function Page() {
                                         <TableBody emptyContent={"No certificate available"} items={sortedItems}>
                                             {(item) => (
                                                 <TableRow key={item._id}>
-                                                    {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item as Certificate, columnKey as string)}</TableCell>}
+                                                    {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item, columnKey as string)}</TableCell>}
                                                 </TableRow>
                                             )}
                                         </TableBody>
@@ -741,11 +589,11 @@ export default function Page() {
                                 <CardContent>
                                     <Table
                                         isHeaderSticky
-                                        aria-label="Leads table with custom cells, pagination and sorting"
+                                        aria-label="Services table"
                                         bottomContent={bottomContentservice}
                                         bottomContentPlacement="outside"
                                         classNames={{
-                                            wrapper: "max-h-[382px] ower-flow-y-auto",
+                                            wrapper: "max-h-[382px] overflow-y-auto",
                                         }}
                                         selectedKeys={selectedKeysService}
                                         sortDescriptor={sortDescriptorService}
@@ -763,7 +611,7 @@ export default function Page() {
                                             {(column) => (
                                                 <TableColumn
                                                     key={column.uid}
-                                                    align={column.uid === "actions" ? "center" : "start"}
+                                                    align="start"
                                                     allowsSorting={column.sortable}
                                                 >
                                                     {column.name}
@@ -773,7 +621,7 @@ export default function Page() {
                                         <TableBody emptyContent={"No service available"} items={sortedItemsservice}>
                                             {(item) => (
                                                 <TableRow key={item._id}>
-                                                    {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCellservice(item as Service, columnKey as string)}</TableCell>}
+                                                    {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCellservice(item, columnKey as string)}</TableCell>}
                                                 </TableRow>
                                             )}
                                         </TableBody>
@@ -785,5 +633,5 @@ export default function Page() {
                 </div>
             </SidebarInset>
         </SidebarProvider>
-    )
+    );
 }

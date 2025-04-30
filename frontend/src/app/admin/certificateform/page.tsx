@@ -1,18 +1,15 @@
-"use client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+'use client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import { toast } from '@/hooks/use-toast'
 import { AdminSidebar } from "@/components/admin-sidebar";
-import { ModeToggle } from "@/components/ModeToggle";
 import { Trash2 } from "lucide-react";
-import router from "next/router";
 import { jsPDF } from "jspdf";
-
 
 interface Company {
     _id: string;
@@ -57,18 +54,19 @@ interface Engineer {
     name: string;
 }
 
-const generateCertificateNumber = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const randomNum = Math.floor(1000 + Math.random() * 9000);
-    return `RPS/${year}${month}${day}/${randomNum}`;
-};
-
 export default function CertificateForm() {
     const searchParams = useSearchParams();
     const certificateId = searchParams.get('id');
+
+    const generateCertificateNumber = () => {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const shortStartYear = String(currentYear).slice(-2);
+        const shortEndYear = String(currentYear + 1).slice(-2);
+        const yearRange = `${shortStartYear}-${shortEndYear}`;
+        const randomNum = Math.floor(1000 + Math.random() * 9000);
+        return `RPS/CER/${yearRange}/${randomNum}`;
+    };
 
     const [formData, setFormData] = useState<CertificateRequest>({
         certificateNo: generateCertificateNumber(),
@@ -210,7 +208,7 @@ export default function CertificateForm() {
                     dateOfCalibration: certificateData.dateOfCalibration?.split('T')[0] || today,
                     calibrationDueDate: certificateData.calibrationDueDate?.split('T')[0] || today,
                     observations: Array.isArray(certificateData.observations)
-                        ? certificateData.observations.map((obs: any) => ({
+                        ? certificateData.observations.map((obs: Observation) => ({
                             gas: obs.gas || "",
                             before: obs.before || "",
                             after: obs.after || ""
@@ -345,7 +343,7 @@ export default function CertificateForm() {
 
             const emptyFields = Object.entries(requiredFields)
                 .filter(([key]) => !formData[key as keyof CertificateRequest]?.toString().trim())
-                .map(([_, label]) => label);
+                .map(([, label]) => label);
 
             if (!startDate || !endDate) {
                 emptyFields.push("Date of Calibration", "Calibration Due Date");
@@ -356,7 +354,6 @@ export default function CertificateForm() {
                 setLoading(false);
                 return;
             }
-
 
             const hasEmptyObservations = formData.observations.some(obs =>
                 !obs.gas?.trim() || !obs.before?.trim() || !obs.after?.trim()
@@ -407,13 +404,13 @@ export default function CertificateForm() {
                 variant: "default",
             });
 
-
-        } catch (err: any) {
-            console.error("Submission error:", err);
+        } catch (err: unknown) {
+            const error = err as { response?: { data?: { message?: string; error?: string } }, message?: string };
+            console.error("Submission error:", error);
             const errorMessage =
-                err.response?.data?.message ||
-                err.response?.data?.error ||
-                err.message ||
+                error.response?.data?.message ||
+                error.response?.data?.error ||
+                error.message ||
                 "An error occurred";
 
             setError(errorMessage);
@@ -426,6 +423,7 @@ export default function CertificateForm() {
             setLoading(false);
         }
     };
+
 
     const filteredCompanies = companies.filter(company =>
         company.companyName.toLowerCase().includes(companySearchTerm.toLowerCase())
@@ -447,12 +445,17 @@ export default function CertificateForm() {
             const contentWidth = pageWidth - leftMargin - rightMargin;
             let y = topMargin;
 
-            const logoWidth = 80;
+            // Set logo dimensions and position
+            const logoWidth = 60;
             const logoHeight = 20;
-            const logoX = leftMargin;
-            doc.addImage(logo, "PNG", logoX, y, logoWidth, logoHeight);
+            const logoX = 2;
+            const logoY = 10;
 
-            y += logoHeight + 10;
+            // Add logo to the PDF
+            doc.addImage(logo, "PNG", logoX, logoY, logoWidth, logoHeight);
+
+            // Move the cursor below the logo
+            y = logoY + logoHeight + 10;
             doc.setFont("times", "bold").setFontSize(16).setTextColor(0, 51, 102);
             doc.text("CALIBRATION CERTIFICATE", pageWidth / 2, y, { align: "center" });
 
@@ -471,6 +474,14 @@ export default function CertificateForm() {
                 y += lineGap;
             };
 
+            const formatDate = (inputDateString: string | undefined) => {
+                if (!inputDateString) return "N/A";
+                const inputDate = new Date(inputDateString);
+                if (isNaN(inputDate.getTime())) return "N/A";
+                const pad = (n: number) => n.toString().padStart(2, "0");
+                return `${pad(inputDate.getDate())} - ${pad(inputDate.getMonth() + 1)} - ${inputDate.getFullYear()}`;
+            };
+
             addRow("Certificate No.", formData.certificateNo);
             addRow("Customer Name", formData.customerName);
             addRow("Site Location", formData.siteLocation);
@@ -481,8 +492,8 @@ export default function CertificateForm() {
             addRow("Gas Canister Details", formData.gasCanisterDetails);
 
             y += 5;
-            addRow("Date of Calibration", formData.dateOfCalibration);
-            addRow("Calibration Due Date", formData.calibrationDueDate);
+            addRow("Date of Calibration", formatDate(formData.dateOfCalibration));
+            addRow("Calibration Due Date", formatDate(formData.calibrationDueDate));
             addRow("Status", formData.status);
 
             y += 5;
@@ -571,7 +582,6 @@ export default function CertificateForm() {
                 <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
-                        <ModeToggle />
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
@@ -616,54 +626,54 @@ export default function CertificateForm() {
                                     </div>
                                 )}
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                    <input
-                                        type="text"
-                                        name="customerName"
-                                        placeholder="Customer Name"
-                                        value={formData.customerName}
-                                        onChange={(e) => {
-                                            handleChange(e);
-                                            setCompanySearchTerm(e.target.value); // Use the search term for filtering if needed
-                                            setShowCompanyDropdown(true); // Show dropdown on input change
-                                        }}
-                                        onFocus={() => setShowCompanyDropdown(true)} // Show dropdown when input is focused
-                                        onBlur={() => setTimeout(() => setShowCompanyDropdown(false), 150)} 
-                                        className="p-2 border rounded-md w-full text-sm focus:ring-indigo-500 focus:border-indigo-500"
-                                    />
+                                    <div className="relative w-full">
+                                        <input
+                                            type="text"
+                                            name="customerName"
+                                            placeholder="Company Name"
+                                            value={formData.customerName}
+                                            onChange={(e) => {
+                                                setFormData(prev => ({ ...prev, customerName: e.target.value }));
+                                                setCompanySearchTerm(e.target.value);
+                                                setShowCompanyDropdown(true);
+                                            }}
+                                            onFocus={() => setShowCompanyDropdown(true)}
+                                            onBlur={() => setTimeout(() => setShowCompanyDropdown(false), 150)}
+                                            className="p-2 border rounded-md w-full text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                        />
 
-                                    {showCompanyDropdown && (
-                                        <ul className="absolute z-20 mt-1 w-60 rounded-md border bg-black text-sm shadow-lg max-h-60 overflow-y-auto">
-                                            {isLoadingCompanies ? (
-                                                <li className="px-4 py-2 text-muted-foreground">Loading companies...</li>
-                                            ) : companies.length > 0 ? (
-                                                companies.map((company) => (
-                                                    <li
-                                                        key={company._id}
-                                                        className={`px-4 py-2 cursor-pointer hover:bg-muted transition-colors ${selectedCompanyName === company.companyName ? "bg-muted font-medium" : ""
-                                                            }`}
-                                                        onMouseDown={(e) => e.preventDefault()} // Prevent focus change when clicking
-                                                        onClick={() => {
-                                                            setFormData({ ...formData, customerName: company.companyName }); // Update customer name from selected company
-                                                            setCompanySearchTerm(company.companyName); // Set the search term as selected value
-                                                            setSelectedCompanyName(company.companyName); // Store the selected company name
-                                                            setShowCompanyDropdown(false); // Hide the dropdown after selection
-                                                        }}
-                                                    >
-                                                        {company.companyName}
+                                        {showCompanyDropdown && (
+                                            <ul className="absolute left-0 top-full mt-1 z-20 w-full rounded-md border bg-white text-sm shadow-lg max-h-60 overflow-y-auto">
+                                                {isLoadingCompanies ? (
+                                                    <li className="px-4 py-2 text-gray-500">Loading companies...</li>
+                                                ) : filteredCompanies.length > 0 ? (
+                                                    filteredCompanies.map((company) => (
+                                                        <li
+                                                            key={company._id}
+                                                            className={`px-4 py-2 cursor-pointer transition-colors ${selectedCompanyName === company.companyName ? " font-medium" : ""
+                                                                }`}
+                                                            onMouseDown={(e) => e.preventDefault()}
+                                                            onClick={() => {
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    customerName: company.companyName
+                                                                }));
+                                                                setCompanySearchTerm(company.companyName);
+                                                                setSelectedCompanyName(company.companyName);
+                                                                setShowCompanyDropdown(false);
+                                                            }}
+                                                        >
+                                                            {company.companyName}
+                                                        </li>
+                                                    ))
+                                                ) : (
+                                                    <li className="px-4 py-2 text-gray-500">
+                                                        {companySearchTerm ? "This name is not in the company records" : "Start typing to search companies"}
                                                     </li>
-                                                ))
-                                            ) : (
-                                                <li className="px-4 py-2 text-muted-foreground">
-                                                    {companySearchTerm ? "No companies found" : "Start typing to search companies"}
-                                                </li>
-                                            )}
-                                        </ul>
-                                    )}
-
-
-
-
-
+                                                )}
+                                            </ul>
+                                        )}
+                                    </div>
 
                                     <input
                                         type="text"
@@ -681,12 +691,13 @@ export default function CertificateForm() {
                                         value={formData.makeModel}
                                         onChange={handleChange}
                                         className="p-2 border rounded"
-
                                         disabled={isLoadingModels}
                                     >
                                         <option value="">Select Model</option>
                                         {isLoadingModels ? (
-                                            <option value="" disabled>Loading models...</option>
+                                            <option value="" disabled>
+                                                Loading models...
+                                            </option>
                                         ) : models.length > 0 ? (
                                             models.map((model) => (
                                                 <option key={model.model_name} value={model.model_name}>
@@ -694,8 +705,9 @@ export default function CertificateForm() {
                                                 </option>
                                             ))
                                         ) : (
-                                            <>
-                                            </>
+                                            <option value="" disabled>
+                                                No models available
+                                            </option>
                                         )}
                                     </select>
                                     <input
@@ -894,10 +906,11 @@ export default function CertificateForm() {
                                         {formData.observations.length === 0 && (
                                             <tr>
                                                 <td colSpan={5} className="border p-2 text-center text-gray-500">
-                                                    Click "Create Observation" to add one
+                                                    Click &quot;Create Observation&quot; to add one
                                                 </td>
                                             </tr>
                                         )}
+
                                         {formData.observations.length >= 5 && (
                                             <tr>
                                                 <td colSpan={5} className="border p-2 text-center text-yellow-600">

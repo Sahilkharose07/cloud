@@ -1,10 +1,17 @@
 "use client";
 
 import { toast } from "@/hooks/use-toast";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { Trash2, Download, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { jsPDF } from "jspdf";
+
+interface ContactPerson {
+    _id: string;
+    firstName: string;
+    contactNo: string;
+    company: string;
+}
 
 interface EngineerRemarks {
     serviceSpares: string;
@@ -29,6 +36,8 @@ interface ServiceRequest {
     makeModelNumberoftheInstrumentQuantity: string;
     serialNumberoftheInstrumentCalibratedOK: string;
     serialNumberoftheFaultyNonWorkingInstruments: string;
+    engineerReport: string;
+    customerReport: string;
     engineerRemarks: EngineerRemarks[];
     engineerId?: string;
     engineerName: string;
@@ -36,6 +45,8 @@ interface ServiceRequest {
 }
 
 interface ServiceResponse {
+    serviceEngineer: string;
+    customerName: string;
     serviceId: string;
     message: string;
     downloadUrl: string;
@@ -66,6 +77,8 @@ export default function GenerateService() {
         makeModelNumberoftheInstrumentQuantity: "",
         serialNumberoftheInstrumentCalibratedOK: "",
         serialNumberoftheFaultyNonWorkingInstruments: "",
+        engineerReport: "",
+        customerReport: "",
         engineerRemarks: [{ serviceSpares: "", partNo: "", rate: "", quantity: "", poNo: "" }],
         engineerName: "",
         status: ""
@@ -78,52 +91,138 @@ export default function GenerateService() {
     const [serviceEngineers, setServiceEngineers] = useState<ServiceEngineer[]>([]);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const [isSendingEmail, setIsSendingEmail] = useState(false);
+    const [contactPersons, setContactPersons] = useState<ContactPerson[]>([]);
+    const [filteredContacts, setFilteredContacts] = useState<ContactPerson[]>([]);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [isLoadingContacts, setIsLoadingContacts] = useState(false);
 
-    useEffect(() => {
-        const fetchEngineers = async () => {
-            try {
-                const response = await axios.get("http://localhost:5000/api/v1/engineers/getEngineers");
-                setEngineers(response.data);
-            } catch (error) {
-                console.error("Error fetching engineers:", error);
+    const fetchContactPersons = useCallback(async () => {
+        setIsLoadingContacts(true);
+        try {
+            const response = await axios.get(
+                "http://localhost:5000/api/v1/contactperson/getContactPersons",
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token")}`,
+                    },
+                }
+            );
+
+            const data = response.data?.data || response.data || [];
+
+            if (!Array.isArray(data)) {
+                console.error("API response is not an array:", data);
+                setContactPersons([]);
+                setFilteredContacts([]);
+                return;
             }
-        };
-        fetchEngineers();
+
+            setContactPersons(data);
+            setFilteredContacts(data);
+        } catch (error) {
+            console.error("Error fetching contact persons:", error);
+            toast({
+                title: "Error",
+                description: "Failed to load contacts",
+                variant: "destructive",
+            });
+            setContactPersons([]);
+            setFilteredContacts([]);
+        } finally {
+            setIsLoadingContacts(false);
+        }
     }, []);
 
     useEffect(() => {
-        const fetchServiceEngineers = async () => {
-            try {
-                const response = await fetch("http://localhost:5000/api/v1/ServiceEngineer/getServiceEngineers");
-                const data = await response.json();
-                setServiceEngineers(data);
-            } catch (error) {
-                console.error("Error fetching service engineers:", error);
-                toast({
-                    title: "Error",
-                    description: "Failed to load service engineers",
-                    variant: "destructive",
-                });
-            } finally {
-                setIsLoadingEngineers(false);
+        fetchContactPersons();
+    }, [fetchContactPersons]);
+
+    useEffect(() => {
+        if (!Array.isArray(contactPersons)) {
+            setFilteredContacts([]);
+            return;
+        }
+
+        const customerNameInput = formData.customerName.trim().toLowerCase();
+
+        if (customerNameInput.length > 0) {
+            const filtered = contactPersons.filter((person) =>
+                person.company?.toLowerCase().includes(customerNameInput)
+            );
+
+            setFilteredContacts(filtered);
+
+            const exactMatches = filtered.filter(
+                (person) => person.company?.toLowerCase() === customerNameInput
+            );
+
+            if (exactMatches.length > 0) {
+                const match = exactMatches[0];
+
+                setFormData((prev) => ({
+                    ...prev,
+                    customerName: match.company || customerNameInput,
+                    contactPerson: match.firstName || "",
+                    contactNumber: match.contactNo || "",
+                }));
             }
-        };
+        } else {
+            setFilteredContacts(contactPersons);
+        }
+    }, [formData.customerName, contactPersons]);
+
+    const fetchEngineers = useCallback(async () => {
+        try {
+            const response = await axios.get("http://localhost:5000/api/v1/engineers/getEngineers");
+            setEngineers(response.data);
+        } catch (error) {
+            console.error("Error fetching engineers:", error);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchEngineers();
+    }, [fetchEngineers]);
+
+    const fetchServiceEngineers = useCallback(async () => {
+        try {
+            const response = await fetch("http://localhost:5000/api/v1/ServiceEngineer/getServiceEngineers");
+            const data = await response.json();
+            setServiceEngineers(data);
+        } catch (error) {
+            console.error("Error fetching service engineers:", error);
+            toast({
+                title: "Error",
+                description: "Failed to load service engineers",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoadingEngineers(false);
+        }
+    }, []);
+
+    useEffect(() => {
         fetchServiceEngineers();
+    }, [fetchServiceEngineers]);
+
+    const generateReportNo = useCallback(() => {
+        const date = new Date();
+        const currentYear = date.getFullYear();
+        const shortStartYear = String(currentYear).slice(-2);
+        const shortEndYear = String(currentYear + 1).slice(-2);
+        const yearRange = `${shortStartYear}-${shortEndYear}`;
+        const randomNum = Math.floor(1000 + Math.random() * 9000);
+        return `RPS/SRV/${yearRange}/${randomNum}`;
     }, []);
 
     useEffect(() => {
         if (!formData.reportNo) {
-            const generateReportNo = () => {
-                const date = new Date();
-                const randomNum = Math.floor(1000 + Math.random() * 9000);
-                return `SRV-${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}-${randomNum}`;
-            };
             setFormData(prev => ({
                 ...prev,
                 reportNo: generateReportNo()
             }));
         }
-    }, []);
+    }, [formData.reportNo, generateReportNo]);
 
     const handleServiceEngineerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const selectedId = e.target.value;
@@ -174,11 +273,12 @@ export default function GenerateService() {
         setFormData({ ...formData, engineerRemarks: updatedEngineerRemarks });
     };
 
-    const validateForm = () => {
+    const validateForm = (): string | null => {
         const requiredFields = [
-            'customerName', 'customerLocation', 'contactPerson',
-            'contactNumber', 'serviceEngineer', 'date', 'place',
-            'placeOptions', 'natureOfJob', 'reportNo', 'engineerName', 'status'
+            'customerName', 'customerLocation', 'contactPerson', 'contactNumber',
+            'serviceEngineer', 'date', 'place', 'placeOptions', 'natureOfJob',
+            'makeModelNumberoftheInstrumentQuantity', 'serialNumberoftheInstrumentCalibratedOK',
+            'serialNumberoftheFaultyNonWorkingInstruments', 'engineerReport', 'customerReport', 'engineerName', 'status'
         ];
 
         for (const field of requiredFields) {
@@ -233,9 +333,10 @@ export default function GenerateService() {
                 description: "Service report generated successfully",
                 variant: "default",
             });
-        } catch (err: any) {
-            setError(err.response?.data?.error || "Failed to generate service. Please try again.");
-            console.error("API Error:", err.response?.data);
+        } catch (err) {
+            const error = err as AxiosError<{ error?: string }>;
+            setError(error.response?.data?.error || "Failed to generate service. Please try again.");
+            console.error("API Error:", error.response?.data);
         } finally {
             setLoading(false);
         }
@@ -250,100 +351,114 @@ export default function GenerateService() {
             });
             return;
         }
-
+    
         setIsGeneratingPDF(true);
-
+        setIsSendingEmail(false);
+    
         try {
-            // Generate PDF
-            const doc = new jsPDF();
+            const doc = new jsPDF({
+                orientation: "portrait",
+                unit: "mm",
+                format: "a4"
+            });
+    
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
-
-            // Load logo and info image
+    
             const logo = new Image();
             logo.src = "/img/rps.png";
             const infoImage = new Image();
             infoImage.src = "/img/handf.png";
-
-            // Wait for images to load
+    
             await new Promise<void>((resolve, reject) => {
                 logo.onload = () => {
                     infoImage.onload = () => resolve();
-                    infoImage.onerror = () => reject("Failed to load info image");
+                    infoImage.onerror = () => reject(new Error("Failed to load footer image"));
                 };
-                logo.onerror = () => reject("Failed to load logo");
+                logo.onerror = () => reject(new Error("Failed to load logo image"));
             });
-
-            // Add content to PDF
+    
             const leftMargin = 15;
             const rightMargin = 15;
             const topMargin = 20;
             let y = topMargin;
-
-            // Logo
-            doc.addImage(logo, "PNG", leftMargin, y, 50, 15);
-            y += 20;
-
-            // Info Image
-            doc.addImage(infoImage, "PNG", leftMargin, y, 180, 20);
-            y += 30;
-
-            // Title
+    
+            doc.addImage(logo, "PNG", 5, 5, 50, 15);
+            y = 40;
+    
             doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
             doc.text("SERVICE / CALIBRATION / INSTALLATION JOBREPORT", pageWidth / 2, y, { align: "center" });
             y += 10;
 
-            // Add form data
+            const formatDate = (inputDateString: string | undefined): string => {
+                if (!inputDateString) return "N/A";
+                const inputDate = new Date(inputDateString);
+                if (isNaN(inputDate.getTime())) return "N/A";
+                const pad = (n: number) => n.toString().padStart(2, "0");
+                return `${pad(inputDate.getDate())} - ${pad(inputDate.getMonth() + 1)} - ${inputDate.getFullYear()}`;
+            };
+    
             const addRow = (label: string, value: string) => {
                 const labelOffset = 65;
                 doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-                doc.text(label + ":", leftMargin, y);
+                doc.text(`${label}:`, leftMargin, y);
                 doc.setFont("times", "normal").setTextColor(50);
                 doc.text(value || "N/A", leftMargin + labelOffset, y);
                 y += 7;
             };
-
+    
+            addRow("Report No.", formData.reportNo);
             addRow("Customer Name", formData.customerName);
             addRow("Customer Location", formData.customerLocation);
             addRow("Contact Person", formData.contactPerson);
             addRow("Status", formData.status);
             addRow("Contact Number", formData.contactNumber);
             addRow("Service Engineer", formData.serviceEngineer);
-            addRow("Date", formData.date);
+            addRow("Date", formatDate(formData.date));
             addRow("Place", formData.place);
             addRow("Place Options", formData.placeOptions);
             addRow("Nature of Job", formData.natureOfJob);
-            addRow("Report No.", formData.reportNo);
             addRow("Make & Model Number", formData.makeModelNumberoftheInstrumentQuantity);
+    
             y += 5;
             addRow("Calibrated & Tested OK", formData.serialNumberoftheInstrumentCalibratedOK);
             addRow("Sr.No Faulty/Non-Working", formData.serialNumberoftheFaultyNonWorkingInstruments);
             y += 10;
-
+    
+            doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+            doc.text("Engineer Report:", leftMargin, y);
+            y += 5;
+    
+            const engineerReportHeight = 30;
             doc.setDrawColor(0);
-            doc.setLineWidth(0.5);
-            doc.line(leftMargin, y, pageWidth - rightMargin, y);
-
-            // Page 2
+            doc.setLineWidth(0.2);
+            doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, engineerReportHeight);
+    
+            const engineerReportLines = doc.splitTextToSize(formData.engineerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
+            doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
+            doc.text(engineerReportLines, leftMargin + 2, y + 5);
+    
+            y += engineerReportHeight + 5;
+    
             doc.addPage();
             y = topMargin;
-
+    
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
             doc.text("ENGINEER REMARKS", leftMargin, y);
             y += 8;
-
+    
             const tableHeaders = ["Sr. No.", "Service/Spares", "Part No.", "Rate", "Quantity", "PO No."];
             const colWidths = [20, 60, 25, 25, 25, 25];
             let x = leftMargin;
-
+    
             tableHeaders.forEach((header, i) => {
                 doc.rect(x, y, colWidths[i], 8);
                 doc.text(header, x + 2, y + 6);
                 x += colWidths[i];
             });
-
+    
             y += 8;
-
+    
             formData.engineerRemarks.forEach((item, index) => {
                 x = leftMargin;
                 const values = [
@@ -360,35 +475,63 @@ export default function GenerateService() {
                     x += colWidths[i];
                 });
                 y += 8;
-
-                if (y + 20 > pageHeight) {
+    
+                if (y + 50 > pageHeight) {
                     doc.addPage();
                     y = topMargin;
                 }
             });
-
+    
             y += 10;
-            doc.setFont("times", "normal");
-            doc.text("Service Engineer", pageWidth - rightMargin - 40, y);
-            doc.text(formData.serviceEngineer || "", pageWidth - rightMargin - 40, y + 5);
-
-            // Generated time
-            const now = new Date();
-            const pad = (n: number) => n.toString().padStart(2, "0");
-            const date = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}`;
-            const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-            doc.setFontSize(9).setTextColor(100);
-            doc.text(`Report Generated On: ${date} ${time}`, leftMargin, pageHeight - 10);
-
-            // Get PDF as base64 string
+    
+            doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+            doc.text("Customer Report:", leftMargin, y);
+            y += 5;
+    
+            const customerReportHeight = 30;
+            doc.setDrawColor(0);
+            doc.setLineWidth(0.2);
+            doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, customerReportHeight);
+    
+            const customerReportLines = doc.splitTextToSize(formData.customerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
+            doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
+            doc.text(customerReportLines, leftMargin + 2, y + 5);
+    
+            y += customerReportHeight + 5 + (10 * 7);
+    
+            doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+            doc.text("Customer Name, Seal & Sign", leftMargin, y);
+            doc.text("Engineer Name, Seal & Sign", pageWidth - rightMargin - 60, y);
+    
+            y += 6;
+    
+            doc.setFont("times", "normal").setFontSize(10).setTextColor(50);
+            doc.text(formData.customerName || "N/A", leftMargin, y);
+            doc.text(formData.engineerName || "N/A", pageWidth - rightMargin - 60, y);
+    
+            const addFooterImage = () => {
+                const footerY = pageHeight - 25;
+                const footerWidth = 180;
+                const footerHeight = 20;
+                const footerX = (pageWidth - footerWidth) / 2;
+    
+                const pageCount = doc.getNumberOfPages();
+                for (let i = 1; i <= pageCount; i++) {
+                    doc.setPage(i);
+                    doc.addImage(infoImage, "PNG", footerX, footerY, footerWidth, footerHeight);
+                }
+            };
+    
+            addFooterImage();
+    
             const pdfBase64 = doc.output('datauristring').split(',')[1];
-
-            // Save the PDF locally
+    
             doc.save(`service-${service.serviceId}.pdf`);
-
-            // Send email with PDF attachment
+    
+            setIsGeneratingPDF(false);
             setIsSendingEmail(true);
-            const emailResponse = await axios.post(
+    
+            await axios.post(
                 'http://localhost:5000/api/v1/services/sendMail',
                 {
                     serviceId: service.serviceId,
@@ -397,21 +540,23 @@ export default function GenerateService() {
                 {
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem("authToken")}`
+                        'Authorization': `Bearer ${localStorage.getItem("token")}`
                     }
                 }
             );
-
+    
             toast({
                 title: "Success",
                 description: "PDF generated and email sent successfully",
                 variant: "default",
             });
-        } catch (err: any) {
-            console.error("Error generating PDF or sending email:", err);
+    
+        } catch (err) {
+            const error = err as Error;
+            console.error("Error generating PDF:", error);
             toast({
                 title: "Error",
-                description: err.response?.data?.error || "Failed to generate PDF or send email",
+                description: error.message || "Failed to generate PDF",
                 variant: "destructive",
             });
         } finally {
@@ -419,6 +564,7 @@ export default function GenerateService() {
             setIsSendingEmail(false);
         }
     };
+    
 
     return (
         <div className="container mx-auto p-4">
@@ -428,16 +574,63 @@ export default function GenerateService() {
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+<form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <input
-                        type="text"
-                        name="customerName"
-                        placeholder="Customer Name "
-                        value={formData.customerName}
-                        onChange={handleChange}
-                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    <div className="relative w-full">
+                        <input
+                            type="text"
+                            name="customerName"
+                            placeholder="Company Name"
+                            value={formData.customerName}
+                            onChange={(e) => {
+                                handleChange(e);
+                                setShowDropdown(true);
+                            }}
+                            onFocus={() => setShowDropdown(true)}
+                            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+                        />
+
+
+                        {showDropdown && (
+                            <ul className="absolute left-0 top-full mt-1 z-20 w-full rounded-md border bg-white dark:bg-gray-800 shadow-lg max-h-60 overflow-y-auto">
+                                {isLoadingContacts ? (
+                                    <li className="px-4 py-2 text-gray-500">Loading contacts...</li>
+                                ) : filteredContacts.length > 0 ? (
+                                    filteredContacts.map((contact) => (
+                                        <li
+                                            key={contact._id}
+                                            className={`px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${formData.customerName === contact.company
+                                                ? "bg-blue-50 dark:bg-blue-900"
+                                                : ""
+                                                }`}
+                                            onClick={() => {
+                                                setFormData((prev) => ({
+                                                    ...prev,
+                                                    customerName: contact.company || "",
+                                                    contactPerson: contact.firstName || "",
+                                                    contactNumber: contact.contactNo || "",
+                                                }));
+                                                setShowDropdown(false);
+                                            }}
+                                        >
+                                            <div className="font-medium">{contact.company || "No company"}</div>
+                                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                {contact.firstName && `Contact: ${contact.firstName}`}
+                                                {contact.contactNo && ` | Phone: ${contact.contactNo}`}
+                                            </div>
+                                        </li>
+                                    ))
+                                ) : (
+                                    <li className="px-4 py-2 text-gray-500">
+                                        {contactPersons.length === 0
+                                            ? "No records available"
+                                            : "No records available with this name"}
+                                    </li>
+                                )}
+                            </ul>
+                        )}
+                    </div>
                     <input
                         type="text"
                         name="customerLocation"
@@ -594,7 +787,7 @@ export default function GenerateService() {
                         required
                         disabled={isLoadingEngineers}
                     >
-                        <option value="">Select Engineer</option>
+                        <option value="">Created By</option>
                         {isLoadingEngineers ? (
                             <option>Loading engineer...</option>
                         ) : (
@@ -633,9 +826,17 @@ export default function GenerateService() {
                         className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black resize-none"
                         rows={3}
                     />
+
+                    <textarea
+                        name="engineerReport"
+                        placeholder="Engineer Remark"
+                        value={formData.engineerReport}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black resize-none"
+                        rows={3}
+                    />
                 </div>
 
-                <h2 className="text-lg font-bold mt-4 text-center">Engineer Remarks Table</h2>
 
                 <div className="flex justify-end mb-4">
                     <button
@@ -654,6 +855,7 @@ export default function GenerateService() {
                             <th className="border p-2">Part Number</th>
                             <th className="border p-2">Rate</th>
                             <th className="border p-2">Quantity</th>
+                            <th className="border p-2">Total</th>
                             <th className="border p-2">PO Number</th>
                             <th className="border p-2">Action</th>
                         </tr>
@@ -676,10 +878,7 @@ export default function GenerateService() {
                                         type="text"
                                         name="partNo"
                                         value={engineerRemark.partNo}
-                                        onChange={(e) => {
-                                            const value = e.target.value.replace(/[^0-9]/g, '');
-                                            handleEngineerRemarksChange(index, 'partNo', value);
-                                        }}
+                                        onChange={(e) => handleEngineerRemarksChange(index, 'partNo', e.target.value)}
                                         className="w-full p-1 border rounded"
                                     />
                                 </td>
@@ -688,10 +887,7 @@ export default function GenerateService() {
                                         type="text"
                                         name="rate"
                                         value={engineerRemark.rate}
-                                        onChange={(e) => {
-                                            const value = e.target.value.replace(/[^0-9]/g, '');
-                                            handleEngineerRemarksChange(index, 'rate', value);
-                                        }}
+                                        onChange={(e) => handleEngineerRemarksChange(index, 'rate', e.target.value)}
                                         className="w-full p-1 border rounded"
                                     />
                                 </td>
@@ -700,10 +896,16 @@ export default function GenerateService() {
                                         type="text"
                                         name="quantity"
                                         value={engineerRemark.quantity}
-                                        onChange={(e) => {
-                                            const value = e.target.value.replace(/[^0-9]/g, '');
-                                            handleEngineerRemarksChange(index, 'quantity', value);
-                                        }}
+                                        onChange={(e) => handleEngineerRemarksChange(index, 'quantity', e.target.value)}
+                                        className="w-full p-1 border rounded"
+                                    />
+                                </td>
+                                <td className="border p-2">
+                                    <input
+                                        type="text"
+                                        name="total"
+                                        value={Number(engineerRemark.rate) * Number(engineerRemark.quantity) || 0}
+                                        readOnly
                                         className="w-full p-1 border rounded"
                                     />
                                 </td>
@@ -712,10 +914,7 @@ export default function GenerateService() {
                                         type="text"
                                         name="poNo"
                                         value={engineerRemark.poNo}
-                                        onChange={(e) => {
-                                            const value = e.target.value.replace(/[^0-9]/g, '');
-                                            handleEngineerRemarksChange(index, 'poNo', value);
-                                        }}
+                                        onChange={(e) => handleEngineerRemarksChange(index, 'poNo', e.target.value)}
                                         className="w-full p-1 border rounded"
                                     />
                                 </td>
@@ -730,8 +929,8 @@ export default function GenerateService() {
                         ))}
                         {formData.engineerRemarks.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="border p-2 text-center text-gray-500">
-                                    Click "Create Engineer Remark" to add one
+                                <td colSpan={8} className="border p-2 text-center text-gray-500">
+                                    Click &quot;Create Engineer Remark&quot; to add one
                                 </td>
                             </tr>
                         )}
@@ -744,6 +943,17 @@ export default function GenerateService() {
                         )}
                     </tbody>
                 </table>
+
+                <div className="flex flex-col gap-4">
+                    <textarea
+                        name="customerReport"
+                        placeholder="Customer Report"
+                        value={formData.customerReport}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black resize-none"
+                        rows={3}
+                    />
+                </div>
 
                 <button
                     type="submit"
@@ -770,13 +980,12 @@ export default function GenerateService() {
                         ) : (
                             <>
                                 <Download className="h-4 w-4" />
-                                Download & Email Service  Report
+                                Download &amp; Email Service Report
                             </>
                         )}
                     </button>
                 </div>
-            )
-            }
-        </div >
+            )}
+        </div>
     );
 }

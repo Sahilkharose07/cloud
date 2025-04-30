@@ -2,33 +2,28 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { AdminSidebar } from "@/components/admin-sidebar";
-import { ModeToggle } from "@/components/ModeToggle";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem,  FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { useRouter } from "next/navigation"
 
 const companySchema = z.object({
     companyName: z.string().nonempty({ message: "Required" }),
     address: z.string().nonempty({ message: "Required" }),
     industries: z.string().nonempty({ message: "Required" }),
     industriesType: z.string().nonempty({ message: "Required" }),
-    gstNumber: z.string().nonempty({ message: "Required" }),
-    website: z.preprocess((val) => (val === "" ? undefined : val),
-        z.string({
-            required_error: "Required",
-            invalid_type_error: "Invalid website URL"
-        }).url("Invalid website URL")
-    ),
+    gstNumber: z.string().optional(),
+    website: z.string().optional(),
     flag: z.enum(["Red", "Yellow", "Green"], {
         errorMap: () => ({ message: "Required" }),
     }),
@@ -38,6 +33,7 @@ export default function AddCategory() {
     const searchParams = useSearchParams();
     const certificateId = searchParams.get('id');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const router = useRouter();
 
     const form = useForm<z.infer<typeof companySchema>>({
         resolver: zodResolver(companySchema),
@@ -57,16 +53,16 @@ export default function AddCategory() {
             const fetchCompany = async () => {
                 try {
                     setIsSubmitting(true);
-                    const response = await axios.get(`http://localhost:5000/api/v1/company/getcompanyById/${certificateId}`);
-                    if (response.data) {
+                    const { data } = await axios.get(`http://localhost:5000/api/v1/company/getcompanyById/${certificateId}`);
+                    if (data) {
                         form.reset({
-                            companyName: response.data.companyName || "",
-                            address: response.data.address || "",
-                            gstNumber: response.data.gstNumber || "",
-                            industries: response.data.industries || "",
-                            website: response.data.website || "",
-                            industriesType: response.data.industriesType || "",
-                            flag: response.data.flag || "",
+                            companyName: data.companyName || "",
+                            address: data.address || "",
+                            gstNumber: data.gstNumber || "",
+                            industries: data.industries || "",
+                            website: data.website || "",
+                            industriesType: data.industriesType || "",
+                            flag: data.flag || "",
                         });
                     }
                 } catch (error) {
@@ -83,26 +79,27 @@ export default function AddCategory() {
             fetchCompany();
         }
     }, [certificateId, form]);
+    
 
     const onSubmit = async (values: z.infer<typeof companySchema>) => {
         setIsSubmitting(true);
-
+    
         try {
-            let response;
             if (certificateId) {
-                response = await axios.put(`http://localhost:5000/api/v1/company/updatecompany/${certificateId}`, values);
+                await axios.put(`http://localhost:5000/api/v1/company/updatecompany/${certificateId}`, values);
                 toast({
                     title: "Company Updated",
                     description: "The company has been successfully updated",
                 });
             } else {
-                response = await axios.post("http://localhost:5000/api/v1/company/createcompany", values);
+                await axios.post("http://localhost:5000/api/v1/company/createcompany", values);
                 toast({
                     title: "Company Submitted",
                     description: "The company has been successfully created",
                 });
                 form.reset();
             }
+            router.push("/admin/companyrecord");
         } catch (error) {
             let errorMessage = "An unknown error occurred";
             if (axios.isAxiosError(error) && error.response) {
@@ -118,6 +115,7 @@ export default function AddCategory() {
             setIsSubmitting(false);
         }
     };
+    
 
     return (
         <SidebarProvider>
@@ -126,13 +124,12 @@ export default function AddCategory() {
                 <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
-                        <ModeToggle />
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
                                 <BreadcrumbItem>
                                     <BreadcrumbLink href="/admin/dashboard">
-                                        <BreadcrumbPage>Dashboard</BreadcrumbPage>
+                                        Dashboard
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
@@ -237,7 +234,7 @@ export default function AddCategory() {
                                                 <FormItem>
                                                     <FormControl>
                                                         <Input
-                                                            placeholder="GST Number"
+                                                            placeholder="GST Number (Optional)"
                                                             {...field}
                                                             disabled={isSubmitting}
                                                         />
@@ -253,7 +250,7 @@ export default function AddCategory() {
                                                 <FormItem>
                                                     <FormControl>
                                                         <Input
-                                                            placeholder="Website"
+                                                            placeholder="Website (Optional)"
                                                             {...field}
                                                             disabled={isSubmitting}
                                                         />

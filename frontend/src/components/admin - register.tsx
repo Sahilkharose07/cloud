@@ -1,12 +1,19 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Eye, EyeOff } from "react-feather"; 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
+import { Eye, EyeOff } from "react-feather";
 
 export function RegisterForm() {
   const [formData, setFormData] = useState({
@@ -14,124 +21,127 @@ export function RegisterForm() {
     email: "",
     contact: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
   });
-  
+
   const [errors, setErrors] = useState({
     name: "",
     email: "",
     contact: "",
     password: "",
     confirmPassword: "",
-    form: ""
+    form: "",
   });
-  
+
   const [touched, setTouched] = useState({
     name: false,
     email: false,
     contact: false,
     password: false,
-    confirmPassword: false
+    confirmPassword: false,
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const router = useRouter();
 
-  // Validate form fields
   const validateField = (name: string, value: string) => {
     let error = "";
-    
+
     switch (name) {
       case "name":
         if (!value.trim()) error = "Name is required";
         else if (value.length < 3) error = "Name must be at least 3 characters";
         break;
-        
+
       case "email":
         if (!value) error = "Email is required";
-        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) error = "Invalid email format";
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
+          error = "Invalid email format";
         break;
-        
+
       case "contact":
         if (!value) error = "Contact number is required";
-        else if (!/^\d{10,15}$/.test(value)) error = "Invalid contact number (10-15 digits)";
+        else if (!/^\d{10,15}$/.test(value))
+          error = "Invalid contact number (10-15 digits)";
         break;
-        
+
       case "password":
         if (!value) error = "Password is required";
-        else if (value.length < 8) error = "Password must be at least 8 characters";
-        else if (!/[A-Z]/.test(value)) error = "Password must contain at least one uppercase letter";
-        else if (!/[a-z]/.test(value)) error = "Password must contain at least one lowercase letter";
-        else if (!/[0-9]/.test(value)) error = "Password must contain at least one number";
-        else if (!/[^A-Za-z0-9]/.test(value)) error = "Password must contain at least one special character";
+        else if (value.length < 8)
+          error = "Password must be at least 8 characters";
+        else if (!/[A-Z]/.test(value))
+          error = "Password must contain at least one uppercase letter";
+        else if (!/[a-z]/.test(value))
+          error = "Password must contain at least one lowercase letter";
+        else if (!/[0-9]/.test(value))
+          error = "Password must contain at least one number";
+        else if (!/[^A-Za-z0-9]/.test(value))
+          error = "Password must contain at least one special character";
         break;
-        
+
       case "confirmPassword":
         if (!value) error = "Please confirm your password";
         else if (value !== formData.password) error = "Passwords do not match";
         break;
     }
-    
+
     return error;
   };
 
-  // Validate entire form
   const validateForm = () => {
     const newErrors = {
       name: validateField("name", formData.name),
       email: validateField("email", formData.email),
       contact: validateField("contact", formData.contact),
       password: validateField("password", formData.password),
-      confirmPassword: validateField("confirmPassword", formData.confirmPassword),
-      form: ""
+      confirmPassword: validateField(
+        "confirmPassword",
+        formData.confirmPassword
+      ),
+      form: "",
     };
-    
+
     setErrors(newErrors);
-    
-    return !Object.values(newErrors).some(error => error !== "");
+
+    return !Object.values(newErrors).some((error) => error !== "");
   };
 
-  // Handle input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    
-    setFormData(prev => ({
+
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
-    
-    // Validate field if it's been touched
+
     if (touched[name as keyof typeof touched]) {
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
         [name]: validateField(name, value),
-        form: "" // Clear form-level error when user makes changes
+        form: "",
       }));
     }
   };
 
-  // Handle blur events (mark fields as touched)
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const { name } = e.target;
-    
+
     if (!touched[name as keyof typeof touched]) {
-      setTouched(prev => ({
+      setTouched((prev) => ({
         ...prev,
-        [name]: true
+        [name]: true,
       }));
-      
-      // Validate the field
-      setErrors(prev => ({
+
+      setErrors((prev) => ({
         ...prev,
         [name]: validateField(name, formData[name as keyof typeof formData]),
-        form: "" // Clear form-level error when user makes changes
+        form: "",
       }));
     }
   };
 
-  // Check if form is valid for submission
   const isFormValid = () => {
     return (
       formData.name &&
@@ -139,30 +149,25 @@ export function RegisterForm() {
       formData.contact &&
       formData.password &&
       formData.confirmPassword &&
-      !Object.values(errors).some(error => error !== "")
+      !Object.values(errors).some((error) => error !== "")
     );
   };
 
-  // Handle form submission
   const handleRegister = async () => {
-    // Mark all fields as touched to show errors
     setTouched({
       name: true,
       email: true,
       contact: true,
       password: true,
-      confirmPassword: true
+      confirmPassword: true,
     });
-
-    // Validate the entire form
+  
     const isValid = validateForm();
-    
-    if (!isValid) {
-      return;
-    }
-
+  
+    if (!isValid) return;
+  
     setLoading(true);
-
+  
     try {
       const response = await fetch("http://localhost:5000/api/v1/users/register", {
         method: "POST",
@@ -173,40 +178,44 @@ export function RegisterForm() {
           name: formData.name,
           email: formData.email,
           password: formData.password,
-          contact: formData.contact
+          contact: formData.contact,
         }),
       });
-
+  
       const data = await response.json();
-
+  
       if (!response.ok) {
-        setErrors(prev => ({
+        setErrors((prev) => ({
           ...prev,
-          form: data.message || data.error || "An error occurred. Please try again."
+          form: data.message || data.error || "An error occurred. Please try again.",
         }));
       } else {
         alert("Registration successful!");
         router.push("/login");
       }
     } catch (error) {
-      setErrors(prev => ({
+      console.error("Registration failed:", error);
+      setErrors((prev) => ({
         ...prev,
-        form: "An error occurred during registration. Please try again."
+        form: "An error occurred during registration. Please try again.",
       }));
     } finally {
       setLoading(false);
     }
   };
+  
 
   return (
     <Card className="w-[400px]">
       <CardHeader>
-        <CardTitle style={{ textAlign: "center" }}>Register</CardTitle>
-        <CardDescription style={{ textAlign: "center" }}>Create a new account.</CardDescription>
+        <CardTitle className="text-center">Register</CardTitle>
+        <CardDescription className="text-center">
+          Create a new account.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid w-full items-center gap-4">
-          {/* Name Input */}
+          {/* Name */}
           <div className="flex flex-col space-y-1.5">
             <Label htmlFor="name">Name</Label>
             <Input
@@ -216,10 +225,12 @@ export function RegisterForm() {
               onChange={handleChange}
               onBlur={handleBlur}
             />
-            {touched.name && errors.name && <p className="text-red-500 text-xs">{errors.name}</p>}
+            {touched.name && errors.name && (
+              <p className="text-red-500 text-xs">{errors.name}</p>
+            )}
           </div>
 
-          {/* Email Input */}
+          {/* Email */}
           <div className="flex flex-col space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -230,10 +241,12 @@ export function RegisterForm() {
               onChange={handleChange}
               onBlur={handleBlur}
             />
-            {touched.email && errors.email && <p className="text-red-500 text-xs">{errors.email}</p>}
+            {touched.email && errors.email && (
+              <p className="text-red-500 text-xs">{errors.email}</p>
+            )}
           </div>
 
-          {/* Contact Input */}
+          {/* Contact */}
           <div className="flex flex-col space-y-1.5">
             <Label htmlFor="contact">Contact</Label>
             <Input
@@ -244,10 +257,12 @@ export function RegisterForm() {
               onChange={handleChange}
               onBlur={handleBlur}
             />
-            {touched.contact && errors.contact && <p className="text-red-500 text-xs">{errors.contact}</p>}
+            {touched.contact && errors.contact && (
+              <p className="text-red-500 text-xs">{errors.contact}</p>
+            )}
           </div>
 
-          {/* Password Input */}
+          {/* Password */}
           <div className="flex flex-col space-y-1.5">
             <Label htmlFor="password">Password</Label>
             <div className="relative">
@@ -267,10 +282,12 @@ export function RegisterForm() {
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
-            {touched.password && errors.password && <p className="text-red-500 text-xs">{errors.password}</p>}
+            {touched.password && errors.password && (
+              <p className="text-red-500 text-xs">{errors.password}</p>
+            )}
           </div>
 
-          {/* Confirm Password Input */}
+          {/* Confirm Password */}
           <div className="flex flex-col space-y-1.5">
             <Label htmlFor="confirmPassword">Confirm Password</Label>
             <div className="relative">
@@ -284,25 +301,28 @@ export function RegisterForm() {
               />
               <button
                 type="button"
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center justify-center text-gray-500"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               >
                 {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
             {touched.confirmPassword && errors.confirmPassword && (
-              <p className="text-red-500 text-xs">{errors.confirmPassword}</p>
+              <p className="text-red-500 text-xs">
+                {errors.confirmPassword}
+              </p>
             )}
           </div>
 
-          {/* Display form-level error */}
-          {errors.form && <p className="text-red-500 text-sm mt-2">{errors.form}</p>}
+          {errors.form && (
+            <p className="text-red-500 text-sm mt-2">{errors.form}</p>
+          )}
         </div>
       </CardContent>
       <CardFooter>
-        <Button 
-          className="w-full" 
-          onClick={handleRegister} 
+        <Button
+          className="w-full"
+          onClick={handleRegister}
           disabled={loading || !isFormValid()}
         >
           {loading ? "Registering..." : "Register"}

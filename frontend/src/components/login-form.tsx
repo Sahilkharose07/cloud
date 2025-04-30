@@ -4,13 +4,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import Link from "next/link"
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai"
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
 import "react-toastify/dist/ReactToastify.css"
 import { ReloadIcon } from "@radix-ui/react-icons"
+import Image from "next/image";
+
+
 
 export function LoginForm() {
   const [email, setEmail] = useState("")
@@ -25,7 +27,7 @@ export function LoginForm() {
 
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email) {
       toast({
         title: "Error",
@@ -34,9 +36,9 @@ export function LoginForm() {
       });
       return;
     }
-  
+
     setIsSubmitting(true);
-  
+
     try {
       const response = await axios.post(
         "http://localhost:5000/api/v1/users/forgot-password",
@@ -45,14 +47,14 @@ export function LoginForm() {
           headers: { "Content-Type": "application/json" },
         }
       );
-  
+
       setEmailSent(true);
       toast({
         title: "Success",
         description: response.data.message,
       });
-  
-    } catch (error: any) {
+
+    } catch (error: unknown) {  // Change from AxiosError to unknown
       console.error("Forgot password error:", error);
       setEmailSent(true);
       toast({
@@ -73,8 +75,7 @@ export function LoginForm() {
       });
       return;
     }
-    
-    
+
     const passwordValidation = () => {
       if (password.length < 8) return "Password must be at least 8 characters";
       if (!/[A-Z]/.test(password)) return "Password must contain at least one uppercase letter";
@@ -83,7 +84,7 @@ export function LoginForm() {
       if (!/[^A-Za-z0-9]/.test(password)) return "Password must contain at least one special character";
       return "";
     };
-    
+
     const passwordError = passwordValidation();
     if (passwordError) {
       toast({
@@ -93,8 +94,6 @@ export function LoginForm() {
       });
       return;
     }
-    
-    
 
     try {
       setLoading(true);
@@ -111,7 +110,7 @@ export function LoginForm() {
       if (userResponse.ok) {
         localStorage.setItem("userId", userData.user.id);
         localStorage.setItem("authToken", userData.accessToken);
-        
+
         toast({
           title: "Login successful",
           description: "You are now on a dashboard",
@@ -148,11 +147,11 @@ export function LoginForm() {
         description: userData.message || adminData.message || "Invalid credentials",
         variant: "destructive",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {  // Change from AxiosError to unknown
       console.error("Login error:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to process request",
+        description: (error as Error).message || "Failed to process request",  // Use 'as Error' to access message property
         variant: "destructive",
       });
     } finally {
@@ -161,136 +160,135 @@ export function LoginForm() {
   };
 
   return (
-    <div>
-    {isForgotPassword ? (
-      emailSent ? (
-        <div className="border border-neutral-300 dark:border-neutral-700 rounded-xl p-6 shadow-sm">
-          <h2 className="font-bold text-xl text-neutral-800 dark:text-neutral-200">
-            Check your email
-          </h2>
-          <p className="text-neutral-600 text-sm mt-2 dark:text-neutral-300">
-            If an account exists with this email, you'll receive a password reset link.
-          </p>
-          <p
-            className="flex items-center justify-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline cursor-pointer mt-4"
-            onClick={() => {
-              setIsForgotPassword(false);
-              setEmailSent(false);
-            }}
-          >
-            Back to Login
-          </p>
-        </div>
-      ) : (
-        <div className="border border-neutral-300 dark:border-neutral-700 rounded-xl p-6 shadow-sm">
-          <h2 className="font-bold text-xl text-neutral-800 dark:text-neutral-200">
-            Forgot Password
-          </h2>
-          <p className="text-neutral-600 text-sm mt-2 dark:text-neutral-300">
-            Enter your email address to receive a password reset link
-          </p>
-          <form onSubmit={handleForgotPasswordSubmit} className="my-8">
-            <div className="mb-4">
-              <Label htmlFor="email">Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="example@gmail.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isSubmitting}
-              />
-            </div>
-            <Button
-              className="w-full"
-              type="submit"
-              disabled={isSubmitting}
+    <div className="flex flex-col items-center gap-4">
+      {isForgotPassword ? (
+        emailSent ? (
+          <div className="border border-neutral-300 dark:border-neutral-700 rounded-xl p-6 shadow-sm">
+            <h2 className="font-bold text-xl text-neutral-800 dark:text-neutral-200">
+              Check your email
+            </h2>
+            <p className="text-neutral-600 text-sm mt-2 dark:text-neutral-300">
+              If an account exists with this email, you&apos;ll receive a password reset link.
+
+            </p>
+            <p
+              className="flex items-center justify-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline cursor-pointer mt-4"
+              onClick={() => {
+                setIsForgotPassword(false);
+                setEmailSent(false);
+              }}
             >
-              {isSubmitting ? (
-                <>
-                  <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                "Send Reset Link"
-              )}
-            </Button>
-          </form>
-          <p
-            className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-            onClick={() => setIsForgotPassword(false)}
-          >
-            Back to Login
-          </p>
-        </div>
-      )
-    ): (
-        <>
-          <Card className="w-[350px]">
-            <CardHeader>
-              <CardTitle>Login</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid w-full items-center gap-4">
-                <div className="flex flex-col space-y-1.5">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={loading}
-                  />
-                </div>
-                <div className="flex flex-col space-y-1.5 relative">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    type={passwordVisible ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={loading}
-                  />
-                  <div
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 cursor-pointer"
-                    onClick={() => !loading && setPasswordVisible(!passwordVisible)}
-                  >
-                    {passwordVisible ? (
-                      <AiOutlineEyeInvisible size={24} className={loading ? "opacity-50" : ""} />
-                    ) : (
-                      <AiOutlineEye size={24} className={loading ? "opacity-50" : ""} />
-                    )}
-                  </div>
-                </div>
+              Back to Login
+            </p>
+          </div>
+        ) : (
+          <div className="border border-neutral-300 dark:border-neutral-700 rounded-xl p-6 shadow-sm">
+            <h2 className="font-bold text-xl text-neutral-800 dark:text-neutral-200">
+              Forgot Password
+            </h2>
+            <p className="text-neutral-600 text-sm mt-2 dark:text-neutral-300">
+              Enter your email address to receive a password reset link
+            </p>
+            <form onSubmit={handleForgotPasswordSubmit} className="my-8">
+              <div className="mb-4">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="example@gmail.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isSubmitting}
+                />
               </div>
-            </CardContent>
-            <CardFooter className="flex flex-col gap-4">
-              <div className="flex justify-end mb-8">
-                <p
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                  onClick={() => setIsForgotPassword(true)}
-                >
-                  Forgot Password?
-                </p>
-              </div>
-              <Button className="w-full" onClick={handleLogin} disabled={loading}>
-                {loading ? (
+              <Button className="w-full" type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
                   <>
                     <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                    Please wait...
+                    Sending...
                   </>
                 ) : (
-                  "Login"
+                  "Send Reset Link"
                 )}
               </Button>
-              <Link href="/register">
-                <span className={`text-blue-600 hover:text-blue-800 ${loading ? "opacity-50 pointer-events-none" : ""}`}>
-                  Don't have an account? Register here
-                </span>
-              </Link>
-            </CardFooter>
-          </Card>
-        </>
+            </form>
+            <p
+              className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+              onClick={() => setIsForgotPassword(false)}
+            >
+              Back to Login
+            </p>
+          </div>
+        )
+      ) : (
+        <Card className="w-[350px]">
+          <CardHeader>
+            <Image
+              src="/img/rps.png"
+              width={450}
+              height={250}
+              alt="Logo"
+              className="w-full h-auto max-w-[450px]"
+              priority
+            />
+
+            <CardTitle className=" text-2xl text-center">Login</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid w-full items-center gap-4">
+              <div className="flex flex-col space-y-1.5">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+              <div className="flex flex-col space-y-1.5 relative">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  type={passwordVisible ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                />
+                <div
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 cursor-pointer"
+                  onClick={() => !loading && setPasswordVisible(!passwordVisible)}
+                >
+                  {passwordVisible ? (
+                    <AiOutlineEyeInvisible size={24} className={loading ? "opacity-50" : ""} />
+                  ) : (
+                    <AiOutlineEye size={24} className={loading ? "opacity-50" : ""} />
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-4">
+            <div className="flex justify-end mb-8">
+              <p
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                onClick={() => setIsForgotPassword(true)}
+              >
+                Forgot Password?
+              </p>
+            </div>
+            <Button className="w-full" onClick={handleLogin} disabled={loading}>
+              {loading ? (
+                <>
+                  <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                  Please wait...
+                </>
+              ) : (
+                "Login"
+              )}
+            </Button>
+          </CardFooter>
+        </Card>
       )}
     </div>
   );

@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { Button } from "@/components/ui/button";
 import { jsPDF } from "jspdf";
+import { Trash2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 interface Observation {
   gas: string;
@@ -20,8 +21,8 @@ interface CertificateRequest {
   serialNo: string;
   calibrationGas: string;
   gasCanisterDetails: string;
-  dateOfCalibration: Date;
-  calibrationDueDate: Date;
+  dateOfCalibration: string;
+  calibrationDueDate: string;
   observations: Observation[];
   engineerId: string;
   engineerName: string;
@@ -44,6 +45,11 @@ interface Engineer {
   name: string;
 }
 
+interface Company {
+  _id: string;
+  companyName: string;
+}
+
 export default function GenerateCertificate() {
   const [formData, setFormData] = useState<CertificateRequest>({
     certificateNo: "",
@@ -54,8 +60,8 @@ export default function GenerateCertificate() {
     serialNo: "",
     calibrationGas: "",
     gasCanisterDetails: "",
-    dateOfCalibration: new Date(),
-    calibrationDueDate: new Date(),
+    dateOfCalibration: new Date().toISOString().split('T')[0],
+    calibrationDueDate: new Date().toISOString().split('T')[0],
     observations: [{ gas: "", before: "", after: "" }],
     engineerId: "",
     engineerName: "",
@@ -73,7 +79,40 @@ export default function GenerateCertificate() {
   const [engineers, setEngineers] = useState<Engineer[]>([]);
   const [isLoadingEngineers, setIsLoadingEngineers] = useState(true);
   const [engineerError, setEngineerError] = useState<string | null>(null);
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companySearchTerm, setCompanySearchTerm] = useState("");
+  const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
+  const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
+  const [selectedCompanyName, setSelectedCompanyName] = useState<string | null>(null);
+
+  const fetchCompanies = async () => {
+    try {
+      setIsLoadingCompanies(true);
+      const response = await axios.get(
+        `http://localhost:5000/api/v1/company/getAllcompanies`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${localStorage.getItem("token")}`
+          }
+        }
+      );
+      setCompanies(response.data.data || response.data);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch companies",
+        variant: "destructive",
+      });
+      console.error("Error fetching companies:", error);
+    } finally {
+      setIsLoadingCompanies(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -112,19 +151,19 @@ export default function GenerateCertificate() {
     const newStartDate = e.target.value;
     setStartDate(newStartDate);
     setFormData(prev => ({
-      ...prev,
-      dateOfCalibration: new Date(newStartDate)
+        ...prev,
+        dateOfCalibration: newStartDate
     }));
 
     if (timePeriod) {
-      const startDateObj = new Date(newStartDate);
-      startDateObj.setMonth(startDateObj.getMonth() + timePeriod);
-      const newEndDate = startDateObj.toISOString().split("T")[0];
-      setEndDate(newEndDate);
-      setFormData(prev => ({
-        ...prev,
-        calibrationDueDate: startDateObj
-      }));
+        const startDateObj = new Date(newStartDate);
+        startDateObj.setMonth(startDateObj.getMonth() + timePeriod);
+        const newEndDate = startDateObj.toISOString().split("T")[0];
+        setEndDate(newEndDate);
+        setFormData(prev => ({
+            ...prev,
+            calibrationDueDate: newEndDate
+        }));
     }
   };
 
@@ -133,14 +172,14 @@ export default function GenerateCertificate() {
     setTimePeriod(period);
 
     if (startDate) {
-      const startDateObj = new Date(startDate);
-      startDateObj.setMonth(startDateObj.getMonth() + period);
-      const newEndDate = startDateObj.toISOString().split("T")[0];
-      setEndDate(newEndDate);
-      setFormData(prev => ({
-        ...prev,
-        calibrationDueDate: startDateObj
-      }));
+        const startDateObj = new Date(startDate);
+        startDateObj.setMonth(startDateObj.getMonth() + period);
+        const newEndDate = startDateObj.toISOString().split("T")[0];
+        setEndDate(newEndDate);
+        setFormData(prev => ({
+            ...prev,
+            calibrationDueDate: newEndDate
+        }));
     }
   };
 
@@ -204,11 +243,12 @@ export default function GenerateCertificate() {
 
   const generateCertificateNumber = () => {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
+    const currentYear = now.getFullYear();
+    const shortStartYear = String(currentYear).slice(-2);
+    const shortEndYear = String(currentYear + 1).slice(-2);
+    const yearRange = `${shortStartYear}-${shortEndYear}`;
     const randomNum = Math.floor(1000 + Math.random() * 9000);
-    return `RPS/${year}${month}${day}/${randomNum}`;
+    return `RPS/CER/${yearRange}/${randomNum}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -223,32 +263,26 @@ export default function GenerateCertificate() {
         calibrationDueDate: endDate ? new Date(endDate) : null
       };
 
-      const hasEmptyObservations = formData.observations.some(obs =>
-        !obs.gas?.trim() || !obs.before?.trim() || !obs.after?.trim()
+      const response = await axios.post(
+        "http://localhost:5000/api/v1/certificates/generateCertificate",
+        submissionData
       );
-
-      const response = await fetch("http://localhost:5000/api/v1/certificates/generateCertificate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(submissionData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate certificate");
-      }
-
-      const certificate = await response.json();
-      setCertificate(certificate);
-    } catch (err: any) {
+      setCertificate(response.data);
+    } catch (err: unknown) {
       console.error('Error submitting form:', err);
-      setError(err.message || "Network error. Please check your connection and try again.");
+      if (err instanceof Error) {
+        setError(err.message || "Failed to generate certificate. Please try again.");
+      } else {
+        setError("An unknown error occurred");
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  const filteredCompanies = companies.filter(company =>
+    company.companyName.toLowerCase().includes(companySearchTerm.toLowerCase())
+  );
 
   const handleDownload = () => {
     const logo = new Image();
@@ -266,12 +300,17 @@ export default function GenerateCertificate() {
       const contentWidth = pageWidth - leftMargin - rightMargin;
       let y = topMargin;
 
-      const logoWidth = 80;
+      // Set logo dimensions and position
+      const logoWidth = 60;
       const logoHeight = 20;
-      const logoX = leftMargin;
-      doc.addImage(logo, "PNG", logoX, y, logoWidth, logoHeight);
+      const logoX = 2;
+      const logoY = 10;
 
-      y += logoHeight + 10;
+      // Add logo to the PDF
+      doc.addImage(logo, "PNG", logoX, logoY, logoWidth, logoHeight);
+
+      // Move the cursor below the logo
+      y = logoY + logoHeight + 10;
       doc.setFont("times", "bold").setFontSize(16).setTextColor(0, 51, 102);
       doc.text("CALIBRATION CERTIFICATE", pageWidth / 2, y, { align: "center" });
 
@@ -290,9 +329,12 @@ export default function GenerateCertificate() {
         y += lineGap;
       };
 
-      // Helper function to format dates
-      const formatDate = (date: Date | null | undefined): string => {
-        return date ? date.toLocaleDateString() : "N/A";
+      const formatDate = (inputDateString: string | undefined) => {
+        if (!inputDateString) return "N/A";
+        const inputDate = new Date(inputDateString);
+        if (isNaN(inputDate.getTime())) return "N/A";
+        const pad = (n: number) => n.toString().padStart(2, "0");
+        return `${pad(inputDate.getDate())} - ${pad(inputDate.getMonth() + 1)} - ${inputDate.getFullYear()}`;
       };
 
       addRow("Certificate No.", formData.certificateNo);
@@ -381,21 +423,60 @@ export default function GenerateCertificate() {
 
   return (
     <div>
-      {/* <h1 className="text-2xl font-bold mb-4">Generate Your Certificate</h1> */}
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <input
-            type="text"
-            name="customerName"
-            placeholder="Enter Name"
-            value={formData.customerName}
-            onChange={handleChange}
-            className="p-2 border rounded"
-          />
+          <div className="relative w-full">
+            <input
+              type="text"
+              name="customerName"
+              placeholder="Company Name"
+              value={formData.customerName}
+              onChange={(e) => {
+                setFormData(prev => ({ ...prev, customerName: e.target.value }));
+                setCompanySearchTerm(e.target.value);
+                setShowCompanyDropdown(true);
+              }}
+              onFocus={() => setShowCompanyDropdown(true)}
+              onBlur={() => setTimeout(() => setShowCompanyDropdown(false), 150)}
+              className="p-2 border rounded-md w-full text-sm focus:ring-indigo-500 focus:border-indigo-500"
+            />
+
+            {showCompanyDropdown && (
+              <ul className="absolute left-0 top-full mt-1 z-20 w-full rounded-md border bg-white text-sm shadow-lg max-h-60 overflow-y-auto">
+                {isLoadingCompanies ? (
+                  <li className="px-4 py-2 text-gray-500">Loading companies...</li>
+                ) : filteredCompanies.length > 0 ? (
+                  filteredCompanies.map((company) => (
+                    <li
+                      key={company._id}
+                      className={`px-4 py-2 cursor-pointer transition-colors ${selectedCompanyName === company.companyName ? " font-medium" : ""
+                        }`}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          customerName: company.companyName
+                        }));
+                        setCompanySearchTerm(company.companyName);
+                        setSelectedCompanyName(company.companyName);
+                        setShowCompanyDropdown(false);
+                      }}
+                    >
+                      {company.companyName}
+                    </li>
+                  ))
+                ) : (
+                  <li className="px-4 py-2 text-gray-500">
+                    {companySearchTerm ? "No companies found" : "Start typing to search companies"}
+                  </li>
+                )}
+              </ul>
+            )}
+          </div>
           <input
             type="text"
             name="siteLocation"
-            placeholder="Enter Site Location"
+            placeholder="Site Location"
             value={formData.siteLocation}
             onChange={handleChange}
             className="p-2 border rounded"
@@ -410,9 +491,9 @@ export default function GenerateCertificate() {
             required
             disabled={isLoadingModels}
           >
-            <option value="">Select Make and Model</option>
+            <option value="">Select Model</option>
             {isLoadingModels ? (
-              <option value="" disabled>Loading models...</option>
+              <option value="" disabled>Loading model...</option>
             ) : models.length > 0 ? (
               models.map((model) => (
                 <option key={model.model_name} value={model.model_name}>
@@ -421,9 +502,6 @@ export default function GenerateCertificate() {
               ))
             ) : (
               <>
-                <option value="GMIleakSurveyor">GMI leak Surveyor</option>
-                <option value="GMIGT41Series">GMI GT 41 Series</option>
-                <option value="GMIGT44">GMI GT 44</option>
               </>
             )}
           </select>
@@ -438,45 +516,46 @@ export default function GenerateCertificate() {
           />
         </div>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-
           <input
             type="text"
             name="serialNo"
-            placeholder="Enter Serial Number"
+            placeholder="Serial Number"
             value={formData.serialNo}
             onChange={handleChange}
             className="p-2 border rounded"
-
           />
           <input
             type="text"
             name="calibrationGas"
-            placeholder="Enter Calibration Gas"
+            placeholder="Calibration Gas"
             value={formData.calibrationGas}
             onChange={handleChange}
             className="p-2 border rounded"
-
           />
         </div>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-1">
           <textarea
             name="gasCanisterDetails"
-            placeholder="Enter Gas Canister Details"
+            placeholder="Gas Canister Details"
             value={formData.gasCanisterDetails}
             onChange={handleChange}
-            className="p-2 border rounded"
-
+            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black resize-none"
+            rows={3}
           />
         </div>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <input
             type="date"
             name="dateOfCalibration"
+            placeholder="Date of Calibration"
             value={startDate}
             onChange={handleStartDateChange}
             className="p-2 border rounded"
-
+            data-date-format="DD-MM-YYYY"
+            min="2000-01-01"
+            max="2100-12-31"
           />
+
           <select
             onChange={handleTimePeriodChange}
             className="border p-2 rounded-md"
@@ -492,15 +571,15 @@ export default function GenerateCertificate() {
           <input
             type="date"
             name="calibrationDueDate"
-            placeholder="Enter Calibration Due Date"
+            placeholder="Calibration Due Date"
             value={endDate}
             onChange={(e) => {
               setEndDate(e.target.value);
               setFormData(prev => ({
-                ...prev,
-                calibrationDueDate: new Date(e.target.value)
+                  ...prev,
+                  calibrationDueDate: e.target.value
               }));
-            }}
+          }}
             className="p-2 border rounded"
             disabled={timePeriod !== null}
             data-date-format="DD-MM-YYYY"
@@ -530,11 +609,10 @@ export default function GenerateCertificate() {
           </select>
         </div>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-
           <input
             type="text"
             name="certificateNo"
-            placeholder="Certificate No."
+            placeholder="Certificate Number"
             value={formData.certificateNo}
             onChange={handleChange}
             readOnly
@@ -552,7 +630,7 @@ export default function GenerateCertificate() {
           </select>
         </div>
 
-        <h2 className="text-lg font-bold mt-4">Observation Table</h2>
+        <h2 className="text-lg font-bold mt-4 text-center">Observation Table</h2>
         <div className="flex justify-end mb-4">
           <button
             type="button"
@@ -570,7 +648,7 @@ export default function GenerateCertificate() {
               <th className="border p-2">Gas</th>
               <th className="border p-2">Before Calibration</th>
               <th className="border p-2">After Calibration</th>
-              <th className="border p-2">Remove</th>
+              <th className="border p-2">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -607,9 +685,8 @@ export default function GenerateCertificate() {
                 <td className="border p-2">
                   <button
                     onClick={() => removeObservation(index)}
-                    className="bg-black-500 text-white px-2 py-1 border rounded hover:bg-red-950"
                   >
-                    Remove
+                    <Trash2 className="h-6 w-6" />
                   </button>
                 </td>
               </tr>
@@ -617,7 +694,7 @@ export default function GenerateCertificate() {
             {formData.observations.length === 0 && (
               <tr>
                 <td colSpan={5} className="border p-2 text-center text-gray-500">
-                  No observations added yet. Click "Add Observation" to add one.
+                  Click &quot;Create Observation&quot; to add one
                 </td>
               </tr>
             )}
@@ -633,7 +710,7 @@ export default function GenerateCertificate() {
 
         <button
           type="submit"
-          className="bg-blue-950 hover:bg-blue-900 text-white p-2 rounded-md"
+          className="bg-blue-950 hover:bg-blue-900 text-white p-2 rounded-md w-full"
           disabled={loading}
         >
           {loading ? "Generating..." : "Generate Certificate"}
@@ -645,13 +722,12 @@ export default function GenerateCertificate() {
       {certificate && (
         <div className="mt-4 text-center">
           <p className="text-green-600 mb-2">{certificate.message}</p>
-          <Button
-            className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 flex items-center justify-center gap-2 mx-auto"
+          <button
             onClick={handleDownload}
-            disabled={loading}
+            className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
           >
-            {loading ? "Downloading..." : "Download Certificate"}
-          </Button>
+            Download Certificate
+          </button>
         </div>
       )}
     </div>

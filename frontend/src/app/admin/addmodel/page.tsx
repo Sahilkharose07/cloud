@@ -5,7 +5,6 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Separator } from "@/components/ui/separator";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { AdminSidebar } from "@/components/admin-sidebar";
-import { ModeToggle } from "@/components/ModeToggle";
 import { toast } from "@/hooks/use-toast"
 import { Trash2 } from "lucide-react";
 
@@ -72,7 +71,7 @@ export default function AddModel() {
             try {
                 const response = await fetch('http://localhost:5000/api/v1/addcategory/getCategories');
                 const data = await response.json();
-                const normalizedModels = data.map((item: any) => ({
+                const normalizedModels = data.map((item: Model) => ({
                     id: item._id || item.id,
                     model_name: item.model_name,
                     range: item.range
@@ -87,7 +86,7 @@ export default function AddModel() {
             try {
                 const response = await fetch("http://localhost:5000/api/v1/ServiceEngineer/getServiceEngineers");
                 const data = await response.json();
-                const normalizedServiceEngineers = data.map((item: any) => ({
+                const normalizedServiceEngineers = data.map((item: ServiceEngineer) => ({
                     id: item._id || item.id,
                     name: item.name
                 }));
@@ -101,7 +100,7 @@ export default function AddModel() {
             try {
                 const response = await fetch("http://localhost:5000/api/v1/engineers/getEngineers");
                 const data = await response.json();
-                const normalizedEngineers = data.map((item: any) => ({
+                const normalizedEngineers = data.map((item: Engineer) => ({
                     id: item._id || item.id,
                     name: item.name
                 }));
@@ -130,27 +129,27 @@ export default function AddModel() {
                         range: newRange,
                     }),
                 });
-    
+
                 const result = await response.json();
-                
+
                 if (!response.ok) {
                     throw new Error(result.error || result.message || "Failed to add model");
                 }
-    
+
                 // Try different ways to get the ID from the response
                 const newId = result._id || result.id || result.data?._id || result.data?.id;
-                
+
                 if (!newId) {
                     console.error("Server response:", result);
                     throw new Error("Server didn't return a valid ID. Response: " + JSON.stringify(result));
                 }
-    
+
                 setModels(prevModels => [...prevModels, {
                     id: newId,
                     model_name: newModel,
                     range: newRange
                 }]);
-    
+
                 setNewModel("");
                 setNewRange("");
                 toast({
@@ -169,7 +168,7 @@ export default function AddModel() {
             }
         } else {
             toast({
-                title: "Warning",
+                title: "Error",
                 description: "Fill both the model and range",
                 variant: "default",
             });
@@ -212,7 +211,7 @@ export default function AddModel() {
             }
         } else {
             toast({
-                title: "Warning",
+                title: "Error",
                 description: "Enter an engineer name",
                 variant: "default",
             });
@@ -255,7 +254,7 @@ export default function AddModel() {
             }
         } else {
             toast({
-                title: "Warning",
+                title: "Error",
                 description: "Enter a service engineer name",
                 variant: "default",
             });
@@ -419,14 +418,6 @@ export default function AddModel() {
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        toast({
-            title: "Form submitted",
-            description: "No backend interaction implemented yet",
-        });
-    };
-
     return (
         <SidebarProvider>
             <AdminSidebar />
@@ -434,13 +425,12 @@ export default function AddModel() {
                 <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
-                        <ModeToggle />
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
                                 <BreadcrumbItem>
                                     <BreadcrumbLink href="/admin/dashboard">
-                                        <BreadcrumbPage>Dashboard</BreadcrumbPage>
+                                        Dashboard
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
@@ -483,7 +473,7 @@ export default function AddModel() {
                                             ))
                                         ) : (
                                             <div className="p-2 text-center text-gray-500">
-                                                No models available. Create a new one below.
+                                                Create New Model and Range
                                             </div>
                                         )}
                                     </div>
@@ -555,7 +545,7 @@ export default function AddModel() {
                                             ))
                                         ) : (
                                             <div className="p-2 text-center text-gray-500">
-                                                No engineers available. Create a new one below.
+                                                Create New Engineer
                                             </div>
                                         )}
                                     </div>
@@ -610,7 +600,7 @@ export default function AddModel() {
                                             ))
                                         ) : (
                                             <div className="p-2 text-center text-gray-500">
-                                                No service engineers available. Create a new one below.
+                                                Create New Service Engineer
                                             </div>
                                         )}
                                     </div>

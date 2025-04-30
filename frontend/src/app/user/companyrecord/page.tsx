@@ -1,10 +1,9 @@
 'use client';
 import React, { useEffect, useState, useCallback } from "react";
-import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Button } from "@/components/ui/button";
-import { Loader2, SearchIcon, Edit2Icon, DeleteIcon } from "lucide-react";
+import { SearchIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import axios from "axios";
 
@@ -13,9 +12,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Separator } from "@/components/ui/separator";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
-import { ModeToggle } from "@/components/ModeToggle";
-import { Pagination, Tooltip } from "@heroui/react";
-import { compareAsc } from "date-fns";
+import { Pagination } from "@heroui/react";
 import { AppSidebar } from "@/components/app-sidebar";
 
 interface CompanyDetails {
@@ -43,31 +40,23 @@ const columns = [
     { name: "Flag", uid: "flag", sortable: true, width: "120px" },
 ];
 
-const INITIAL_VISIBLE_COLUMNS = ["companyName", "address", "gstNumber", "industries", "website", "industriesType", "flag"];
-
 export default function CompanyDetailsTable() {
     const [companies, setCompanies] = useState<CompanyDetails[]>([]);
-    const [error, setError] = useState<string | null>(null);
     const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set([]));
-    const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(INITIAL_VISIBLE_COLUMNS));
-    const [rowsPerPage, setRowsPerPage] = useState(15);
-    const [page, setPage] = useState(1);
     const [filterValue, setFilterValue] = useState("");
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isDownloading, setIsDownloading] = useState<string | null>(null);
-    const [contactToDelete, setContactToDelete] = useState<CompanyDetails | null>(null); // To handle contact deletion
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false); // To toggle delete modal
-
+    const [page, setPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(15);
     const [sortDescriptor, setSortDescriptor] = useState<{
         column: string;
         direction: "ascending" | "descending";
-      }>({
+    }>({
         column: "",
         direction: "ascending",
-      });
-      
+    });
 
-    const router = useRouter();
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [contactToDelete, setContactToDelete] = useState<CompanyDetails | null>(null);
+
     const hasSearchFilter = Boolean(filterValue);
 
     const fetchCompanies = async () => {
@@ -77,7 +66,7 @@ export default function CompanyDetailsTable() {
                 {
                     headers: {
                         "Content-Type": "application/json",
-                        "Authorization": `Bearer ${localStorage.getItem("token")}`
+                        "Authorization": `Bearer ${localStorage.getItem("token")}`,
                     }
                 }
             );
@@ -89,17 +78,16 @@ export default function CompanyDetailsTable() {
                     : [];
 
             const companiesWithKeys = companiesData
-                .reverse() // 👈 Latest added data comes first
+                .reverse() // Latest added data comes first
                 .map((company: CompanyDetails) => ({
                     ...company,
                     key: company._id || generateUniqueId(),
                 }));
 
             setCompanies(companiesWithKeys);
-            setError(null);
         } catch (error) {
             console.error("Error fetching companies:", error);
-            setError("Failed to fetch companies. Please try again.");
+            toast.error("Failed to fetch companies. Please try again.");
             setCompanies([]);
         }
     };
@@ -107,11 +95,6 @@ export default function CompanyDetailsTable() {
     useEffect(() => {
         fetchCompanies();
     }, []);
-
-    const handleDeleteClick = (company: CompanyDetails) => {
-        setContactToDelete(company);
-        setIsDeleteModalOpen(true); 
-    };
 
     const handleConfirmDelete = async () => {
         if (!contactToDelete) return;
@@ -158,10 +141,6 @@ export default function CompanyDetailsTable() {
         );
     };
 
-    const headerColumns = React.useMemo(() => {
-        return columns.filter(column => visibleColumns.has(column.uid));
-    }, [visibleColumns]);
-
     const filteredItems = React.useMemo(() => {
         let filtered = [...companies];
 
@@ -179,11 +158,10 @@ export default function CompanyDetailsTable() {
         }
 
         return filtered;
-    }, [companies, filterValue, hasSearchFilter]);
+    }, [companies, filterValue, hasSearchFilter]);  // Adding hasSearchFilter to the dependency array.
 
     const sortedItems = React.useMemo(() => {
         if (!sortDescriptor.column) {
-            // No sorting = just show as-is (which is reversed from fetch)
             return filteredItems;
         }
 
@@ -245,13 +223,13 @@ export default function CompanyDetailsTable() {
                 </label>
             </div>
         );
-    }, [filterValue, onRowsPerPageChange, companies.length]);
+    }, [filterValue, onRowsPerPageChange]);
 
     const bottomContent = React.useMemo(() => {
         return (
             <div className="py-2 px-2 flex justify-between items-center">
                 <span className="text-default-400 text-small">
-                    Total {filteredItems.length} companies
+                    Total {filteredItems.length} company
                 </span>
                 <div className="absolute left-1/2 transform -translate-x-1/2">
                     <Pagination
@@ -292,10 +270,11 @@ export default function CompanyDetailsTable() {
     }, [page, pages, onPreviousPage, onNextPage, filteredItems]);
 
     const renderCell = useCallback((company: CompanyDetails, columnKey: string) => {
-        if (columnKey === "actions") {
+        if (columnKey === "gstNumber" || columnKey === "website") {
+            return company[columnKey as keyof CompanyDetails] || "N/A";
         }
         return company[columnKey as keyof CompanyDetails];
-    }, [isDownloading, router]);
+    }, []);
 
     return (
         <SidebarProvider>
@@ -304,7 +283,6 @@ export default function CompanyDetailsTable() {
                 <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
-                        <ModeToggle />
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
@@ -358,10 +336,9 @@ export default function CompanyDetailsTable() {
                                                 if (!column.sortable) return;
                                                 setSortDescriptor(prev => ({
                                                     column: column.uid,
-                                                    direction:
-                                                        prev.column === column.uid && prev.direction === "ascending"
-                                                            ? "descending"
-                                                            : "ascending",
+                                                    direction: prev.column === column.uid && prev.direction === "ascending"
+                                                        ? "descending"
+                                                        : "ascending",
                                                 }));
                                             }}
                                             style={{ cursor: column.sortable ? "pointer" : "default" }}
