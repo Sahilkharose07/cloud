@@ -5,6 +5,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Separator } from "@/components/ui/separator";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { AdminSidebar } from "@/components/admin-sidebar";
+
 import { toast } from "@/hooks/use-toast"
 import { Trash2 } from "lucide-react";
 
@@ -71,7 +72,7 @@ export default function AddModel() {
             try {
                 const response = await fetch('http://localhost:5000/api/v1/addcategory/getCategories');
                 const data = await response.json();
-                const normalizedModels = data.map((item: Model) => ({
+                const normalizedModels = data.map((item: any) => ({
                     id: item._id || item.id,
                     model_name: item.model_name,
                     range: item.range
@@ -86,7 +87,7 @@ export default function AddModel() {
             try {
                 const response = await fetch("http://localhost:5000/api/v1/ServiceEngineer/getServiceEngineers");
                 const data = await response.json();
-                const normalizedServiceEngineers = data.map((item: ServiceEngineer) => ({
+                const normalizedServiceEngineers = data.map((item: any) => ({
                     id: item._id || item.id,
                     name: item.name
                 }));
@@ -100,7 +101,7 @@ export default function AddModel() {
             try {
                 const response = await fetch("http://localhost:5000/api/v1/engineers/getEngineers");
                 const data = await response.json();
-                const normalizedEngineers = data.map((item: Engineer) => ({
+                const normalizedEngineers = data.map((item: any) => ({
                     id: item._id || item.id,
                     name: item.name
                 }));
@@ -129,27 +130,27 @@ export default function AddModel() {
                         range: newRange,
                     }),
                 });
-
+    
                 const result = await response.json();
-
+                
                 if (!response.ok) {
                     throw new Error(result.error || result.message || "Failed to add model");
                 }
-
+    
                 // Try different ways to get the ID from the response
                 const newId = result._id || result.id || result.data?._id || result.data?.id;
-
+                
                 if (!newId) {
                     console.error("Server response:", result);
                     throw new Error("Server didn't return a valid ID. Response: " + JSON.stringify(result));
                 }
-
+    
                 setModels(prevModels => [...prevModels, {
                     id: newId,
                     model_name: newModel,
                     range: newRange
                 }]);
-
+    
                 setNewModel("");
                 setNewRange("");
                 toast({
@@ -168,7 +169,7 @@ export default function AddModel() {
             }
         } else {
             toast({
-                title: "Error",
+                title: "Warning",
                 description: "Fill both the model and range",
                 variant: "default",
             });
@@ -211,7 +212,7 @@ export default function AddModel() {
             }
         } else {
             toast({
-                title: "Error",
+                title: "Warning",
                 description: "Enter an engineer name",
                 variant: "default",
             });
@@ -254,7 +255,7 @@ export default function AddModel() {
             }
         } else {
             toast({
-                title: "Error",
+                title: "Warning",
                 description: "Enter a service engineer name",
                 variant: "default",
             });
@@ -418,6 +419,14 @@ export default function AddModel() {
         }
     };
 
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        toast({
+            title: "Form submitted",
+            description: "No backend interaction implemented yet",
+        });
+    };
+
     return (
         <SidebarProvider>
             <AdminSidebar />
@@ -425,12 +434,13 @@ export default function AddModel() {
                 <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
+                        
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
                                 <BreadcrumbItem>
                                     <BreadcrumbLink href="/admin/dashboard">
-                                        Dashboard
+                                        <BreadcrumbPage>Dashboard</BreadcrumbPage>
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
@@ -473,7 +483,7 @@ export default function AddModel() {
                                             ))
                                         ) : (
                                             <div className="p-2 text-center text-gray-500">
-                                                Create New Model and Range
+                                                No models available. Create a new one below.
                                             </div>
                                         )}
                                     </div>
@@ -481,7 +491,7 @@ export default function AddModel() {
                                         <select
                                             value={selectedModel}
                                             onChange={(e) => handleModelSelect(e.target.value)}
-                                            className="p-2 border rounded"
+                                           className= "p-2 border rounded bg-white"
                                         >
                                             <option value="">Select Model</option>
                                             {models.map((model) => (
@@ -495,7 +505,7 @@ export default function AddModel() {
                                             placeholder="Range"
                                             value={formData.range}
                                             onChange={(e) => setFormData(prev => ({ ...prev, range: e.target.value }))}
-                                            className="p-2 border rounded"
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                             disabled={!selectedModel}
                                         />
                                     </div>
@@ -505,14 +515,14 @@ export default function AddModel() {
                                             placeholder="New Model Name"
                                             value={newModel}
                                             onChange={(e) => setNewModel(e.target.value)}
-                                            className="p-2 border rounded"
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         />
                                         <input
                                             type="text"
                                             placeholder="New Range"
                                             value={newRange}
                                             onChange={(e) => setNewRange(e.target.value)}
-                                            className="p-2 border rounded"
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         />
                                     </div>
                                     <button
@@ -545,7 +555,7 @@ export default function AddModel() {
                                             ))
                                         ) : (
                                             <div className="p-2 text-center text-gray-500">
-                                                Create New Engineer
+                                                No engineers available. Create a new one below.
                                             </div>
                                         )}
                                     </div>
@@ -553,7 +563,7 @@ export default function AddModel() {
                                         <select
                                             value={selectedEngineer}
                                             onChange={(e) => setSelectedEngineer(e.target.value)}
-                                            className="p-2 border rounded"
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         >
                                             <option value="">Select Engineer</option>
                                             {engineers.map((engineer) => (
@@ -567,7 +577,7 @@ export default function AddModel() {
                                             placeholder="New Engineer Name"
                                             value={newEngineer}
                                             onChange={(e) => setNewEngineer(e.target.value)}
-                                            className="p-2 border rounded"
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         />
                                     </div>
                                     <button
@@ -600,7 +610,7 @@ export default function AddModel() {
                                             ))
                                         ) : (
                                             <div className="p-2 text-center text-gray-500">
-                                                Create New Service Engineer
+                                                No service engineers available. Create a new one below.
                                             </div>
                                         )}
                                     </div>
@@ -608,7 +618,7 @@ export default function AddModel() {
                                         <select
                                             value={selectedServiceEngineer}
                                             onChange={(e) => setSelectedServiceEngineer(e.target.value)}
-                                            className="p-2 border rounded"
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         >
                                             <option value="">Select Service Engineer</option>
                                             {serviceEngineers.map((engineer) => (
@@ -622,7 +632,7 @@ export default function AddModel() {
                                             placeholder="New Service Engineer Name"
                                             value={newServiceEngineer}
                                             onChange={(e) => setNewServiceEngineer(e.target.value)}
-                                            className="p-2 border rounded"
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         />
                                     </div>
                                     <button

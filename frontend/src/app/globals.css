@@ -10,6 +10,10 @@ body {
   width: 40%;
 }
 
+/* .container {
+  width: 120%;
+} */
+
 .max-h-screen-xl {
   height: 45rem;
 }

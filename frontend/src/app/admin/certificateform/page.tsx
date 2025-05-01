@@ -1,15 +1,17 @@
-'use client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+"use client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import { toast } from '@/hooks/use-toast'
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { Trash2 } from "lucide-react";
+import router from "next/router";
 import { jsPDF } from "jspdf";
+import { Calendar } from 'lucide-react';
 
 interface Company {
     _id: string;
@@ -54,19 +56,19 @@ interface Engineer {
     name: string;
 }
 
+const generateCertificateNumber = () => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const shortStartYear = String(currentYear).slice(-2);
+    const shortEndYear = String(currentYear + 1).slice(-2);
+    const yearRange = `${shortStartYear}-${shortEndYear}`;
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    return `RPS/CER/${yearRange}/${randomNum}`;
+};
+
 export default function CertificateForm() {
     const searchParams = useSearchParams();
     const certificateId = searchParams.get('id');
-
-    const generateCertificateNumber = () => {
-        const now = new Date();
-        const currentYear = now.getFullYear();
-        const shortStartYear = String(currentYear).slice(-2);
-        const shortEndYear = String(currentYear + 1).slice(-2);
-        const yearRange = `${shortStartYear}-${shortEndYear}`;
-        const randomNum = Math.floor(1000 + Math.random() * 9000);
-        return `RPS/CER/${yearRange}/${randomNum}`;
-    };
 
     const [formData, setFormData] = useState<CertificateRequest>({
         certificateNo: generateCertificateNumber(),
@@ -126,13 +128,9 @@ export default function CertificateForm() {
         }
     };
 
-
     useEffect(() => {
         fetchCompanies();
-
     }, []);
-
-
 
     useEffect(() => {
         const fetchCategories = async () => {
@@ -169,7 +167,6 @@ export default function CertificateForm() {
         console.log("Current formData:", formData);
     }, [formData]);
 
-
     useEffect(() => {
         const fetchCertificateData = async () => {
             const today = new Date().toISOString().split('T')[0];
@@ -184,7 +181,6 @@ export default function CertificateForm() {
                     `http://localhost:5000/api/v1/certificates/getCertificateById/${certificateId}`,
                     {
                         headers: {
-
                             "Authorization": `Bearer ${localStorage.getItem("token")}`
                         }
                     }
@@ -208,7 +204,7 @@ export default function CertificateForm() {
                     dateOfCalibration: certificateData.dateOfCalibration?.split('T')[0] || today,
                     calibrationDueDate: certificateData.calibrationDueDate?.split('T')[0] || today,
                     observations: Array.isArray(certificateData.observations)
-                        ? certificateData.observations.map((obs: Observation) => ({
+                        ? certificateData.observations.map((obs: any) => ({
                             gas: obs.gas || "",
                             before: obs.before || "",
                             after: obs.after || ""
@@ -232,7 +228,6 @@ export default function CertificateForm() {
 
         fetchCertificateData();
     }, [certificateId]);
-
 
     const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newStartDate = e.target.value;
@@ -329,7 +324,6 @@ export default function CertificateForm() {
         setError(null);
 
         try {
-            // Validate required fields
             const requiredFields: Record<string, string> = {
                 customerName: "Customer Name",
                 siteLocation: "Site Location",
@@ -343,7 +337,7 @@ export default function CertificateForm() {
 
             const emptyFields = Object.entries(requiredFields)
                 .filter(([key]) => !formData[key as keyof CertificateRequest]?.toString().trim())
-                .map(([, label]) => label);
+                .map(([_, label]) => label);
 
             if (!startDate || !endDate) {
                 emptyFields.push("Date of Calibration", "Calibration Due Date");
@@ -365,7 +359,6 @@ export default function CertificateForm() {
                 return;
             }
 
-            // Prepare the submission data
             const submissionData = {
                 ...formData,
                 dateOfCalibration: startDate,
@@ -378,7 +371,6 @@ export default function CertificateForm() {
                 }))
             };
 
-            // Determine API details
             const isEditMode = !!certificateId;
             const url = isEditMode
                 ? `http://localhost:5000/api/v1/certificates/updateCertificate/${certificateId}`
@@ -404,13 +396,12 @@ export default function CertificateForm() {
                 variant: "default",
             });
 
-        } catch (err: unknown) {
-            const error = err as { response?: { data?: { message?: string; error?: string } }, message?: string };
-            console.error("Submission error:", error);
+        } catch (err: any) {
+            console.error("Submission error:", err);
             const errorMessage =
-                error.response?.data?.message ||
-                error.response?.data?.error ||
-                error.message ||
+                err.response?.data?.message ||
+                err.response?.data?.error ||
+                err.message ||
                 "An error occurred";
 
             setError(errorMessage);
@@ -423,7 +414,6 @@ export default function CertificateForm() {
             setLoading(false);
         }
     };
-
 
     const filteredCompanies = companies.filter(company =>
         company.companyName.toLowerCase().includes(companySearchTerm.toLowerCase())
@@ -445,20 +435,17 @@ export default function CertificateForm() {
             const contentWidth = pageWidth - leftMargin - rightMargin;
             let y = topMargin;
 
-            // Set logo dimensions and position
             const logoWidth = 60;
             const logoHeight = 20;
             const logoX = 2;
             const logoY = 10;
 
-            // Add logo to the PDF
             doc.addImage(logo, "PNG", logoX, logoY, logoWidth, logoHeight);
 
-            // Move the cursor below the logo
             y = logoY + logoHeight + 10;
+
             doc.setFont("times", "bold").setFontSize(16).setTextColor(0, 51, 102);
             doc.text("CALIBRATION CERTIFICATE", pageWidth / 2, y, { align: "center" });
-
             y += 10;
 
             const labelX = leftMargin;
@@ -466,20 +453,20 @@ export default function CertificateForm() {
             const valueX = labelX + labelWidth + 2;
             const lineGap = 8;
 
-            const addRow = (labelText: string, value: string) => {
-                doc.setFont("times", "bold").setFontSize(11).setTextColor(0);
-                doc.text(labelText, labelX, y);
-                doc.setFont("times", "normal").setTextColor(50);
-                doc.text(": " + (value || "N/A"), valueX, y);
-                y += lineGap;
-            };
-
             const formatDate = (inputDateString: string | undefined) => {
                 if (!inputDateString) return "N/A";
                 const inputDate = new Date(inputDateString);
                 if (isNaN(inputDate.getTime())) return "N/A";
                 const pad = (n: number) => n.toString().padStart(2, "0");
                 return `${pad(inputDate.getDate())} - ${pad(inputDate.getMonth() + 1)} - ${inputDate.getFullYear()}`;
+              };
+
+            const addRow = (labelText: string, value: string) => {
+                doc.setFont("times", "bold").setFontSize(11).setTextColor(0);
+                doc.text(labelText, labelX, y);
+                doc.setFont("times", "normal").setTextColor(50);
+                doc.text(": " + (value || "N/A"), valueX, y);
+                y += lineGap;
             };
 
             addRow("Certificate No.", formData.certificateNo);
@@ -582,6 +569,7 @@ export default function CertificateForm() {
                 <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
+
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
@@ -630,7 +618,7 @@ export default function CertificateForm() {
                                         <input
                                             type="text"
                                             name="customerName"
-                                            placeholder="Company Name"
+                                            placeholder="Customer Name"
                                             value={formData.customerName}
                                             onChange={(e) => {
                                                 setFormData(prev => ({ ...prev, customerName: e.target.value }));
@@ -639,7 +627,7 @@ export default function CertificateForm() {
                                             }}
                                             onFocus={() => setShowCompanyDropdown(true)}
                                             onBlur={() => setTimeout(() => setShowCompanyDropdown(false), 150)}
-                                            className="p-2 border rounded-md w-full text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md w-full text-sm"
                                         />
 
                                         {showCompanyDropdown && (
@@ -668,7 +656,7 @@ export default function CertificateForm() {
                                                     ))
                                                 ) : (
                                                     <li className="px-4 py-2 text-gray-500">
-                                                        {companySearchTerm ? "This name is not in the company records" : "Start typing to search companies"}
+                                                        {companySearchTerm ? "No companies found" : "Start typing to search companies"}
                                                     </li>
                                                 )}
                                             </ul>
@@ -681,8 +669,7 @@ export default function CertificateForm() {
                                         placeholder="Site Location"
                                         value={formData.siteLocation}
                                         onChange={handleChange}
-                                        className="p-2 border rounded"
-
+                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                     />
                                 </div>
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -690,14 +677,12 @@ export default function CertificateForm() {
                                         name="makeModel"
                                         value={formData.makeModel}
                                         onChange={handleChange}
-                                        className="p-2 border rounded"
+                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         disabled={isLoadingModels}
                                     >
                                         <option value="">Select Model</option>
                                         {isLoadingModels ? (
-                                            <option value="" disabled>
-                                                Loading models...
-                                            </option>
+                                            <option value="" disabled>Loading models...</option>
                                         ) : models.length > 0 ? (
                                             models.map((model) => (
                                                 <option key={model.model_name} value={model.model_name}>
@@ -705,9 +690,7 @@ export default function CertificateForm() {
                                                 </option>
                                             ))
                                         ) : (
-                                            <option value="" disabled>
-                                                No models available
-                                            </option>
+                                            <></>
                                         )}
                                     </select>
                                     <input
@@ -716,7 +699,7 @@ export default function CertificateForm() {
                                         placeholder="Range"
                                         value={formData.range}
                                         onChange={handleChange}
-                                        className="p-2 border rounded"
+                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         disabled
                                     />
                                 </div>
@@ -727,8 +710,7 @@ export default function CertificateForm() {
                                         placeholder="Serial Number"
                                         value={formData.serialNo}
                                         onChange={handleChange}
-                                        className="p-2 border rounded"
-
+                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                     />
                                     <input
                                         type="text"
@@ -736,8 +718,7 @@ export default function CertificateForm() {
                                         placeholder="Calibration Gas"
                                         value={formData.calibrationGas}
                                         onChange={handleChange}
-                                        className="p-2 border rounded"
-
+                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                     />
                                 </div>
                                 <div className="grid grid-cols-1 gap-6">
@@ -746,7 +727,7 @@ export default function CertificateForm() {
                                         placeholder="Gas Canister Details"
                                         value={formData.gasCanisterDetails}
                                         onChange={handleChange}
-                                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black resize-none"
+                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black w-full px-3 py-2 rounded-md resize-none"
                                         rows={3}
                                     />
                                 </div>
@@ -754,18 +735,16 @@ export default function CertificateForm() {
                                     <input
                                         type="date"
                                         name="dateOfCalibration"
-                                        placeholder="Enter Date of Calibration"
                                         value={startDate}
                                         onChange={handleStartDateChange}
-                                        className="p-2 border rounded"
-                                        data-date-format="DD-MM-YYYY"
+                                        className="p-2 rounded-md border bg-white"
                                         min="2000-01-01"
                                         max="2100-12-31"
                                     />
+
                                     <select
                                         onChange={handleTimePeriodChange}
-                                        className="border p-2 rounded-md"
-
+                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                     >
                                         <option value="">Select Period</option>
                                         <option value="3">3 Months</option>
@@ -787,7 +766,7 @@ export default function CertificateForm() {
                                                 calibrationDueDate: e.target.value
                                             }));
                                         }}
-                                        className="p-2 border rounded"
+                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         disabled={timePeriod !== null}
                                         data-date-format="DD-MM-YYYY"
                                         min="2000-01-01"
@@ -797,7 +776,7 @@ export default function CertificateForm() {
                                         name="engineerName"
                                         value={formData.engineerName}
                                         onChange={handleChange}
-                                        className="p-2 border rounded"
+                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         required
                                         disabled={isLoadingEngineers}
                                     >
@@ -814,11 +793,8 @@ export default function CertificateForm() {
                                             ))
                                         )}
                                     </select>
-
-
                                 </div>
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-
                                     <input
                                         type="text"
                                         id="certificateNo"
@@ -826,14 +802,13 @@ export default function CertificateForm() {
                                         value={formData.certificateNo}
                                         onChange={handleChange}
                                         readOnly
-                                        className="p-2 border rounded"
+                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                     />
-
                                     <select
                                         name="status"
                                         value={formData.status}
                                         onChange={handleChange}
-                                        className="p-2 border rounded"
+                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                     >
                                         <option value="">Select Status</option>
                                         <option value="Checked">Checked</option>
@@ -872,7 +847,7 @@ export default function CertificateForm() {
                                                         name="gas"
                                                         value={observation.gas}
                                                         onChange={(e) => handleObservationChange(index, 'gas', e.target.value)}
-                                                        className="w-full p-1 border rounded"
+                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
                                                     />
                                                 </td>
                                                 <td className="border p-2">
@@ -881,7 +856,7 @@ export default function CertificateForm() {
                                                         name="before"
                                                         value={observation.before}
                                                         onChange={(e) => handleObservationChange(index, 'before', e.target.value)}
-                                                        className="w-full p-1 border rounded"
+                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
                                                     />
                                                 </td>
                                                 <td className="border p-2">
@@ -890,7 +865,7 @@ export default function CertificateForm() {
                                                         name="after"
                                                         value={observation.after}
                                                         onChange={(e) => handleObservationChange(index, 'after', e.target.value)}
-                                                        className="w-full p-1 border rounded"
+                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
                                                     />
                                                 </td>
                                                 <td className="border p-2">
@@ -906,11 +881,10 @@ export default function CertificateForm() {
                                         {formData.observations.length === 0 && (
                                             <tr>
                                                 <td colSpan={5} className="border p-2 text-center text-gray-500">
-                                                    Click &quot;Create Observation&quot; to add one
+                                                    Click "Create Observation" to add one
                                                 </td>
                                             </tr>
                                         )}
-
                                         {formData.observations.length >= 5 && (
                                             <tr>
                                                 <td colSpan={5} className="border p-2 text-center text-yellow-600">
@@ -929,6 +903,7 @@ export default function CertificateForm() {
                                     {loading ? "Generating..." : "Generate Certificate"}
                                 </button>
                             </form>
+
 
                             {certificate && (
                                 <div className="mt-4 text-center">

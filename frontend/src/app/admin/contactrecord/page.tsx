@@ -10,56 +10,61 @@ import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import {
-    Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator
-} from "@/components/ui/breadcrumb";
-import {
-    SortDescriptor, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow
-} from "@heroui/react";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import {SortDescriptor, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
 import { Pagination, Tooltip } from "@heroui/react";
 import { AdminSidebar } from "@/components/admin-sidebar";
 
-// Define the ContactPerson type
 interface ContactPerson {
     firstName: string;
     middleName: string;
     lastName: string;
     contactNo: string;
     email: string;
-    company: string;
     designation: string;
+    company: string;
     _id: string;
     key?: string;
-    createdAt: string;
+    createdAt: string; 
 }
 
+
+
+// Define columns for the table
 const columns = [
-    { name: "Company Name", uid: "company", sortable: true, width: "120px" },
+    {name: "Company", uid: "company", sortable: true, width: "120px"},
     { name: "First Name", uid: "firstName", sortable: true, width: "120px" },
+    { name: "Middle Name", uid: "middleName", sortable: true, width: "120px" },
     { name: "Last Name", uid: "lastName", sortable: true, width: "120px" },
-    { name: "Company Name", uid: "middleName", sortable: true, width: "120px" },
     { name: "Contact Number", uid: "contactNo", sortable: true, width: "120px" },
     { name: "Email Address", uid: "email", sortable: true, width: "120px" },
     { name: "Designation", uid: "designation", sortable: true, width: "120px" },
-    { name: "Actions", uid: "actions", sortable: false, width: "120px" },
+    { name: "Action", uid: "actions", sortable: false, width: "120px" },
 ];
 
-const INITIAL_VISIBLE_COLUMNS = ["company", "firstName", "middleName", "lastName", "contactNo", "email", "designation", "actions"];
+// Define initial visible columns
+const INITIAL_VISIBLE_COLUMNS = ["firstName", "middleName", "lastName","company", "contactNo", "email", "designation", "actions"];
 
 export default function ContactPersonDetailsTable() {
     const [contactPersons, setContactPersons] = useState<ContactPerson[]>([]);
+    const [error, setError] = useState<string | null>(null);
     const [selectedKeys, setSelectedKeys] = React.useState<Set<string>>(new Set([]));
-    const visibleColumns = React.useMemo(() => new Set(INITIAL_VISIBLE_COLUMNS), []);
+    const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(new Set(INITIAL_VISIBLE_COLUMNS));
+    const [statusFilter, setStatusFilter] = React.useState<string>("all");
     const [rowsPerPage, setRowsPerPage] = useState(15);
     const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
         column: "createdAt",
         direction: "descending",
     });
     const [page, setPage] = React.useState(1);
-    const [filterValue, setFilterValue] = useState("");
     const router = useRouter();
-
+    const [filterValue, setFilterValue] = useState("");
+    const [isLoading, setIsLoading] = useState(true);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [contactToDelete, setContactToDelete] = useState<ContactPerson | null>(null);
     const hasSearchFilter = Boolean(filterValue);
+
+
 
     const fetchContactPersons = async () => {
         try {
@@ -72,24 +77,26 @@ export default function ContactPersonDetailsTable() {
                     },
                 }
             );
-            const contactPersonsData = response.data.data || [];
-            contactPersonsData.sort((a: ContactPerson, b: ContactPerson) =>
-                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            );
+            let contactPersonsData = response.data.data || [];
+            contactPersonsData.sort((a: { createdAt: string | number | Date; }, b: { createdAt: string | number | Date; }) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+            // Replace the entire array with the new sorted data
             setContactPersons(contactPersonsData);
+
+            setError(null);
         } catch (error) {
             console.error("Error fetching contact persons:", error);
-            toast({
-                title: "Error",
-                description: "Failed to fetch contact persons. Please try again.",
-                variant: "destructive",
-            });
+            setError("Failed to fetch contact persons. Please try again.");
             setContactPersons([]);
         }
     };
 
+
+    // Delete contact person by ID
     const handleDelete = async (contactPersonId: string) => {
-        if (!window.confirm("Are you sure you want to delete this contact?")) return;
+        if (!window.confirm("Are you sure you want to delete this contact?")) {
+            return;
+        }
 
         try {
             await axios.delete(
@@ -101,30 +108,32 @@ export default function ContactPersonDetailsTable() {
                     },
                 }
             );
+
             setContactPersons(prev => prev.filter(contact => contact._id !== contactPersonId));
             toast({
-                title: "Contact Deleted",
-                description: "The contact has been successfully deleted",
+                title: "Delete Successful!",
+                description: "Contact person deleted successfully!",
             });
         } catch (error) {
             console.error("Error deleting contact person:", error);
             toast({
                 title: "Error",
-                description: "Could not delete contact person. Please try again.",
+                description: "Failed to delete contact person.",
                 variant: "destructive",
             });
         }
     };
 
+
     const headerColumns = React.useMemo(() => {
         return columns.filter((column) => visibleColumns.has(column.uid));
     }, [visibleColumns]);
-
     const filteredItems = React.useMemo(() => {
         let filteredContacts = [...contactPersons];
 
         if (hasSearchFilter) {
             filteredContacts = filteredContacts.filter((contact) =>
+                contact.company.toLowerCase().includes(filterValue.toLowerCase()) ||
                 contact.firstName.toLowerCase().includes(filterValue.toLowerCase()) ||
                 contact.middleName.toLowerCase().includes(filterValue.toLowerCase()) ||
                 contact.lastName.toLowerCase().includes(filterValue.toLowerCase()) ||
@@ -152,6 +161,8 @@ export default function ContactPersonDetailsTable() {
         });
     }, [filteredItems, sortDescriptor]);
 
+
+    // Pagination logic
     const paginatedItems = React.useMemo(() => {
         const start = (page - 1) * rowsPerPage;
         return sortedItems.slice(start, start + rowsPerPage);
@@ -187,9 +198,9 @@ export default function ContactPersonDetailsTable() {
                 <label className="flex items-center text-default-400 text-small">
                     Rows per page:
                     <select
-                        className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
+                        className="bg-transparent outline-none text-default-400 text-small ml-2"
                         onChange={onRowsPerPageChange}
-                        defaultValue="15"
+                        defaultValue="5"
                     >
                         <option value="5">5</option>
                         <option value="10">10</option>
@@ -204,7 +215,7 @@ export default function ContactPersonDetailsTable() {
         return (
             <div className="py-2 px-2 relative flex justify-between items-center">
                 <span className="text-default-400 text-small">
-                    Total {filteredItems.length} contact{filteredItems.length !== 1 ? 's' : ''}
+                Total {filteredItems.length} contact{filteredItems.length !== 1 ? 's' : ''}
                 </span>
                 <div className="absolute left-1/2 transform -translate-x-1/2">
                     <Pagination
@@ -242,7 +253,7 @@ export default function ContactPersonDetailsTable() {
                 </div>
             </div>
         );
-    }, [page, pages, onPreviousPage, onNextPage, filteredItems.length]);
+    }, [page, pages, onPreviousPage, onNextPage, contactPersons.length]);
 
     const renderCell = useCallback((contact: ContactPerson, columnKey: string) => {
         if (columnKey === "actions") {
@@ -267,11 +278,12 @@ export default function ContactPersonDetailsTable() {
                             <Trash2 />
                         </span>
                     </Tooltip>
+
                 </div>
             );
         }
         return contact[columnKey as keyof ContactPerson];
-    }, [router]);
+    }, []);
 
     useEffect(() => {
         fetchContactPersons();
@@ -287,10 +299,14 @@ export default function ContactPersonDetailsTable() {
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
-                                <BreadcrumbLink href="/admin/dashboard">Dashboard</BreadcrumbLink>
+                                <BreadcrumbLink href="/admin/dashboard">
+                                    Dashboard
+                                </BreadcrumbLink>
                                 <BreadcrumbSeparator className="hidden md:block" />
                                 <BreadcrumbItem>
-                                    <BreadcrumbLink href="/admin/contactform">Create Contact</BreadcrumbLink>
+                                    <BreadcrumbLink href="/admin/contactform">
+                                        Create Contact
+                                    </BreadcrumbLink>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>
@@ -307,32 +323,41 @@ export default function ContactPersonDetailsTable() {
                                 aria-label="Contacts table with custom cells, pagination, and sorting"
                                 bottomContent={bottomContent}
                                 bottomContentPlacement="outside"
-                                classNames={{ wrapper: "max-h-[382px] overflow-y-auto" }}
+                                classNames={{
+                                    wrapper: "max-h-[382px] overflow-y-auto",
+                                }}
                                 selectedKeys={selectedKeys}
                                 sortDescriptor={sortDescriptor}
                                 topContent={topContent}
                                 topContentPlacement="outside"
                                 onSelectionChange={(keys) => setSelectedKeys(keys as Set<string>)}
-                                onSortChange={(descriptor) =>
+                                onSortChange={(descriptor) => {
                                     setSortDescriptor({
                                         column: descriptor.column as string,
                                         direction: descriptor.direction as "ascending" | "descending",
-                                    })
-                                }
+                                    });
+                                }}
                             >
                                 <TableHeader>
                                     {columns.map((column) => (
                                         <TableColumn
                                             key={column.uid}
                                             allowsSorting={column.sortable}
-                                            onClick={() =>
-                                                setSortDescriptor((prev) => ({
-                                                    column: column.uid,
-                                                    direction: prev.column === column.uid && prev.direction === "ascending"
-                                                        ? "descending"
-                                                        : "ascending",
-                                                }))
-                                            }
+                                            onClick={() => {
+                                                setSortDescriptor((prev) => {
+                                                    if (prev.column === column.uid) {
+                                                        return {
+                                                            column: column.uid,
+                                                            direction: prev.direction === "ascending" ? "descending" : "ascending",
+                                                        };
+                                                    } else {
+                                                        return {
+                                                            column: column.uid,
+                                                            direction: "ascending",
+                                                        };
+                                                    }
+                                                });
+                                            }}
                                         >
                                             {column.name}
                                             {sortDescriptor.column === column.uid && (
@@ -347,7 +372,7 @@ export default function ContactPersonDetailsTable() {
                                     {paginatedItems.map((contact) => (
                                         <TableRow key={contact._id}>
                                             {headerColumns.map((column) => (
-                                                <TableCell key={column.uid} style={{ fontSize: "12px", padding: "8px" }}>
+                                                <TableCell key={column.uid}  style={{ fontSize: "12px", padding: "8px" }}>
                                                     {renderCell(contact, column.uid)}
                                                 </TableCell>
                                             ))}

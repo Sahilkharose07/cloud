@@ -1,7 +1,7 @@
-'use client';
+"use client";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
@@ -24,6 +24,7 @@ interface EngineerRemarks {
     partNo: string;
     rate: string;
     quantity: string;
+    total: string;
     poNo: string;
 }
 
@@ -88,7 +89,7 @@ export default function GenerateService() {
         serialNumberoftheFaultyNonWorkingInstruments: "",
         engineerReport: "",
         customerReport: "",
-        engineerRemarks: [{ serviceSpares: "", partNo: "", rate: "", quantity: "", poNo: "" }],
+        engineerRemarks: [{ serviceSpares: "", partNo: "", rate: "", quantity: "", poNo: "", total: "" }],
         engineerName: "",
         status: ""
     });
@@ -101,6 +102,7 @@ export default function GenerateService() {
     const [isLoadingEngineers, setIsLoadingEngineers] = useState(true);
     const [serviceEngineers, setServiceEngineers] = useState<ServiceEngineer[]>([]);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
     const [filteredContacts, setFilteredContacts] = useState<ContactPerson[]>([]);
     const [showDropdown, setShowDropdown] = useState(false);
     const [isLoadingContacts, setIsLoadingContacts] = useState(false);
@@ -233,7 +235,7 @@ export default function GenerateService() {
                         engineerReport: serviceData.engineerReport || "",
                         customerReport: serviceData.customerReport || "",
                         engineerRemarks: serviceData.engineerRemarks?.length > 0
-                            ? serviceData.engineerRemarks.map((remark:EngineerRemarks ) => ({
+                            ? serviceData.engineerRemarks.map((remark: any) => ({
                                 ...remark,
                                 quantity: remark.quantity.toString()
                             }))
@@ -282,7 +284,7 @@ export default function GenerateService() {
                 reportNo: generateReportNo()
             }));
         }
-    }, [isEditMode, formData.reportNo]);
+    }, [isEditMode]);
 
     useEffect(() => {
         const fetchServiceEngineers = async () => {
@@ -330,25 +332,33 @@ export default function GenerateService() {
         setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
-    const handleengineerRemarksChange = (index: number, field: keyof EngineerRemarks, value: string) => {
-        const updatedengineerRemarks = [...formData.engineerRemarks];
-        updatedengineerRemarks[index] = { ...updatedengineerRemarks[index], [field]: value };
-        setFormData({ ...formData, engineerRemarks: updatedengineerRemarks });
-    };
+    const handleEngineerRemarksChange = (index: number, field: keyof EngineerRemarks, value: string) => {
+        const updatedEngineerRemarks = [...formData.engineerRemarks];
+        updatedEngineerRemarks[index] = { ...updatedEngineerRemarks[index], [field]: value };
 
-    const addEngineerRemark = () => {
-        if (formData.engineerRemarks.length < 10) {
-            setFormData({
-                ...formData,
-                engineerRemarks: [...formData.engineerRemarks, { serviceSpares: "", partNo: "", rate: "", quantity: "", poNo: "" }]
-            });
+        // Calculate total whenever rate or quantity changes
+        if (field === 'rate' || field === 'quantity') {
+            const rate = parseFloat(updatedEngineerRemarks[index].rate) || 0;
+            const quantity = parseFloat(updatedEngineerRemarks[index].quantity) || 0;
+            updatedEngineerRemarks[index].total = (rate * quantity).toString();
         }
+
+        setFormData({ ...formData, engineerRemarks: updatedEngineerRemarks });
     };
 
     const removeEngineerRemark = (index: number) => {
         const updatedEngineerRemarks = [...formData.engineerRemarks];
         updatedEngineerRemarks.splice(index, 1);
         setFormData({ ...formData, engineerRemarks: updatedEngineerRemarks });
+    };
+
+    const addEngineerRemark = () => {
+        if (formData.engineerRemarks.length < 10) {
+            setFormData({
+                ...formData,
+                engineerRemarks: [...formData.engineerRemarks, { serviceSpares: "", partNo: "", rate: "", quantity: "", poNo: "", total: "" }]
+            });
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -363,6 +373,7 @@ export default function GenerateService() {
                 remark.partNo?.trim() &&
                 remark.rate?.toString().trim() &&
                 remark.quantity?.toString().trim() &&
+                remark.total?.toString().trim() &&
                 remark.poNo?.trim()
             )
             .map(remark => ({
@@ -370,6 +381,7 @@ export default function GenerateService() {
                 partNo: remark.partNo.trim(),
                 rate: remark.rate.toString().trim(),
                 quantity: Number(remark.quantity),
+                total: remark.total.toString().trim(),
                 poNo: remark.poNo.trim()
             }));
 
@@ -469,9 +481,9 @@ export default function GenerateService() {
             });
             return;
         }
-    
+
         setIsGeneratingPDF(true);
-    
+
         try {
             // Create PDF with A4 size
             const doc = new jsPDF({
@@ -479,16 +491,16 @@ export default function GenerateService() {
                 unit: "mm",
                 format: "a4"
             });
-    
+
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
-    
+
             // Load logo and footer image
             const logo = new Image();
             logo.src = "/img/rps.png";
             const infoImage = new Image();
             infoImage.src = "/img/handf.png";
-    
+
             // Wait for images to load
             await new Promise<void>((resolve, reject) => {
                 logo.onload = () => {
@@ -497,29 +509,29 @@ export default function GenerateService() {
                 };
                 logo.onerror = () => reject("Failed to load logo image");
             });
-    
-            const leftMargin = 15;
-            const rightMargin = 15;
-            const topMargin = 20;
-            let y = topMargin;
-    
-            // Add logo to top-left corner
-            doc.addImage(logo, "PNG", 5, 5, 50, 15);
-            y = 40; // Add spacing below the logo
-    
-            // Add title
-            doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
-            doc.text("SERVICE / CALIBRATION / INSTALLATION JOBREPORT", pageWidth / 2, y, { align: "center" });
-            y += 10;
-    
-            const formatDate = (inputDateString: string | undefined) => {
+
+            const formatDate = (inputDateString: string | undefined): string => {
                 if (!inputDateString) return "N/A";
                 const inputDate = new Date(inputDateString);
                 if (isNaN(inputDate.getTime())) return "N/A";
                 const pad = (n: number) => n.toString().padStart(2, "0");
                 return `${pad(inputDate.getDate())} - ${pad(inputDate.getMonth() + 1)} - ${inputDate.getFullYear()}`;
             };
-    
+
+            const leftMargin = 15;
+            const rightMargin = 15;
+            const topMargin = 20;
+            let y = topMargin;
+
+            // Add logo to top-left corner
+            doc.addImage(logo, "PNG", 5, 5, 50, 15);
+            y = 40; // Add spacing below the logo
+
+            // Add title
+            doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
+            doc.text("SERVICE / CALIBRATION / INSTALLATION JOBREPORT", pageWidth / 2, y, { align: "center" });
+            y += 10;
+
             // Add form data rows
             const addRow = (label: string, value: string) => {
                 const labelOffset = 65;
@@ -529,7 +541,7 @@ export default function GenerateService() {
                 doc.text(value || "N/A", leftMargin + labelOffset, y);
                 y += 7;
             };
-    
+
             addRow("Report No.", formData.reportNo);
             addRow("Customer Name", formData.customerName);
             addRow("Customer Location", formData.customerLocation);
@@ -541,51 +553,54 @@ export default function GenerateService() {
             addRow("Place", formData.place);
             addRow("Place Options", formData.placeOptions);
             addRow("Nature of Job", formData.natureOfJob);
-            
+
             addRow("Make & Model Number", formData.makeModelNumberoftheInstrumentQuantity);
             y += 5;
             addRow("Calibrated & Tested OK", formData.serialNumberoftheInstrumentCalibratedOK);
             addRow("Sr.No Faulty/Non-Working", formData.serialNumberoftheFaultyNonWorkingInstruments);
             y += 10;
-    
+
             // Add Engineer Report section
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
             doc.text("Engineer Report:", leftMargin, y);
             y += 5;
-    
+
             // Draw box around engineer report
             const engineerReportHeight = 30; // Adjust based on content
             doc.setDrawColor(0);
             doc.setLineWidth(0.2);
             doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, engineerReportHeight);
-    
+
             // Split text into lines that fit within the box
             const engineerReportLines = doc.splitTextToSize(formData.engineerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
             doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
             doc.text(engineerReportLines, leftMargin + 2, y + 5);
             y += engineerReportHeight + 5;
-    
+
+
+
             // Page 2: Engineer Remarks Table and Customer Report
             doc.addPage();
             y = topMargin;
-    
+
             // Engineer Remarks Table
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
             doc.text("ENGINEER REMARKS", leftMargin, y);
             y += 8;
-    
-            const tableHeaders = ["Sr. No.", "Service/Spares", "Part No.", "Rate", "Quantity", "PO No."];
-            const colWidths = [20, 60, 25, 25, 25, 25];
+
+            const tableHeaders = ["Sr. No.", "Service/Spares", "Part No.", "Rate", "Quantity", "Total", "PO No."];
+            const colWidths = [15, 50, 25, 20, 20, 25, 25];
+
             let x = leftMargin;
-    
+
             tableHeaders.forEach((header, i) => {
                 doc.rect(x, y, colWidths[i], 8);
                 doc.text(header, x + 2, y + 6);
                 x += colWidths[i];
             });
-    
+
             y += 8;
-    
+
             formData.engineerRemarks.forEach((item, index) => {
                 x = leftMargin;
                 const values = [
@@ -594,6 +609,7 @@ export default function GenerateService() {
                     item.partNo || "",
                     item.rate || "",
                     item.quantity || "",
+                    item.total || "",
                     item.poNo || ""
                 ];
                 values.forEach((val, i) => {
@@ -602,85 +618,82 @@ export default function GenerateService() {
                     x += colWidths[i];
                 });
                 y += 8;
-    
+
                 // Add new page if needed
                 if (y + 50 > pageHeight) { // Leave space for customer report
                     doc.addPage();
                     y = topMargin;
                 }
             });
-    
+
             y += 10;
-    
+
             // Add Customer Report section in a box after the table
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
             doc.text("Customer Report:", leftMargin, y);
             y += 5;
-    
+
             // Draw box around customer report
             const customerReportHeight = 30; // Adjust based on content
             doc.setDrawColor(0);
             doc.setLineWidth(0.2);
             doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, customerReportHeight);
-    
+
             // Split text into lines that fit within the box
             const customerReportLines = doc.splitTextToSize(formData.customerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
             doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
             doc.text(customerReportLines, leftMargin + 2, y + 5);
             y += customerReportHeight + 5;
-    
+
             // Service Engineer signature
             doc.setFont("times", "normal");
             doc.text("Service Engineer", pageWidth - rightMargin - 40, y);
             doc.text(formData.serviceEngineer || "", pageWidth - rightMargin - 40, y + 5);
-    
+
+            // Timestamp
+            const now = new Date();
+            const pad = (n: number) => n.toString().padStart(2, "0");
+            const date = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}`;
+            const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+            doc.setFontSize(9).setTextColor(100);
+            doc.text(`Report Generated On: ${date} ${time}`, leftMargin, pageHeight - 10);
+
             // Add footer image to all pages
             const addFooterImage = () => {
                 const footerY = pageHeight - 25;
                 const footerWidth = 180;
                 const footerHeight = 20;
                 const footerX = (pageWidth - footerWidth) / 2;
-    
+
                 const pageCount = doc.getNumberOfPages();
                 for (let i = 1; i <= pageCount; i++) {
                     doc.setPage(i);
                     doc.addImage(infoImage, "PNG", footerX, footerY, footerWidth, footerHeight);
                 }
             };
-    
+
             addFooterImage();
-    
+
             // Save PDF locally
             doc.save(`service-${service.serviceId}.pdf`);
-    
+
             toast({
                 title: "Success",
                 description: "PDF generated successfully",
                 variant: "default",
             });
-    
-        } catch (err: unknown) {
-            // Type assertion or type guard to narrow down the error type
-            if (err instanceof Error) {
-                console.error("Error generating PDF:", err.message);
-                toast({
-                    title: "Error",
-                    description: err.message || "Failed to generate PDF",
-                    variant: "destructive",
-                });
-            } else {
-                console.error("Unexpected error:", err);
-                toast({
-                    title: "Error",
-                    description: "An unexpected error occurred",
-                    variant: "destructive",
-                });
-            }
+
+        } catch (err: any) {
+            console.error("Error generating PDF:", err);
+            toast({
+                title: "Error",
+                description: err.response?.data?.error || "Failed to generate PDF",
+                variant: "destructive",
+            });
         } finally {
             setIsGeneratingPDF(false);
         }
     };
-    
 
 
     return (
@@ -723,16 +736,6 @@ export default function GenerateService() {
                         </CardHeader>
                         <CardContent>
                             <form onSubmit={handleSubmit} className="space-y-6">
-                                {error && (
-                                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-                                        <span className="block sm:inline">{error}</span>
-                                    </div>
-                                )}
-                                {loading && (
-                                    <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded relative" role="alert">
-                                        <span className="block sm:inline">{isEditMode ? "Updating..." : "Generating..."}</span>
-                                    </div>
-                                )}
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                     <div className="relative w-full">
                                         <input
@@ -746,7 +749,7 @@ export default function GenerateService() {
                                             }}
                                             onFocus={() => setShowDropdown(true)}
                                             onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-                                            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         />
 
 
@@ -759,7 +762,7 @@ export default function GenerateService() {
                                                         <li
                                                             key={contact._id}
                                                             className={`px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${formData.customerName === contact.company
-                                                                ? "bg-blue-50 dark:bg-blue-900"
+                                                                ? "bg-white"
                                                                 : ""
                                                                 }`}
                                                             onClick={() => {
@@ -789,25 +792,23 @@ export default function GenerateService() {
                                             </ul>
                                         )}
                                     </div>
-
                                     <input
                                         type="text"
                                         name="customerLocation"
                                         placeholder="Site Location "
                                         value={formData.customerLocation}
                                         onChange={handleChange}
-                                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                     />
                                 </div>
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-
                                     <input
                                         type="text"
                                         name="contactPerson"
                                         placeholder="Contact Person"
                                         value={formData.contactPerson}
                                         onChange={handleChange}
-                                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                     />
                                     <input
                                         type="number"
@@ -815,18 +816,15 @@ export default function GenerateService() {
                                         placeholder="Contact Number"
                                         value={formData.contactNumber}
                                         onChange={handleChange}
-                                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                     />
-
-
                                 </div>
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-
                                     <select
                                         name="status"
                                         value={formData.status}
                                         onChange={handleChange}
-                                        className="p-2 border rounded"
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                     >
                                         <option value="">Select Status</option>
                                         <option value="Checked">Checked</option>
@@ -836,7 +834,7 @@ export default function GenerateService() {
                                         name="serviceEngineerId"
                                         value={formData.serviceEngineerId || ""}
                                         onChange={handleServiceEngineerChange}
-                                        className="p-2 border rounded"
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         required
                                     >
                                         <option value="">Select Service Engineer</option>
@@ -853,19 +851,18 @@ export default function GenerateService() {
                                         name="date"
                                         value={formData.date}
                                         onChange={handleChange}
-                                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="p-2 border rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         data-date-format="DD-MM-YYYY"
                                         min="2000-01-01"
                                         max="2100-12-31"
                                     />
-
                                     <input
                                         type="text"
                                         name="place"
                                         placeholder="Enter Place"
                                         value={formData.place}
                                         onChange={handleChange}
-                                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                     />
                                 </div>
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -941,13 +938,13 @@ export default function GenerateService() {
                                         value={formData.reportNo}
                                         onChange={handleChange}
                                         readOnly
-                                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                     />
                                     <select
                                         name="engineerId"
                                         value={formData.engineerId || ""}
                                         onChange={handleEngineerChange}
-                                        className="p-2 border rounded w-full"
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         required
                                         disabled={isLoadingEngineers}
                                     >
@@ -969,7 +966,7 @@ export default function GenerateService() {
                                         placeholder="Model Number of the Instrument Quantity"
                                         value={formData.makeModelNumberoftheInstrumentQuantity}
                                         onChange={handleChange}
-                                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black resize-none"
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         rows={3}
                                     />
 
@@ -978,7 +975,7 @@ export default function GenerateService() {
                                         placeholder="Serial Number of the Instrument Calibrated & OK"
                                         value={formData.serialNumberoftheInstrumentCalibratedOK}
                                         onChange={handleChange}
-                                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black resize-none"
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         rows={3}
                                     />
 
@@ -987,7 +984,7 @@ export default function GenerateService() {
                                         placeholder="Serial Number of Faulty / Non-Working Instruments"
                                         value={formData.serialNumberoftheFaultyNonWorkingInstruments}
                                         onChange={handleChange}
-                                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black resize-none"
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         rows={3}
                                     />
 
@@ -996,11 +993,10 @@ export default function GenerateService() {
                                         placeholder="Engineer Report"
                                         value={formData.engineerReport}
                                         onChange={handleChange}
-                                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black resize-none"
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         rows={3}
                                     />
                                 </div>
-
 
                                 <div className="flex justify-end mb-4">
                                     <button
@@ -1012,105 +1008,113 @@ export default function GenerateService() {
                                     </button>
                                 </div>
                                 <table className="table-auto border-collapse border border-gray-500 rounded w-full">
-                                    <thead>
-                                        <tr>
-                                            <th className="border p-2">#</th>
-                                            <th className="border p-2">Service / Spares</th>
-                                            <th className="border p-2">Part Number</th>
-                                            <th className="border p-2">Rate</th>
-                                            <th className="border p-2">Quantity</th>
-                                            <th className="border p-2">Total</th>
-                                            <th className="border p-2">PO Number</th>
-                                            <th className="border p-2">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {formData.engineerRemarks.map((engineerRemark, index) => (
-                                            <tr key={index}>
-                                                <td className="border p-2">{index + 1}</td>
-                                                <td className="border p-2">
-                                                    <input
-                                                        type="text"
-                                                        name="serviceSpares"
-                                                        value={engineerRemark.serviceSpares}
-                                                        onChange={(e) => handleengineerRemarksChange(index, 'serviceSpares', e.target.value)}
-                                                        className="w-full p-1 border rounded"
-                                                    />
-                                                </td>
-                                                <td className="border p-2">
-                                                    <input
-                                                        type="text"
-                                                        name="partNo"
-                                                        value={engineerRemark.partNo}
-                                                        onChange={(e) => handleengineerRemarksChange(index, 'partNo', e.target.value)}
-                                                        className="w-full p-1 border rounded"
-                                                    />
-                                                </td>
-                                                <td className="border p-2">
-                                                    <input
-                                                        type="text"
-                                                        name="rate"
-                                                        value={engineerRemark.rate}
-                                                        onChange={(e) => {
-                                                            const value = e.target.value.replace(/[^0-9.]/g, ''); // Allows numbers and decimal point
-                                                            handleengineerRemarksChange(index, 'rate', value);
-                                                        }}
-                                                        className="w-full p-1 border rounded"
-                                                    />
-                                                </td>
-                                                <td className="border p-2">
-                                                    <input
-                                                        type="text"
-                                                        name="quantity"
-                                                        value={engineerRemark.quantity}
-                                                        onChange={(e) => {
-                                                            const value = e.target.value.replace(/[^0-9]/g, ''); // Only whole numbers
-                                                            handleengineerRemarksChange(index, 'quantity', value);
-                                                        }}
-                                                        className="w-full p-1 border rounded"
-                                                    />
-                                                </td>
-                                                <td className="border p-2">
-                                                    <input
-                                                        type="text"
-                                                        name="total"
-                                                        value={Number(engineerRemark.rate) * Number(engineerRemark.quantity) || 0}
-                                                        readOnly
-                                                        className="w-full p-1 border rounded"
-                                                    />
-                                                </td>
-                                                <td className="border p-2">
-                                                    <input
-                                                        type="text"
-                                                        name="poNo"
-                                                        value={engineerRemark.poNo}
-                                                        onChange={(e) => handleengineerRemarksChange(index, 'poNo', e.target.value)}
-                                                        className="w-full p-1 border rounded"
-                                                    />
-                                                </td>
-                                                <td className="border p-2">
-                                                    <button onClick={() => removeEngineerRemark(index)}>
-                                                        <Trash2 className="h-6 w-6" />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {formData.engineerRemarks.length === 0 && (
-                                            <tr>
-                                                <td colSpan={7} className="border p-2 text-center text-gray-500">
-                                                    Click &quot;Create Engineer Remark&quot; to add one
-                                                </td>
-                                            </tr>
-                                        )}
-                                        {formData.engineerRemarks.length >= 10 && (
-                                            <tr>
-                                                <td colSpan={7} className="border p-2 text-center text-yellow-600">
-                                                    Maximum limit of 10 engineer remarks reached.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                    <thead>
+                        <tr>
+                            <th className="border p-2">#</th>
+                            <th className="border p-2">Service / Spares</th>
+                            <th className="border p-2">Part Number</th>
+                            <th className="border p-2">Rate</th>
+                            <th className="border p-2">Quantity</th>
+                            <th className="border p-2">total</th>
+                            <th className="border p-2">PO Number</th>
+                            <th className="border p-2">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {formData.engineerRemarks.map((engineerRemark, index) => (
+                            <tr key={index}>
+                                <td className="border p-2">{index + 1}</td>
+                                <td className="border p-2">
+                                    <input
+                                        type="text"
+                                        name="serviceSpares"
+                                        value={engineerRemark.serviceSpares}
+                                        onChange={(e) => handleEngineerRemarksChange(index, 'serviceSpares', e.target.value)}
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
+                                    />
+                                </td>
+                                <td className="border p-2">
+                                    <input
+                                        type="text"
+                                        name="partNo"
+                                        value={engineerRemark.partNo}
+                                        onChange={(e) => {
+                                            const value = e.target.value.replace(/[^0-9]/g, '');
+                                            handleEngineerRemarksChange(index, 'partNo', value);
+                                        }}
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
+                                    />
+                                </td>
+                                <td className="border p-2">
+                                    <input
+                                        type="text"
+                                        name="rate"
+                                        value={engineerRemark.rate}
+                                        onChange={(e) => {
+                                            const value = e.target.value.replace(/[^0-9]/g, '');
+                                            handleEngineerRemarksChange(index, 'rate', value);
+                                        }}
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
+                                    />
+                                </td>
+                                <td className="border p-2">
+                                    <input
+                                        type="text"
+                                        name="quantity"
+                                        value={engineerRemark.quantity}
+                                        onChange={(e) => {
+                                            const value = e.target.value.replace(/[^0-9]/g, '');
+                                            handleEngineerRemarksChange(index, 'quantity', value);
+                                        }}
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
+                                    />
+                                </td>
+                                <td className="border p-2">
+                                    <input
+                                        type="text"
+                                        name="total"
+                                        value={engineerRemark.total || ""}
+                                        readOnly
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
+                                    />
+                                </td>
+                                <td className="border p-2">
+                                    <input
+                                        type="text"
+                                        name="poNo"
+                                        value={engineerRemark.poNo}
+                                        onChange={(e) => {
+                                            const value = e.target.value.replace(/[^0-9]/g, '');
+                                            handleEngineerRemarksChange(index, 'poNo', value);
+                                        }}
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
+                                    />
+                                </td>
+                                <td className="border p-2">
+                                    <button
+                                        onClick={() => removeEngineerRemark(index)}
+                                    >
+                                        <Trash2 className="h-6 w-6" />
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                        {formData.engineerRemarks.length === 0 && (
+                            <tr>
+                                <td colSpan={5} className="border p-2 text-center text-gray-500">
+                                    Click "Create Engineer Remark" to add one
+                                </td>
+                            </tr>
+                        )}
+                        {formData.engineerRemarks.length >= 10 && (
+                            <tr>
+                                <td colSpan={5} className="border p-2 text-center text-yellow-600">
+                                    Maximum limit of 10 engineer remarks reached.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
 
                                 <div className="flex flex-col gap-4">
 
@@ -1119,7 +1123,7 @@ export default function GenerateService() {
                                         placeholder="Customer Report"
                                         value={formData.customerReport}
                                         onChange={handleChange}
-                                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black resize-none"
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         rows={3}
                                     />
                                 </div>
@@ -1129,7 +1133,7 @@ export default function GenerateService() {
                                     className="bg-blue-950 hover:bg-blue-900 text-white p-2 rounded-md w-full"
                                     disabled={loading}
                                 >
-                                    {loading ? (isEditMode ? "Updating..." : "Generating...") : (isEditMode ? "Update Service Report" : "Generate Service Report")}
+                                    {loading ? "Generating..." : "Generate Service Report"}
                                 </button>
                             </form>
 

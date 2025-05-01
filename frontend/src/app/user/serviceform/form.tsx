@@ -1,10 +1,11 @@
 "use client";
 
 import { toast } from "@/hooks/use-toast";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import { Trash2, Download, Loader2 } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { jsPDF } from "jspdf";
+
 
 interface ContactPerson {
     _id: string;
@@ -18,6 +19,7 @@ interface EngineerRemarks {
     partNo: string;
     rate: string;
     quantity: string;
+    total: string;
     poNo: string;
 }
 
@@ -45,8 +47,6 @@ interface ServiceRequest {
 }
 
 interface ServiceResponse {
-    serviceEngineer: string;
-    customerName: string;
     serviceId: string;
     message: string;
     downloadUrl: string;
@@ -79,7 +79,7 @@ export default function GenerateService() {
         serialNumberoftheFaultyNonWorkingInstruments: "",
         engineerReport: "",
         customerReport: "",
-        engineerRemarks: [{ serviceSpares: "", partNo: "", rate: "", quantity: "", poNo: "" }],
+        engineerRemarks: [{ serviceSpares: "", partNo: "", rate: "", quantity: "", poNo: "", total: "" }],
         engineerName: "",
         status: ""
     });
@@ -96,46 +96,50 @@ export default function GenerateService() {
     const [showDropdown, setShowDropdown] = useState(false);
     const [isLoadingContacts, setIsLoadingContacts] = useState(false);
 
-    const fetchContactPersons = useCallback(async () => {
-        setIsLoadingContacts(true);
-        try {
-            const response = await axios.get(
-                "http://localhost:5000/api/v1/contactperson/getContactPersons",
-                {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
-                    },
-                }
-            );
 
-            const data = response.data?.data || response.data || [];
-
-            if (!Array.isArray(data)) {
-                console.error("API response is not an array:", data);
-                setContactPersons([]);
-                setFilteredContacts([]);
-                return;
-            }
-
-            setContactPersons(data);
-            setFilteredContacts(data);
-        } catch (error) {
-            console.error("Error fetching contact persons:", error);
-            toast({
-                title: "Error",
-                description: "Failed to load contacts",
-                variant: "destructive",
-            });
-            setContactPersons([]);
-            setFilteredContacts([]);
-        } finally {
-            setIsLoadingContacts(false);
-        }
-    }, []);
 
     useEffect(() => {
+        const fetchContactPersons = async () => {
+            setIsLoadingContacts(true);
+            try {
+                const response = await axios.get(
+                    "http://localhost:5000/api/v1/contactperson/getContactPersons",
+                    {
+                        headers: {
+                            Authorization: `Bearer ${localStorage.getItem("token")}`,
+                        },
+                    }
+                );
+
+                // Check different possible response structures
+                const data = response.data?.data || response.data || [];
+
+                if (!Array.isArray(data)) {
+                    console.error("API response is not an array:", data);
+                    setContactPersons([]);
+                    setFilteredContacts([]);
+                    return;
+                }
+
+                setContactPersons(data);
+                setFilteredContacts(data);
+            } catch (error) {
+                console.error("Error fetching contact persons:", error);
+                toast({
+                    title: "Error",
+                    description: "Failed to load contacts",
+                    variant: "destructive",
+                });
+                setContactPersons([]);
+                setFilteredContacts([]);
+            } finally {
+                setIsLoadingContacts(false);
+            }
+        };
+
+
         fetchContactPersons();
-    }, [fetchContactPersons]);
+    }, []);
 
     useEffect(() => {
         if (!Array.isArray(contactPersons)) {
@@ -161,7 +165,7 @@ export default function GenerateService() {
 
                 setFormData((prev) => ({
                     ...prev,
-                    customerName: match.company || customerNameInput,
+                    customerName: match.company || customerNameInput, // normalize company name
                     contactPerson: match.firstName || "",
                     contactNumber: match.contactNo || "",
                 }));
@@ -171,58 +175,61 @@ export default function GenerateService() {
         }
     }, [formData.customerName, contactPersons]);
 
-    const fetchEngineers = useCallback(async () => {
-        try {
-            const response = await axios.get("http://localhost:5000/api/v1/engineers/getEngineers");
-            setEngineers(response.data);
-        } catch (error) {
-            console.error("Error fetching engineers:", error);
-        }
-    }, []);
+
+
+
+
 
     useEffect(() => {
+        const fetchEngineers = async () => {
+            try {
+                const response = await axios.get("http://localhost:5000/api/v1/engineers/getEngineers");
+                setEngineers(response.data);
+            } catch (error) {
+                console.error("Error fetching engineers:", error);
+            }
+        };
         fetchEngineers();
-    }, [fetchEngineers]);
-
-    const fetchServiceEngineers = useCallback(async () => {
-        try {
-            const response = await fetch("http://localhost:5000/api/v1/ServiceEngineer/getServiceEngineers");
-            const data = await response.json();
-            setServiceEngineers(data);
-        } catch (error) {
-            console.error("Error fetching service engineers:", error);
-            toast({
-                title: "Error",
-                description: "Failed to load service engineers",
-                variant: "destructive",
-            });
-        } finally {
-            setIsLoadingEngineers(false);
-        }
     }, []);
 
     useEffect(() => {
+        const fetchServiceEngineers = async () => {
+            try {
+                const response = await fetch("http://localhost:5000/api/v1/ServiceEngineer/getServiceEngineers");
+                const data = await response.json();
+                setServiceEngineers(data);
+            } catch (error) {
+                console.error("Error fetching service engineers:", error);
+                toast({
+                    title: "Error",
+                    description: "Failed to load service engineers",
+                    variant: "destructive",
+                });
+            } finally {
+                setIsLoadingEngineers(false);
+            }
+        };
         fetchServiceEngineers();
-    }, [fetchServiceEngineers]);
-
-    const generateReportNo = useCallback(() => {
-        const date = new Date();
-        const currentYear = date.getFullYear();
-        const shortStartYear = String(currentYear).slice(-2);
-        const shortEndYear = String(currentYear + 1).slice(-2);
-        const yearRange = `${shortStartYear}-${shortEndYear}`;
-        const randomNum = Math.floor(1000 + Math.random() * 9000);
-        return `RPS/SRV/${yearRange}/${randomNum}`;
     }, []);
 
     useEffect(() => {
         if (!formData.reportNo) {
+            const generateReportNo = () => {
+                const date = new Date();
+                const currentYear = date.getFullYear();
+                const shortStartYear = String(currentYear).slice(-2);
+                const shortEndYear = String(currentYear + 1).slice(-2);
+                const yearRange = `${shortStartYear}-${shortEndYear}`;
+                const randomNum = Math.floor(1000 + Math.random() * 9000);
+                return `RPS/SRV/${yearRange}/${randomNum}`;
+            };
+
             setFormData(prev => ({
                 ...prev,
                 reportNo: generateReportNo()
             }));
         }
-    }, [formData.reportNo, generateReportNo]);
+    }, []);
 
     const handleServiceEngineerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const selectedId = e.target.value;
@@ -255,6 +262,14 @@ export default function GenerateService() {
     const handleEngineerRemarksChange = (index: number, field: keyof EngineerRemarks, value: string) => {
         const updatedEngineerRemarks = [...formData.engineerRemarks];
         updatedEngineerRemarks[index] = { ...updatedEngineerRemarks[index], [field]: value };
+
+        // Calculate total whenever rate or quantity changes
+        if (field === 'rate' || field === 'quantity') {
+            const rate = parseFloat(updatedEngineerRemarks[index].rate) || 0;
+            const quantity = parseFloat(updatedEngineerRemarks[index].quantity) || 0;
+            updatedEngineerRemarks[index].total = (rate * quantity).toString();
+        }
+
         setFormData({ ...formData, engineerRemarks: updatedEngineerRemarks });
     };
 
@@ -262,7 +277,7 @@ export default function GenerateService() {
         if (formData.engineerRemarks.length < 10) {
             setFormData({
                 ...formData,
-                engineerRemarks: [...formData.engineerRemarks, { serviceSpares: "", partNo: "", rate: "", quantity: "", poNo: "" }]
+                engineerRemarks: [...formData.engineerRemarks, { serviceSpares: "", partNo: "", rate: "", quantity: "", poNo: "", total: "" }]
             });
         }
     };
@@ -273,12 +288,11 @@ export default function GenerateService() {
         setFormData({ ...formData, engineerRemarks: updatedEngineerRemarks });
     };
 
-    const validateForm = (): string | null => {
+    const validateForm = () => {
         const requiredFields = [
-            'customerName', 'customerLocation', 'contactPerson', 'contactNumber',
-            'serviceEngineer', 'date', 'place', 'placeOptions', 'natureOfJob',
-            'makeModelNumberoftheInstrumentQuantity', 'serialNumberoftheInstrumentCalibratedOK',
-            'serialNumberoftheFaultyNonWorkingInstruments', 'engineerReport', 'customerReport', 'engineerName', 'status'
+            'customerName', 'customerLocation', 'contactPerson',
+            'contactNumber', 'serviceEngineer', 'date', 'place',
+            'placeOptions', 'natureOfJob', 'reportNo', 'engineerName', 'status'
         ];
 
         for (const field of requiredFields) {
@@ -333,10 +347,9 @@ export default function GenerateService() {
                 description: "Service report generated successfully",
                 variant: "default",
             });
-        } catch (err) {
-            const error = err as AxiosError<{ error?: string }>;
-            setError(error.response?.data?.error || "Failed to generate service. Please try again.");
-            console.error("API Error:", error.response?.data);
+        } catch (err: any) {
+            setError(err.response?.data?.error || "Failed to generate service. Please try again.");
+            console.error("API Error:", err.response?.data);
         } finally {
             setLoading(false);
         }
@@ -351,41 +364,45 @@ export default function GenerateService() {
             });
             return;
         }
-    
+
         setIsGeneratingPDF(true);
-        setIsSendingEmail(false);
-    
+
         try {
+            // Create PDF with A4 size
             const doc = new jsPDF({
                 orientation: "portrait",
                 unit: "mm",
                 format: "a4"
             });
-    
+
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
-    
+
+            // Load logo and footer image
             const logo = new Image();
             logo.src = "/img/rps.png";
             const infoImage = new Image();
             infoImage.src = "/img/handf.png";
-    
+
+            // Wait for images to load
             await new Promise<void>((resolve, reject) => {
                 logo.onload = () => {
                     infoImage.onload = () => resolve();
-                    infoImage.onerror = () => reject(new Error("Failed to load footer image"));
+                    infoImage.onerror = () => reject("Failed to load footer image");
                 };
-                logo.onerror = () => reject(new Error("Failed to load logo image"));
+                logo.onerror = () => reject("Failed to load logo image");
             });
-    
+
             const leftMargin = 15;
             const rightMargin = 15;
             const topMargin = 20;
             let y = topMargin;
-    
+
+            // Add logo to top-left corner
             doc.addImage(logo, "PNG", 5, 5, 50, 15);
-            y = 40;
-    
+            y = 40; // Add spacing below the logo
+
+            // Add title
             doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
             doc.text("SERVICE / CALIBRATION / INSTALLATION JOBREPORT", pageWidth / 2, y, { align: "center" });
             y += 10;
@@ -397,16 +414,17 @@ export default function GenerateService() {
                 const pad = (n: number) => n.toString().padStart(2, "0");
                 return `${pad(inputDate.getDate())} - ${pad(inputDate.getMonth() + 1)} - ${inputDate.getFullYear()}`;
             };
-    
+
+            // Add form data rows
             const addRow = (label: string, value: string) => {
                 const labelOffset = 65;
                 doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-                doc.text(`${label}:`, leftMargin, y);
+                doc.text(label + ":", leftMargin, y);
                 doc.setFont("times", "normal").setTextColor(50);
                 doc.text(value || "N/A", leftMargin + labelOffset, y);
                 y += 7;
             };
-    
+
             addRow("Report No.", formData.reportNo);
             addRow("Customer Name", formData.customerName);
             addRow("Customer Location", formData.customerLocation);
@@ -419,46 +437,51 @@ export default function GenerateService() {
             addRow("Place Options", formData.placeOptions);
             addRow("Nature of Job", formData.natureOfJob);
             addRow("Make & Model Number", formData.makeModelNumberoftheInstrumentQuantity);
-    
             y += 5;
             addRow("Calibrated & Tested OK", formData.serialNumberoftheInstrumentCalibratedOK);
             addRow("Sr.No Faulty/Non-Working", formData.serialNumberoftheFaultyNonWorkingInstruments);
             y += 10;
-    
+
+            // Add Engineer Report section
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
             doc.text("Engineer Report:", leftMargin, y);
             y += 5;
-    
-            const engineerReportHeight = 30;
+
+            // Draw box around engineer report
+            const engineerReportHeight = 30; // Adjust based on content
             doc.setDrawColor(0);
             doc.setLineWidth(0.2);
             doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, engineerReportHeight);
-    
+
+            // Split text into lines that fit within the box
             const engineerReportLines = doc.splitTextToSize(formData.engineerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
             doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
             doc.text(engineerReportLines, leftMargin + 2, y + 5);
-    
             y += engineerReportHeight + 5;
-    
+
+
+
+            // Page 2: Engineer Remarks Table
             doc.addPage();
             y = topMargin;
-    
+
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
             doc.text("ENGINEER REMARKS", leftMargin, y);
             y += 8;
-    
-            const tableHeaders = ["Sr. No.", "Service/Spares", "Part No.", "Rate", "Quantity", "PO No."];
-            const colWidths = [20, 60, 25, 25, 25, 25];
+
+            const tableHeaders = ["Sr. No.", "Service/Spares", "Part No.", "Rate", "Quantity", "Total", "PO No."];
+            const colWidths = [15, 50, 25, 20, 20, 25, 25];
+
             let x = leftMargin;
-    
+
             tableHeaders.forEach((header, i) => {
                 doc.rect(x, y, colWidths[i], 8);
                 doc.text(header, x + 2, y + 6);
                 x += colWidths[i];
             });
-    
+
             y += 8;
-    
+
             formData.engineerRemarks.forEach((item, index) => {
                 x = leftMargin;
                 const values = [
@@ -467,6 +490,7 @@ export default function GenerateService() {
                     item.partNo || "",
                     item.rate || "",
                     item.quantity || "",
+                    item.total || "",
                     item.poNo || ""
                 ];
                 values.forEach((val, i) => {
@@ -475,63 +499,70 @@ export default function GenerateService() {
                     x += colWidths[i];
                 });
                 y += 8;
-    
-                if (y + 50 > pageHeight) {
+
+                // Add new page if needed
+                if (y + 20 > pageHeight) {
                     doc.addPage();
                     y = topMargin;
                 }
             });
-    
+
             y += 10;
-    
+
+
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
             doc.text("Customer Report:", leftMargin, y);
             y += 5;
-    
-            const customerReportHeight = 30;
+
+            // Draw box around customer report
+            const customerReportHeight = 30; // Adjust based on content
             doc.setDrawColor(0);
             doc.setLineWidth(0.2);
             doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, customerReportHeight);
-    
+
+            // Split text into lines that fit within the box
             const customerReportLines = doc.splitTextToSize(formData.customerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
             doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
             doc.text(customerReportLines, leftMargin + 2, y + 5);
-    
-            y += customerReportHeight + 5 + (10 * 7);
-    
-            doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-            doc.text("Customer Name, Seal & Sign", leftMargin, y);
-            doc.text("Engineer Name, Seal & Sign", pageWidth - rightMargin - 60, y);
-    
-            y += 6;
-    
-            doc.setFont("times", "normal").setFontSize(10).setTextColor(50);
-            doc.text(formData.customerName || "N/A", leftMargin, y);
-            doc.text(formData.engineerName || "N/A", pageWidth - rightMargin - 60, y);
-    
+            y += customerReportHeight + 5;
+
+            doc.setFont("times", "normal");
+            doc.text("Service Engineer", pageWidth - rightMargin - 40, y);
+            doc.text(formData.serviceEngineer || "", pageWidth - rightMargin - 40, y + 5);
+
+            // Timestamp
+            const now = new Date();
+            const pad = (n: number) => n.toString().padStart(2, "0");
+            const date = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}`;
+            const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+            doc.setFontSize(9).setTextColor(100);
+            doc.text(`Report Generated On: ${date} ${time}`, leftMargin, pageHeight - 10);
+
+            // Add footer image to all pages
             const addFooterImage = () => {
                 const footerY = pageHeight - 25;
                 const footerWidth = 180;
                 const footerHeight = 20;
                 const footerX = (pageWidth - footerWidth) / 2;
-    
+
                 const pageCount = doc.getNumberOfPages();
                 for (let i = 1; i <= pageCount; i++) {
                     doc.setPage(i);
                     doc.addImage(infoImage, "PNG", footerX, footerY, footerWidth, footerHeight);
                 }
             };
-    
+
             addFooterImage();
-    
+
+            // Get base64 PDF
             const pdfBase64 = doc.output('datauristring').split(',')[1];
-    
+
+            // Save PDF locally
             doc.save(`service-${service.serviceId}.pdf`);
-    
-            setIsGeneratingPDF(false);
+
+            // Send email with PDF
             setIsSendingEmail(true);
-    
-            await axios.post(
+            const emailResponse = await axios.post(
                 'http://localhost:5000/api/v1/services/sendMail',
                 {
                     serviceId: service.serviceId,
@@ -540,23 +571,22 @@ export default function GenerateService() {
                 {
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem("token")}`
+                        'Authorization': `Bearer ${localStorage.getItem("authToken")}`
                     }
                 }
             );
-    
+
             toast({
                 title: "Success",
                 description: "PDF generated and email sent successfully",
                 variant: "default",
             });
-    
-        } catch (err) {
-            const error = err as Error;
-            console.error("Error generating PDF:", error);
+
+        } catch (err: any) {
+            console.error("Error generating PDF or sending email:", err);
             toast({
                 title: "Error",
-                description: error.message || "Failed to generate PDF",
+                description: err.response?.data?.error || "Failed to generate PDF or send email",
                 variant: "destructive",
             });
         } finally {
@@ -564,7 +594,8 @@ export default function GenerateService() {
             setIsSendingEmail(false);
         }
     };
-    
+
+
 
     return (
         <div className="container mx-auto p-4">
@@ -574,13 +605,13 @@ export default function GenerateService() {
                 </div>
             )}
 
-<form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <div className="relative w-full">
                         <input
                             type="text"
                             name="customerName"
-                            placeholder="Company Name"
+                            placeholder="Customer Name"
                             value={formData.customerName}
                             onChange={(e) => {
                                 handleChange(e);
@@ -588,7 +619,7 @@ export default function GenerateService() {
                             }}
                             onFocus={() => setShowDropdown(true)}
                             onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-                            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                         />
 
 
@@ -601,7 +632,7 @@ export default function GenerateService() {
                                         <li
                                             key={contact._id}
                                             className={`px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${formData.customerName === contact.company
-                                                ? "bg-blue-50 dark:bg-blue-900"
+                                                ? "bg-white"
                                                 : ""
                                                 }`}
                                             onClick={() => {
@@ -624,8 +655,8 @@ export default function GenerateService() {
                                 ) : (
                                     <li className="px-4 py-2 text-gray-500">
                                         {contactPersons.length === 0
-                                            ? "No records available"
-                                            : "No records available with this name"}
+                                            ? "No contacts available"
+                                            : "No matching contacts found"}
                                     </li>
                                 )}
                             </ul>
@@ -637,7 +668,7 @@ export default function GenerateService() {
                         placeholder="Site Location "
                         value={formData.customerLocation}
                         onChange={handleChange}
-                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                     />
                 </div>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -647,7 +678,7 @@ export default function GenerateService() {
                         placeholder="Contact Person"
                         value={formData.contactPerson}
                         onChange={handleChange}
-                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                     />
                     <input
                         type="number"
@@ -655,7 +686,7 @@ export default function GenerateService() {
                         placeholder="Contact Number"
                         value={formData.contactNumber}
                         onChange={handleChange}
-                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                     />
                 </div>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -663,7 +694,7 @@ export default function GenerateService() {
                         name="status"
                         value={formData.status}
                         onChange={handleChange}
-                        className="p-2 border rounded"
+                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                     >
                         <option value="">Select Status</option>
                         <option value="Checked">Checked</option>
@@ -673,7 +704,7 @@ export default function GenerateService() {
                         name="serviceEngineerId"
                         value={formData.serviceEngineerId || ""}
                         onChange={handleServiceEngineerChange}
-                        className="p-2 border rounded"
+                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                         required
                     >
                         <option value="">Select Service Engineer</option>
@@ -690,7 +721,7 @@ export default function GenerateService() {
                         name="date"
                         value={formData.date}
                         onChange={handleChange}
-                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="p-2 border rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         data-date-format="DD-MM-YYYY"
                         min="2000-01-01"
                         max="2100-12-31"
@@ -701,11 +732,11 @@ export default function GenerateService() {
                         placeholder="Enter Place"
                         value={formData.place}
                         onChange={handleChange}
-                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                     />
                 </div>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <label className="font-medium text-black dark:text-white">Place :</label>
+                    <label className="font-medium text-black">Place :</label>
                     <div className="flex gap-4">
                         <label className="flex items-center cursor-pointer">
                             <input
@@ -716,7 +747,7 @@ export default function GenerateService() {
                                 onChange={handleChange}
                                 className="mr-2 text-blue-600 focus:ring-blue-500"
                             />
-                            <span className="text-black dark:text-white">At Site</span>
+                            <span className="text-black">At Site</span>
                         </label>
                         <label className="flex items-center cursor-pointer">
                             <input
@@ -727,12 +758,12 @@ export default function GenerateService() {
                                 onChange={handleChange}
                                 className="mr-2 text-blue-600 focus:ring-blue-500"
                             />
-                            <span className="text-black dark:text-white">In House</span>
+                            <span className="text-black">In House</span>
                         </label>
                     </div>
                 </div>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <label className="font-medium text-black dark:text-white">Nature of Job :</label>
+                    <label className="font-medium text-black">Nature of Job :</label>
                     <div className="flex gap-4">
                         <label className="flex items-center cursor-pointer">
                             <input
@@ -743,7 +774,7 @@ export default function GenerateService() {
                                 onChange={handleChange}
                                 className="mr-2 text-blue-600 focus:ring-blue-500"
                             />
-                            <span className="text-black dark:text-white">AMC</span>
+                            <span className="text-black">AMC</span>
                         </label>
                         <label className="flex items-center cursor-pointer">
                             <input
@@ -754,7 +785,7 @@ export default function GenerateService() {
                                 onChange={handleChange}
                                 className="mr-2 text-blue-600 focus:ring-blue-500"
                             />
-                            <span className="text-black dark:text-white">Charged</span>
+                            <span className="text-black">Charged</span>
                         </label>
                         <label className="flex items-center cursor-pointer">
                             <input
@@ -765,7 +796,7 @@ export default function GenerateService() {
                                 onChange={handleChange}
                                 className="mr-2 text-blue-600 focus:ring-blue-500"
                             />
-                            <span className="text-black dark:text-white">Warranty</span>
+                            <span className="text-black">Warranty</span>
                         </label>
                     </div>
                 </div>
@@ -777,17 +808,17 @@ export default function GenerateService() {
                         value={formData.reportNo}
                         onChange={handleChange}
                         readOnly
-                        className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                     />
                     <select
                         name="engineerId"
                         value={formData.engineerId || ""}
                         onChange={handleEngineerChange}
-                        className="p-2 border rounded w-full"
+                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                         required
                         disabled={isLoadingEngineers}
                     >
-                        <option value="">Created By</option>
+                        <option value="">Select Engineer</option>
                         {isLoadingEngineers ? (
                             <option>Loading engineer...</option>
                         ) : (
@@ -805,7 +836,7 @@ export default function GenerateService() {
                         placeholder="Model Number of the Instrument Quantity"
                         value={formData.makeModelNumberoftheInstrumentQuantity}
                         onChange={handleChange}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black resize-none"
+                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                         rows={3}
                     />
 
@@ -814,7 +845,7 @@ export default function GenerateService() {
                         placeholder="Serial Number of the Instrument Calibrated & OK"
                         value={formData.serialNumberoftheInstrumentCalibratedOK}
                         onChange={handleChange}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black resize-none"
+                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                         rows={3}
                     />
 
@@ -823,20 +854,19 @@ export default function GenerateService() {
                         placeholder="Serial Number of Faulty / Non-Working Instruments"
                         value={formData.serialNumberoftheFaultyNonWorkingInstruments}
                         onChange={handleChange}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black resize-none"
+                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                         rows={3}
                     />
 
                     <textarea
                         name="engineerReport"
-                        placeholder="Engineer Remark"
+                        placeholder="Engineer Report"
                         value={formData.engineerReport}
                         onChange={handleChange}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black resize-none"
+                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                         rows={3}
                     />
                 </div>
-
 
                 <div className="flex justify-end mb-4">
                     <button
@@ -855,7 +885,7 @@ export default function GenerateService() {
                             <th className="border p-2">Part Number</th>
                             <th className="border p-2">Rate</th>
                             <th className="border p-2">Quantity</th>
-                            <th className="border p-2">Total</th>
+                            <th className="border p-2">total</th>
                             <th className="border p-2">PO Number</th>
                             <th className="border p-2">Action</th>
                         </tr>
@@ -870,7 +900,7 @@ export default function GenerateService() {
                                         name="serviceSpares"
                                         value={engineerRemark.serviceSpares}
                                         onChange={(e) => handleEngineerRemarksChange(index, 'serviceSpares', e.target.value)}
-                                        className="w-full p-1 border rounded"
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
                                     />
                                 </td>
                                 <td className="border p-2">
@@ -878,8 +908,11 @@ export default function GenerateService() {
                                         type="text"
                                         name="partNo"
                                         value={engineerRemark.partNo}
-                                        onChange={(e) => handleEngineerRemarksChange(index, 'partNo', e.target.value)}
-                                        className="w-full p-1 border rounded"
+                                        onChange={(e) => {
+                                            const value = e.target.value.replace(/[^0-9]/g, '');
+                                            handleEngineerRemarksChange(index, 'partNo', value);
+                                        }}
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
                                     />
                                 </td>
                                 <td className="border p-2">
@@ -887,8 +920,11 @@ export default function GenerateService() {
                                         type="text"
                                         name="rate"
                                         value={engineerRemark.rate}
-                                        onChange={(e) => handleEngineerRemarksChange(index, 'rate', e.target.value)}
-                                        className="w-full p-1 border rounded"
+                                        onChange={(e) => {
+                                            const value = e.target.value.replace(/[^0-9]/g, '');
+                                            handleEngineerRemarksChange(index, 'rate', value);
+                                        }}
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
                                     />
                                 </td>
                                 <td className="border p-2">
@@ -896,17 +932,20 @@ export default function GenerateService() {
                                         type="text"
                                         name="quantity"
                                         value={engineerRemark.quantity}
-                                        onChange={(e) => handleEngineerRemarksChange(index, 'quantity', e.target.value)}
-                                        className="w-full p-1 border rounded"
+                                        onChange={(e) => {
+                                            const value = e.target.value.replace(/[^0-9]/g, '');
+                                            handleEngineerRemarksChange(index, 'quantity', value);
+                                        }}
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
                                     />
                                 </td>
                                 <td className="border p-2">
                                     <input
                                         type="text"
                                         name="total"
-                                        value={Number(engineerRemark.rate) * Number(engineerRemark.quantity) || 0}
+                                        value={engineerRemark.total || ""}
                                         readOnly
-                                        className="w-full p-1 border rounded"
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
                                     />
                                 </td>
                                 <td className="border p-2">
@@ -914,8 +953,11 @@ export default function GenerateService() {
                                         type="text"
                                         name="poNo"
                                         value={engineerRemark.poNo}
-                                        onChange={(e) => handleEngineerRemarksChange(index, 'poNo', e.target.value)}
-                                        className="w-full p-1 border rounded"
+                                        onChange={(e) => {
+                                            const value = e.target.value.replace(/[^0-9]/g, '');
+                                            handleEngineerRemarksChange(index, 'poNo', value);
+                                        }}
+                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
                                     />
                                 </td>
                                 <td className="border p-2">
@@ -929,8 +971,8 @@ export default function GenerateService() {
                         ))}
                         {formData.engineerRemarks.length === 0 && (
                             <tr>
-                                <td colSpan={8} className="border p-2 text-center text-gray-500">
-                                    Click &quot;Create Engineer Remark&quot; to add one
+                                <td colSpan={5} className="border p-2 text-center text-gray-500">
+                                    Click "Create Engineer Remark" to add one
                                 </td>
                             </tr>
                         )}
@@ -945,12 +987,13 @@ export default function GenerateService() {
                 </table>
 
                 <div className="flex flex-col gap-4">
+
                     <textarea
                         name="customerReport"
                         placeholder="Customer Report"
                         value={formData.customerReport}
                         onChange={handleChange}
-                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-black resize-none"
+                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                         rows={3}
                     />
                 </div>
@@ -980,12 +1023,13 @@ export default function GenerateService() {
                         ) : (
                             <>
                                 <Download className="h-4 w-4" />
-                                Download &amp; Email Service Report
+                                Download & Email Service  Report
                             </>
                         )}
                     </button>
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 }

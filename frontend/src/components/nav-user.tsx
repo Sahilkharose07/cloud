@@ -1,3 +1,5 @@
+"use client";
+
 import {
   ChevronsUpDown,
   LogOut,
@@ -56,7 +58,7 @@ import {
 import {
   Toaster,
   toast
-} from "sonner";
+} from "sonner"; 
 
 interface User {
   _id: string;
@@ -72,6 +74,7 @@ export function NavUser() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [dialogKey, setDialogKey] = useState(0);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -98,8 +101,10 @@ export function NavUser() {
 
         const response = await axios.get(`http://localhost:5000/api/v1/users/getuser/${userId}`);
         setCurrentUser(response.data);
+        toast.success("User profile loaded");
       } catch (err) {
         setError("Failed to fetch user data.");
+        toast.error("Failed to load user profile");
         console.error(err);
       } finally {
         setLoading(false);
@@ -108,7 +113,6 @@ export function NavUser() {
 
     fetchUser();
   }, []);
-
 
   const handleEditClick = (user: User) => {
     setEditUser(user);
@@ -195,7 +199,7 @@ export function NavUser() {
                   }}
                   className="w-full text-left"
                 >
-                  <Dialog open={open} onOpenChange={setOpen}>
+                  <Dialog key={dialogKey} open={open} onOpenChange={setOpen}>
                     <DropdownMenuLabel className="p-0 font-normal">
                       <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                         <Avatar className="h-8 w-8 rounded-lg">
@@ -222,6 +226,7 @@ export function NavUser() {
         </SidebarMenuItem>
       </SidebarMenu>
 
+      {/* Profile View Dialog */}
       <Dialog open={open} onOpenChange={(open) => setOpen(open)}>
         <DialogContent
           className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto hide-scrollbar"
@@ -268,6 +273,7 @@ export function NavUser() {
         </DialogContent>
       </Dialog>
 
+      {/* Profile Edit Dialog */}
       <Dialog open={isEditing} onOpenChange={(open) => setIsEditing(open)}>
         <DialogContent
           className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto hide-scrollbar"
@@ -339,4 +345,4 @@ export function NavUser() {
       <Toaster position="top-right" richColors />
     </>
   );
-} 
+}

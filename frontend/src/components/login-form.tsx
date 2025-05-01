@@ -4,15 +4,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import Link from "next/link"
 import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai"
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
 import "react-toastify/dist/ReactToastify.css"
 import { ReloadIcon } from "@radix-ui/react-icons"
-import Image from "next/image";
-
-
+import { AlignCenter } from "lucide-react"
 
 export function LoginForm() {
   const [email, setEmail] = useState("")
@@ -54,7 +53,7 @@ export function LoginForm() {
         description: response.data.message,
       });
 
-    } catch (error: unknown) {  // Change from AxiosError to unknown
+    } catch (error: any) {
       console.error("Forgot password error:", error);
       setEmailSent(true);
       toast({
@@ -76,6 +75,7 @@ export function LoginForm() {
       return;
     }
 
+
     const passwordValidation = () => {
       if (password.length < 8) return "Password must be at least 8 characters";
       if (!/[A-Z]/.test(password)) return "Password must contain at least one uppercase letter";
@@ -94,6 +94,8 @@ export function LoginForm() {
       });
       return;
     }
+
+
 
     try {
       setLoading(true);
@@ -147,11 +149,11 @@ export function LoginForm() {
         description: userData.message || adminData.message || "Invalid credentials",
         variant: "destructive",
       });
-    } catch (error: unknown) {  // Change from AxiosError to unknown
+    } catch (error: any) {
       console.error("Login error:", error);
       toast({
         title: "Error",
-        description: (error as Error).message || "Failed to process request",  // Use 'as Error' to access message property
+        description: error.message || "Failed to process request",
         variant: "destructive",
       });
     } finally {
@@ -161,6 +163,9 @@ export function LoginForm() {
 
   return (
     <div className="flex flex-col items-center gap-4">
+      
+      
+  
       {isForgotPassword ? (
         emailSent ? (
           <div className="border border-neutral-300 dark:border-neutral-700 rounded-xl p-6 shadow-sm">
@@ -168,8 +173,7 @@ export function LoginForm() {
               Check your email
             </h2>
             <p className="text-neutral-600 text-sm mt-2 dark:text-neutral-300">
-              If an account exists with this email, you&apos;ll receive a password reset link.
-
+              If an account exists with this email, you'll receive a password reset link.
             </p>
             <p
               className="flex items-center justify-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline cursor-pointer mt-4"
@@ -224,15 +228,7 @@ export function LoginForm() {
       ) : (
         <Card className="w-[350px]">
           <CardHeader>
-            <Image
-              src="/img/rps.png"
-              width={450}
-              height={250}
-              alt="Logo"
-              className="w-full h-auto max-w-[450px]"
-              priority
-            />
-
+        <img src="/img/rps.png" className="w-full h-auto max-w-[450px]" alt="Logo" />
             <CardTitle className=" text-2xl text-center">Login</CardTitle>
           </CardHeader>
           <CardContent>
@@ -292,4 +288,5 @@ export function LoginForm() {
       )}
     </div>
   );
+  
 }

@@ -7,8 +7,7 @@ import axios from "axios";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useRouter, useParams } from "next/navigation";
-import { Eye, EyeOff } from "react-feather"
-import { ReloadIcon } from "@radix-ui/react-icons";
+import {  IoEye, IoEyeOff  } from "react-icons/io5";
 
 export default function ResetPassword() {
   const [password, setPassword] = useState<string>("");
@@ -25,19 +24,19 @@ export default function ResetPassword() {
     e.preventDefault();
 
     if (password !== confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Passwords do not match.",
-        variant: "destructive",
-      }); return;
+        toast({
+            title: "Error",
+            description: "Passwords do not match.",
+            variant: "destructive",
+        });       return;
     }
 
     if (!isPasswordStrong(password)) {
-      toast({
-        title: "Error",
-        description: "Passwords do not match.",
-        variant: "destructive",
-      }); return;
+        toast({
+            title: "Error",
+            description: "Passwords do not match.",
+            variant: "destructive",
+        });       return;
     }
 
     setIsSubmitting(true);
@@ -46,31 +45,24 @@ export default function ResetPassword() {
         `http://localhost:5000/api/v1/users/reset-password/${token}`,
         { password }
       );
-    
+
       if (response.data.success) {
         setPasswordReset(true);
       } else {
         toast({
-          title: "Error",
-          description: "Passwords do not match.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      // Check if the error is an instance of Error and log it
-      if (error instanceof Error) {
-        console.error(error.message);  // Log the error message to the console
-      }
-    
-      toast({
-        title: "Error",
-        description: "Passwords do not match.",
-        variant: "destructive",
-      });
+            title: "Error",
+            description: "Passwords do not match.",
+            variant: "destructive",
+        });       }
+    } catch (error: any) {
+        toast({
+            title: "Error",
+            description: "Passwords do not match.",
+            variant: "destructive",
+        }); 
     } finally {
       setIsSubmitting(false);
     }
-    
   };
 
   const isPasswordStrong = (password: string): boolean => {
@@ -100,8 +92,8 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black p-4">
-      <div className="max-w-md w-full mx-auto rounded-none md:rounded-2xl p-8 md:p-8 bg-white dark:bg-black border border-neutral-300 dark:border-neutral-700">
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900 p-4">
+      <div className="max-w-md w-full mx-auto rounded-none md:rounded-2xl p-8 md:p-8 shadow-input bg-white dark:bg-black shadow-lg shadow-gray-500">
         {passwordReset ? (
           <div className="text-center">
             <h2 className="font-bold text-xl text-neutral-800 dark:text-neutral-200">
@@ -146,7 +138,7 @@ export default function ResetPassword() {
                     className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? <Eye size={20} /> : <EyeOff size={20} />}
+                    {showPassword ? <IoEye size={20} /> : <IoEyeOff size={20} />}
                   </button>
                 </div>
                 {passwordMessage && (
@@ -172,7 +164,7 @@ export default function ResetPassword() {
                     className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700"
                     aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                   >
-                    {showConfirmPassword ? <Eye size={20} /> : <EyeOff size={20} />}
+                    {showConfirmPassword ? <IoEye size={20} /> : <IoEyeOff size={20} />}
                   </button>
                 </div>
               </LabelInputContainer>
@@ -182,14 +174,7 @@ export default function ResetPassword() {
                 type="submit"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? (
-                  <>
-                    <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                    Resetting...
-                  </>
-                ) : (
-                  "Reset Password"
-                )}
+                {isSubmitting ? "Resetting..." : "Reset Password"}
               </button>
             </form>
           </>

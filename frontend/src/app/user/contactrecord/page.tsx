@@ -1,20 +1,18 @@
 'use client';
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-    SidebarInset,
-    SidebarProvider,
-    SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
-import React, { useEffect, useState, useCallback, useMemo } from "react"
-import { Button } from "@/components/ui/button"
-import { SearchIcon } from "lucide-react"
-import { toast } from "sonner"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Selection, SortDescriptor, Pagination } from "@heroui/react"
+import React, { useEffect, useState, useCallback } from "react";
+import { useRouter } from 'next/navigation';
+import { toast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { SearchIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import axios from "axios";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { SortDescriptor, Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
+import { Pagination } from "@heroui/react";
 import { AppSidebar } from "@/components/app-sidebar";
 
 interface ContactPerson {
@@ -24,34 +22,40 @@ interface ContactPerson {
     contactNo: string;
     email: string;
     designation: string;
+    company: string;
     _id: string;
     key?: string;
-    createdAt?: string;
-    updatedAt?: string;
+    createdAt: string;
 }
 
+// Columns definition (without actions)
 const columns = [
+    { name: "Company", uid: "company", sortable: true, width: "120px" },
     { name: "First Name", uid: "firstName", sortable: true, width: "120px" },
+    { name: "Middle Name", uid: "middleName", sortable: true, width: "120px" },
     { name: "Last Name", uid: "lastName", sortable: true, width: "120px" },
-    { name: "Company Name", uid: "middleName", sortable: true, width: "120px" },
     { name: "Contact Number", uid: "contactNo", sortable: true, width: "120px" },
     { name: "Email Address", uid: "email", sortable: true, width: "120px" },
     { name: "Designation", uid: "designation", sortable: true, width: "120px" },
 ];
 
-export default function AdminContactTable() {
+// Visible columns without actions
+const INITIAL_VISIBLE_COLUMNS = ["firstName", "middleName", "lastName", "company", "contactNo", "email", "designation"];
+
+export default function ContactPersonDetailsTable() {
     const [contactPersons, setContactPersons] = useState<ContactPerson[]>([]);
-    const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set([]));
+    const [error, setError] = useState<string | null>(null);
+    const [selectedKeys, setSelectedKeys] = React.useState<Set<string>>(new Set([]));
+    const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(new Set(INITIAL_VISIBLE_COLUMNS));
     const [rowsPerPage, setRowsPerPage] = useState(15);
     const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
         column: "createdAt",
         direction: "descending",
     });
-
-    const [page, setPage] = useState(1);
+    const [page, setPage] = React.useState(1);
     const [filterValue, setFilterValue] = useState("");
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [contactToDelete, setContactToDelete] = useState<ContactPerson | null>(null);
+    const router = useRouter();
+
     const hasSearchFilter = Boolean(filterValue);
 
     const fetchContactPersons = async () => {
@@ -65,105 +69,57 @@ export default function AdminContactTable() {
                     },
                 }
             );
-
-            const contactPersonsData = response.data.data || [];
-
-
-            contactPersonsData.sort((a: ContactPerson, b: ContactPerson) => {
-                const dateA = new Date(a.createdAt || 0).getTime();
-                const dateB = new Date(b.createdAt || 0).getTime();
-                return dateB - dateA;
-            });
-
+            let contactPersonsData = response.data.data || [];
+            contactPersonsData.sort((a, b) =>
+                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
             setContactPersons(contactPersonsData);
+            setError(null);
         } catch (error) {
             console.error("Error fetching contact persons:", error);
+            setError("Failed to fetch contact persons. Please try again.");
             setContactPersons([]);
         }
     };
 
-    useEffect(() => {
-        fetchContactPersons();
-    }, []);
+    const headerColumns = React.useMemo(() => {
+        return columns.filter((column) => visibleColumns.has(column.uid));
+    }, [visibleColumns]);
 
-    const handleConfirmDelete = async () => {
-        if (!contactToDelete) return;
-
-        try {
-            await axios.delete(
-                `http://localhost:5000/api/v1/contactperson/deleteContactPerson/${contactToDelete._id}`,
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${localStorage.getItem("token")}`,
-                    },
-                }
-            );
-
-            setIsDeleteModalOpen(false);
-            setContactToDelete(null);
-            await fetchContactPersons();
-            toast.success("Contact person deleted successfully");
-        } catch (error) {
-            console.error("Error deleting contact person:", error);
-            toast.error("Failed to delete contact person");
-        }
-    };
-
-    const handleCancelDelete = () => {
-        setIsDeleteModalOpen(false);
-        setContactToDelete(null);
-    };
-
-    const ConfirmationDialog = ({ isOpen, onClose, onConfirm }: { isOpen: boolean; onClose: () => void; onConfirm: () => void }) => {
-        if (!isOpen) return null;
-
-        return (
-            <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50">
-                <div className="bg-black p-6 rounded shadow-md max-w-sm w-full">
-                    <h3 className="text-lg font-semibold text-white">Are you sure you want to delete this contact?</h3>
-                    <div className="mt-4 flex justify-end gap-4">
-                        <Button onClick={onClose} variant="outline" className="text-white border-white">Cancel</Button>
-                        <Button onClick={onConfirm} className="bg-red-500 text-white">Delete</Button>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    const filteredItems = useMemo(() => {
+    const filteredItems = React.useMemo(() => {
         let filteredContacts = [...contactPersons];
-
         if (hasSearchFilter) {
             filteredContacts = filteredContacts.filter((contact) =>
+                contact.company.toLowerCase().includes(filterValue.toLowerCase()) ||
                 contact.firstName.toLowerCase().includes(filterValue.toLowerCase()) ||
                 contact.middleName.toLowerCase().includes(filterValue.toLowerCase()) ||
                 contact.lastName.toLowerCase().includes(filterValue.toLowerCase()) ||
-                contact.email.toLowerCase().includes(filterValue.toLowerCase()) ||
                 contact.contactNo.toLowerCase().includes(filterValue.toLowerCase()) ||
+                contact.email.toLowerCase().includes(filterValue.toLowerCase()) ||
                 contact.designation.toLowerCase().includes(filterValue.toLowerCase())
             );
         }
-
         return filteredContacts;
     }, [contactPersons, hasSearchFilter, filterValue]);
 
-    const sortedItems = useMemo(() => {
+    const sortedItems = React.useMemo(() => {
+        if (!sortDescriptor.column) return filteredItems;
         return [...filteredItems].sort((a, b) => {
             const first = a[sortDescriptor.column as keyof ContactPerson] || "";
             const second = b[sortDescriptor.column as keyof ContactPerson] || "";
-            const cmp = String(first).localeCompare(String(second), undefined, { sensitivity: 'base' });
+            let cmp = 0;
+            if (first < second) cmp = -1;
+            if (first > second) cmp = 1;
             return sortDescriptor.direction === "descending" ? -cmp : cmp;
         });
     }, [filteredItems, sortDescriptor]);
 
-    const pages = Math.ceil(filteredItems.length / rowsPerPage);
-
-    const items = useMemo(() => {
+    const paginatedItems = React.useMemo(() => {
         const start = (page - 1) * rowsPerPage;
-        const end = start + rowsPerPage;
-        return sortedItems.slice(start, end);
-    }, [page, rowsPerPage, sortedItems]);
+        return sortedItems.slice(start, start + rowsPerPage);
+    }, [sortedItems, page, rowsPerPage]);
+
+    const pages = Math.ceil(filteredItems.length / rowsPerPage) || 1;
 
     const onNextPage = useCallback(() => {
         if (page < pages) setPage(page + 1);
@@ -178,106 +134,118 @@ export default function AdminContactTable() {
         setPage(1);
     }, []);
 
-    const topContent = useMemo(() => (
-        <div className="flex justify-between gap-3 items-end">
-            <Input
-                isClearable
-                className="w-full max-w-[300px]"
-                placeholder="Search"
-                startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
-                value={filterValue}
-                onChange={(e) => setFilterValue(e.target.value)}
-                onClear={() => setFilterValue("")}
-            />
-            <label className="flex items-center text-default-400 text-small">
-                Rows per page:
-                <select
-                    className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small"
-                    onChange={onRowsPerPageChange}
-                    defaultValue="15"
-                >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="15">15</option>
-                </select>
-            </label>
-        </div>
-    ), [filterValue, onRowsPerPageChange]);
-
-    const bottomContent = useMemo(() => (
-        <div className="py-2 px-2 flex justify-between items-center">
-            <span className="text-default-400 text-small">
-                Total {contactPersons.length} contact
-            </span>
-            <Pagination
-                isCompact
-                showShadow
-                color="success"
-                page={page}
-                total={pages}
-                onChange={setPage}
-                classNames={{
-                    cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
-                    item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
-                }}
-            />
-            <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
-                <Button
-                    className="bg-[hsl(339.92deg_91.04%_52.35%)]"
-                    size="sm"
-                    disabled={page === 1}
-                    onClick={onPreviousPage}
-                >
-                    Previous
-                </Button>
-                <Button
-                    className="bg-[hsl(339.92deg_91.04%_52.35%)]"
-                    size="sm"
-                    disabled={page === pages}
-                    onClick={onNextPage}
-                >
-                    Next
-                </Button>
+    const topContent = React.useMemo(() => {
+        return (
+            <div className="flex justify-between items-center gap-4">
+                <Input
+                    isClearable
+                    className="w-full max-w-[300px]"
+                    placeholder="Search"
+                    startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
+                    value={filterValue}
+                    onChange={(e) => setFilterValue(e.target.value)}
+                    onClear={() => setFilterValue("")}
+                />
+                <label className="flex items-center text-default-400 text-small">
+                    Rows per page:
+                    <select
+                        className="bg-transparent  outline-none text-default-400 text-small ml-2"
+                        onChange={onRowsPerPageChange}
+                        defaultValue="15"
+                    >
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                    </select>
+                </label>
             </div>
-        </div>
-    ), [page, pages, onPreviousPage, onNextPage, contactPersons.length]);
+        );
+    }, [filterValue, onRowsPerPageChange]);
 
-    const renderCell = useCallback((contact: ContactPerson, columnKey: string): React.ReactNode => {
-        const cellValue = contact[columnKey as keyof ContactPerson];
-        if (columnKey === "createdAt") {
-            return new Date(cellValue as string).toLocaleDateString();
-        }
-        return cellValue;
+    const bottomContent = React.useMemo(() => {
+        return (
+            <div className="py-2 px-2 relative flex justify-between items-center">
+                <span className="text-default-400 text-small">
+                    Total {filteredItems.length} contact{filteredItems.length !== 1 ? 's' : ''}
+                </span>
+                <div className="absolute left-1/2 transform -translate-x-1/2">
+                    <Pagination
+                        isCompact
+                        showShadow
+                        color="success"
+                        page={page}
+                        total={pages}
+                        onChange={setPage}
+                        classNames={{
+                            cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
+                            item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
+                        }}
+                    />
+                </div>
+                <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
+                    <Button
+                        className="bg-[hsl(339.92deg_91.04%_52.35%)]"
+                        variant="default"
+                        size="sm"
+                        disabled={page === 1}
+                        onClick={onPreviousPage}
+                    >
+                        Previous
+                    </Button>
+                    <Button
+                        className="bg-[hsl(339.92deg_91.04%_52.35%)]"
+                        variant="default"
+                        size="sm"
+                        disabled={page === pages}
+                        onClick={onNextPage}
+                    >
+                        Next
+                    </Button>
+                </div>
+            </div>
+        );
+    }, [page, pages, onPreviousPage, onNextPage, filteredItems.length]);
+
+    const renderCell = useCallback((contact: ContactPerson, columnKey: string) => {
+        return contact[columnKey as keyof ContactPerson];
+    }, []);
+
+    useEffect(() => {
+        fetchContactPersons();
     }, []);
 
     return (
         <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
-                <header className="flex h-16 items-center gap-2">
+                <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
-                                <BreadcrumbLink href="/user/dashboard">Dashboard</BreadcrumbLink>
-                                <BreadcrumbSeparator />
+                                <BreadcrumbLink href="/user/dashboard">
+                                    Dashboard
+                                </BreadcrumbLink>
+                                <BreadcrumbSeparator className="hidden md:block" />
                                 <BreadcrumbItem>
-                                    <BreadcrumbLink href="/user/contactform">Create Contact</BreadcrumbLink>
+                                    <BreadcrumbLink href="/user/contactform">
+                                        Create Contact
+                                    </BreadcrumbLink>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>
                     </div>
                 </header>
-                <div className="container mx-auto py-10 px-4">
-                    <Card className="max-w-7xl mx-auto">
+                <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15">
+                    <Card className="max-w-6xl mx-auto">
                         <CardHeader>
                             <CardTitle className="text-3xl font-bold text-center">Contact Record</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <Table
                                 isHeaderSticky
-                                aria-label="Contacts table"
+                                aria-label="Contacts table with custom cells, pagination, and sorting"
                                 bottomContent={bottomContent}
                                 bottomContentPlacement="outside"
                                 classNames={{ wrapper: "max-h-[382px] overflow-y-auto" }}
@@ -285,39 +253,49 @@ export default function AdminContactTable() {
                                 sortDescriptor={sortDescriptor}
                                 topContent={topContent}
                                 topContentPlacement="outside"
-                                onSelectionChange={setSelectedKeys}
-                                onSortChange={setSortDescriptor}
+                                onSelectionChange={(keys) => setSelectedKeys(keys as Set<string>)}
+                                onSortChange={(descriptor) => {
+                                    setSortDescriptor({
+                                        column: descriptor.column as string,
+                                        direction: descriptor.direction as "ascending" | "descending",
+                                    });
+                                }}
                             >
                                 <TableHeader>
                                     {columns.map((column) => (
                                         <TableColumn
                                             key={column.uid}
+                                            allowsSorting={column.sortable}
                                             onClick={() => {
-                                                setSortDescriptor(prev => ({
-                                                    column: column.uid,
-                                                    direction: prev.column === column.uid && prev.direction === "ascending"
-                                                        ? "descending"
-                                                        : "ascending"
-                                                }));
+                                                setSortDescriptor((prev) => {
+                                                    if (prev.column === column.uid) {
+                                                        return {
+                                                            column: column.uid,
+                                                            direction: prev.direction === "ascending" ? "descending" : "ascending",
+                                                        };
+                                                    } else {
+                                                        return {
+                                                            column: column.uid,
+                                                            direction: "ascending",
+                                                        };
+                                                    }
+                                                });
                                             }}
-                                            className="cursor-pointer"
                                         >
-                                            <div className="flex items-center">
-                                                {column.name}
-                                                {sortDescriptor.column === column.uid && (
-                                                    <span className="ml-1">
-                                                        {sortDescriptor.direction === "ascending" ? "↑" : "↓"}
-                                                    </span>
-                                                )}
-                                            </div>
+                                            {column.name}
+                                            {sortDescriptor.column === column.uid && (
+                                                <span className="ml-1 text-xs">
+                                                    {sortDescriptor.direction === "ascending" ? "↑" : "↓"}
+                                                </span>
+                                            )}
                                         </TableColumn>
                                     ))}
                                 </TableHeader>
                                 <TableBody emptyContent={"Create contact and add data"}>
-                                    {items.map((contact) => (
+                                    {paginatedItems.map((contact) => (
                                         <TableRow key={contact._id}>
-                                            {columns.map((column) => (
-                                                <TableCell key={column.uid}>
+                                            {headerColumns.map((column) => (
+                                                <TableCell key={column.uid} style={{ fontSize: "12px", padding: "8px" }}>
                                                     {renderCell(contact, column.uid)}
                                                 </TableCell>
                                             ))}
@@ -329,11 +307,6 @@ export default function AdminContactTable() {
                     </Card>
                 </div>
             </SidebarInset>
-            <ConfirmationDialog
-                isOpen={isDeleteModalOpen}
-                onClose={handleCancelDelete}
-                onConfirm={handleConfirmDelete}
-            />
         </SidebarProvider>
     );
 }

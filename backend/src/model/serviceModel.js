@@ -5,6 +5,7 @@ const engineerRemarksSchema = new mongoose.Schema({
     partNo: { type: String, required: true },
     rate: { type: String, required: true },
     quantity: { type: String, required: true },
+    total: { type: String, required: true },
     poNo: { type: String, required: true }
 }, { _id: false });
 
@@ -28,6 +29,8 @@ const serviceSchema = new mongoose.Schema({
     makeModelNumberoftheInstrumentQuantity: { type: String, required: true },
     serialNumberoftheInstrumentCalibratedOK: { type: String, required: true },
     serialNumberoftheFaultyNonWorkingInstruments: { type: String, required: true },
+    engineerReport:{ type: String, required: true },
+    customerReport: { type: String, required: true },
     engineerRemarks: { type: [engineerRemarksSchema], required: true },
     engineerName: { type: String, required: true },
     status: { type: String, required: true, default: "checked" }

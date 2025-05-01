@@ -1,31 +1,32 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { Button } from "@/components/ui/button";
-import { Loader2, SearchIcon, Download } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Selection } from "@heroui/react";
+import React, { useEffect, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Loader2, SearchIcon, FileDown, Trash2, Download } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
+import { Input } from "@/components/ui/input"
+import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Selection, ChipProps, Select } from "@heroui/react"
 import axios from "axios";
-import { Pagination, Tooltip } from "@heroui/react";
+import { Pagination, Tooltip } from "@heroui/react"
+import { useRouter } from "next/navigation";
 import { jsPDF } from "jspdf";
 
+interface EngineerRemarks {
+    serviceSpares: string;
+    partNo: string;
+    rate: string;
+    quantity: string;
+    poNo: string;
+}
+
 interface Service {
-    engineerReport: string;
-    engineerRemarks: Array<{
-        serviceSpares: string;
-        partNo: string;
-        rate: string;
-        quantity: string;
-        poNo: string;
-    }>;
-    customerReport: string;
-    status: string;
-    customerLocation: string;
-    customerName: string;
     _id: string;
+    customerName: string;
+    customerLocation: string;
     contactPerson: string;
     contactNumber: string;
     serviceEngineer: string;
+    serviceEngineerId?: string;
     date: string;
     place: string;
     placeOptions: string;
@@ -34,8 +35,12 @@ interface Service {
     makeModelNumberoftheInstrumentQuantity: string;
     serialNumberoftheInstrumentCalibratedOK: string;
     serialNumberoftheFaultyNonWorkingInstruments: string;
+    engineerReport: string;
+    customerReport: string;
+    engineerRemarks: EngineerRemarks[];
     engineerName: string;
-    createdAt: string;
+    engineerId?: string;
+    status: string;
 }
 
 type SortDescriptor = {
@@ -43,47 +48,64 @@ type SortDescriptor = {
     direction: 'ascending' | 'descending';
 }
 
+interface ServiceResponse {
+    serviceId: string;
+    message: string;
+    downloadUrl: string;
+}
+
 const generateUniqueId = () => {
     return Math.random().toString(36).substring(2) + Date.now().toString(36);
 };
 
-const formatDate = (dateString: string | Date): string => {
-    if (!dateString) return "N/A";
-
-    const date = dateString instanceof Date ? dateString : new Date(dateString);
-    if (isNaN(date.getTime())) return "Invalid Date";
-
-    const pad = (n: number) => n.toString().padStart(2, "0");
-    const day = pad(date.getDate());
-    const month = pad(date.getMonth() + 1);
-    const year = date.getFullYear();
-
-    return `${day}-${month}-${year}`;
+const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toISOString().split("T")[0]; // Returns "YYYY-MM-DD"
 };
 
 const columns = [
-    { name: "Report Number", uid: "reportNo", sortable: true, width: "120px" },
-    { name: "Customer Name", uid: "customerName", sortable: true, width: "120px" },
+    { name: "Customer", uid: "customerName", sortable: true, width: "120px" },
     { name: "Contact Person", uid: "contactPerson", sortable: true, width: "120px" },
     { name: "Contact Number", uid: "contactNumber", sortable: true, width: "120px" },
     { name: "Service Engineer", uid: "serviceEngineer", sortable: true, width: "120px" },
-    { name: "Date", uid: "date", sortable: true, width: "120px" },
+    { name: "Report Number", uid: "reportNo", sortable: true, width: "120px" },
     { name: "Action", uid: "actions", sortable: true, width: "100px" },
 ];
 
+export const statusOptions = [
+    { name: "Paused", uid: "paused" },
+    { name: "Vacation", uid: "vacation" },
+];
+
+
+const statusColorMap: Record<string, ChipProps["color"]> = {
+    active: "success",
+    paused: "danger",
+    vacation: "warning",
+};
+
+const INITIAL_VISIBLE_COLUMNS = ["customerName", "nameAndLocation", "contactPerson", "contactNumber", "serviceEngineer", "reportNo", "actions"];
+
+
 export default function Servicetable() {
     const [services, setServices] = useState<Service[]>([]);
-    const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set([]));
+    const [service, setService] = useState<ServiceResponse | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [selectedKeys, setSelectedKeys] = React.useState<Set<string>>(new Set([]));
+    const [visibleColumns, setVisibleColumns] = React.useState<Selection>(new Set(columns.map(column => column.uid)));
+    const [statusFilter, setStatusFilter] = React.useState<Selection>("all");
     const [rowsPerPage, setRowsPerPage] = useState(15);
-    const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
-        column: "createdAt",
-        direction: "descending",
+    const [sortDescriptor, setSortDescriptor] = React.useState<SortDescriptor>({
+        column: "createdAt", // This should match your date field name
+        direction: "descending", // Newest first
     });
-    const [page, setPage] = useState(1);
+    const [page, setPage] = React.useState(1);
+    const router = useRouter();
+
     const [startDate, setStartDate] = useState<string>("");
     const [endDate, setEndDate] = useState<string>("");
-    const [filterValue, setFilterValue] = useState("");
     const [isDownloading, setIsDownloading] = useState<string | null>(null);
+
 
     const fetchServices = async () => {
         try {
@@ -106,7 +128,8 @@ export default function Servicetable() {
                 throw new Error('Invalid response format');
             }
 
-            servicesData.sort((a: { createdAt: string | number | Date }, b: { createdAt: string | number | Date }) =>
+            // Sort by createdAt in descending order (newest first)
+            servicesData.sort((a, b) =>
                 new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
             );
 
@@ -116,8 +139,10 @@ export default function Servicetable() {
             }));
 
             setServices(servicesWithKeys);
+            setError(null);
         } catch (error) {
             console.error("Error fetching services:", error);
+            setError("Failed to fetch services.");
             setServices([]);
         }
     };
@@ -126,11 +151,16 @@ export default function Servicetable() {
         fetchServices();
     }, []);
 
+    const [filterValue, setFilterValue] = useState("");
     const hasSearchFilter = Boolean(filterValue);
 
-    const headerColumns = columns;
+    const headerColumns = React.useMemo(() => {
+        if (visibleColumns === "all") return columns;
 
-    const filteredItems = useMemo(() => {
+        return columns.filter((column) => Array.from(visibleColumns).includes(column.uid));
+    }, [visibleColumns]);
+
+    const filteredItems = React.useMemo(() => {
         let filteredServices = [...services];
 
         if (hasSearchFilter) {
@@ -148,7 +178,7 @@ export default function Servicetable() {
                 const serviceDate = new Date(service.date);
                 const start = startDate ? new Date(startDate) : null;
                 const end = endDate ? new Date(endDate) : null;
-                
+
                 if (start && end) {
                     return serviceDate >= start && serviceDate <= end;
                 } else if (start) {
@@ -165,15 +195,16 @@ export default function Servicetable() {
 
     const pages = Math.ceil(filteredItems.length / rowsPerPage);
 
-    const items = useMemo(() => {
+    const items = React.useMemo(() => {
         const start = (page - 1) * rowsPerPage;
         const end = start + rowsPerPage;
 
         return filteredItems.slice(start, end);
     }, [page, filteredItems, rowsPerPage]);
 
-    const sortedItems = useMemo(() => {
+    const sortedItems = React.useMemo(() => {
         return [...items].sort((a, b) => {
+            // Handle date fields specially
             if (sortDescriptor.column === 'date' || sortDescriptor.column === 'createdAt') {
                 const dateA = new Date(a[sortDescriptor.column]).getTime();
                 const dateB = new Date(b[sortDescriptor.column]).getTime();
@@ -181,6 +212,7 @@ export default function Servicetable() {
                 return sortDescriptor.direction === "descending" ? -cmp : cmp;
             }
 
+            // Default string comparison
             const first = a[sortDescriptor.column as keyof Service] || '';
             const second = b[sortDescriptor.column as keyof Service] || '';
             const cmp = String(first).localeCompare(String(second));
@@ -189,8 +221,8 @@ export default function Servicetable() {
         });
     }, [sortDescriptor, items]);
 
-    const handleDownload = useCallback((service: Service) => {
-        setIsDownloading(service._id);
+
+    const handleDownload = (service: Service) => {
         const logo = new Image();
         logo.src = "/img/rps.png";
 
@@ -213,13 +245,16 @@ export default function Servicetable() {
                 const topMargin = 20;
                 let y = topMargin;
 
+                // Add logo to top-left
                 doc.addImage(logo, "PNG", 5, 5, 50, 15);
                 y = 40;
 
+                // Title
                 doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
                 doc.text("SERVICE / CALIBRATION / INSTALLATION JOBREPORT", pageWidth / 2, y, { align: "center" });
                 y += 10;
 
+                // Form data rows
                 const addRow = (label: string, value: string) => {
                     const labelOffset = 65;
                     doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
@@ -237,28 +272,32 @@ export default function Servicetable() {
                 addRow("Contact Number", service.contactNumber);
                 addRow("Service Engineer", service.serviceEngineer);
                 addRow("Date", formatDate(service.date));
-                addRow("Place of work", service.place);
+                addRow("Place", service.place);
                 addRow("Place Options", service.placeOptions);
                 addRow("Nature of Job", service.natureOfJob);
+
                 addRow("Make & Model Number", service.makeModelNumberoftheInstrumentQuantity);
                 y += 5;
                 addRow("Calibrated & Tested OK", service.serialNumberoftheInstrumentCalibratedOK);
                 addRow("Sr.No Faulty/Non-Working", service.serialNumberoftheFaultyNonWorkingInstruments);
                 y += 10;
 
+                // Engineer Report section
                 doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
                 doc.text("Engineer Report:", leftMargin, y);
                 y += 5;
 
                 const engineerReportHeight = 30;
-                doc.setDrawColor(0).setLineWidth(0.2);
+                doc.setDrawColor(0);
+                doc.setLineWidth(0.2);
                 doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, engineerReportHeight);
 
-                const engineerReportLines = doc.splitTextToSize(service.engineerReport || "", pageWidth - leftMargin - rightMargin - 5);
+                const engineerReportLines = doc.splitTextToSize(service.engineerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
                 doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
                 doc.text(engineerReportLines, leftMargin + 2, y + 5);
                 y += engineerReportHeight + 5;
 
+                // Page 2 for engineer remarks and customer report
                 doc.addPage();
                 y = topMargin;
 
@@ -267,10 +306,9 @@ export default function Servicetable() {
                 y += 8;
 
                 const tableHeaders = ["Sr. No.", "Service/Spares", "Part No.", "Rate", "Quantity", "Total", "PO No."];
-                const colWidths = [15, 50, 25, 20, 20, 25, 25];
+                const colWidths = [20, 50, 25, 25, 25, 15, 15];
                 let x = leftMargin;
 
-                doc.setFontSize(9);
                 tableHeaders.forEach((header, i) => {
                     doc.rect(x, y, colWidths[i], 8);
                     doc.text(header, x + 2, y + 6);
@@ -279,29 +317,24 @@ export default function Servicetable() {
 
                 y += 8;
 
-                service.engineerRemarks.forEach((item, index) => {
+                const engineerRemarks = service.engineerRemarks || [];
+
+                engineerRemarks.forEach((item: any, index: number) => {
                     x = leftMargin;
-
-                    const rate = parseFloat(item.rate) || 0;
-                    const quantity = parseFloat(item.quantity) || 0;
-                    const total = rate * quantity;
-
                     const values = [
                         String(index + 1),
                         item.serviceSpares || "",
                         item.partNo || "",
-                        rate.toFixed(2),
-                        quantity.toString(),
-                        total.toFixed(2),
+                        item.rate || "",
+                        item.quantity || "",
+                        item.total || "",
                         item.poNo || ""
                     ];
-
                     values.forEach((val, i) => {
                         doc.rect(x, y, colWidths[i], 8);
                         doc.text(val, x + 2, y + 6);
                         x += colWidths[i];
                     });
-
                     y += 8;
 
                     if (y + 50 > pageHeight) {
@@ -312,31 +345,35 @@ export default function Servicetable() {
 
                 y += 10;
 
+                // Customer Report section
                 doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
                 doc.text("Customer Report:", leftMargin, y);
                 y += 5;
 
                 const customerReportHeight = 30;
-                doc.setDrawColor(0).setLineWidth(0.2);
+                doc.setDrawColor(0);
+                doc.setLineWidth(0.2);
                 doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, customerReportHeight);
 
-                const customerReportLines = doc.splitTextToSize(service.customerReport || "", pageWidth - leftMargin - rightMargin - 5);
+                const customerReportLines = doc.splitTextToSize(service.customerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
                 doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
                 doc.text(customerReportLines, leftMargin + 2, y + 5);
                 y += customerReportHeight + 5;
 
-                y += 10 * 7;
+                // Service Engineer signature
+                doc.setFont("times", "normal");
+                doc.text("Service Engineer", pageWidth - rightMargin - 40, y);
+                doc.text(service.serviceEngineer || "", pageWidth - rightMargin - 40, y + 5);
 
-                doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-                doc.text("Customer Name, Seal & Sign", leftMargin, y);
-                doc.text("Engineer Name, Seal & Sign", pageWidth - rightMargin - 60, y);
+                // Timestamp
+                const now = new Date();
+                const pad = (n: number) => n.toString().padStart(2, "0");
+                const date = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}`;
+                const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+                doc.setFontSize(9).setTextColor(100);
+                doc.text(`Report Generated On: ${date} ${time}`, leftMargin, pageHeight - 10);
 
-                y += 6;
-
-                doc.setFont("times", "normal").setFontSize(10).setTextColor(50);
-                doc.text(service.customerName || "N/A", leftMargin, y);
-                doc.text(service.serviceEngineer || "N/A", pageWidth - rightMargin - 60, y);
-
+                // Add footer image to all pages
                 const footerY = pageHeight - 25;
                 const footerWidth = 180;
                 const footerHeight = 20;
@@ -348,84 +385,55 @@ export default function Servicetable() {
                     doc.addImage(infoImage, "PNG", footerX, footerY, footerWidth, footerHeight);
                 }
 
+                // Save PDF
                 doc.save(`service-${service.reportNo || service._id}.pdf`);
-                setIsDownloading(null);
             };
 
             infoImage.onerror = () => {
                 console.error("Failed to load footer image.");
-                setIsDownloading(null);
+                alert("Company info image not found. Please check the path.");
             };
         };
 
         logo.onerror = () => {
             console.error("Failed to load logo image.");
-            setIsDownloading(null);
+            alert("Logo image not found. Please check the path.");
         };
-    }, []);
+    };
 
-    const onNextPage = useCallback(() => {
+
+    const onNextPage = React.useCallback(() => {
         if (page < pages) {
             setPage(page + 1);
         }
     }, [page, pages]);
 
-    const onPreviousPage = useCallback(() => {
+    const onPreviousPage = React.useCallback(() => {
         if (page > 1) {
             setPage(page - 1);
         }
     }, [page]);
 
-    const onRowsPerPageChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const onRowsPerPageChange = React.useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
         setRowsPerPage(Number(e.target.value));
         setPage(1);
     }, []);
 
-    const handleSelectionChange = (keys: Selection) => {
-        if (keys === "all") {
-            setSelectedKeys(new Set(services.map(service => service._id)));
+    const onSearchChange = React.useCallback((value: string) => {
+        if (value) {
+            setFilterValue(value);
+            setPage(1);
         } else {
-            setSelectedKeys(keys);
+            setFilterValue("");
         }
-    };
+    }, []);
 
-    const renderCell = useCallback((service: Service, columnKey: string): React.ReactNode => {
-        const cellValue = service[columnKey as keyof Service];
+    const onClear = React.useCallback(() => {
+        setFilterValue("");
+        setPage(1);
+    }, []);
 
-        if ((columnKey === "date" || columnKey === "createdAt") && cellValue) {
-            return formatDate(cellValue as string | Date);
-        }
-
-        if (columnKey === "actions") {
-            return (
-                <div className="relative flex items-center gap-2">
-                    <Tooltip>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-lg text-danger cursor-pointer active:opacity-50"
-                            onClick={() => handleDownload(service)}
-                            disabled={isDownloading === service._id}
-                        >
-                            {isDownloading === service._id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <Download className="h-6 w-6" />
-                            )}
-                        </Button>
-                    </Tooltip>
-                </div>
-            );
-        }
-
-        if (Array.isArray(cellValue)) {
-            return cellValue.length > 0 ? `${cellValue.length} items` : "Empty";
-        }
-
-        return cellValue ? String(cellValue) : "N/A";
-    }, [handleDownload, isDownloading]);
-
-    const topContent = useMemo(() => {
+    const topContent = React.useMemo(() => {
         return (
             <div className="flex flex-col gap-4">
                 <div className="flex justify-between items-center">
@@ -441,7 +449,7 @@ export default function Servicetable() {
                     <label className="flex items-center text-default-400 text-small">
                         Rows per page:
                         <select
-                            className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
+                            className="bg-transparent outline-none text-default-400 text-small ml-2"
                             onChange={onRowsPerPageChange}
                             defaultValue="15"
                         >
@@ -451,7 +459,7 @@ export default function Servicetable() {
                         </select>
                     </label>
                 </div>
-                
+
                 <div className="flex flex-wrap items-center gap-4">
                     <div className="flex items-center gap-2">
                         <span className="text-sm text-default-400">From:</span>
@@ -459,7 +467,8 @@ export default function Servicetable() {
                             type="date"
                             value={startDate}
                             onChange={(e) => setStartDate(e.target.value)}
-                            className="border rounded p-2 text-sm dark:bg-gray-800 dark:border-gray-700"
+                            className="border border-gray-300 rounded p-2 text-sm bg-gray-100 text-black 
+                 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                         />
                     </div>
                     <div className="flex items-center gap-2">
@@ -469,7 +478,8 @@ export default function Servicetable() {
                             value={endDate}
                             onChange={(e) => setEndDate(e.target.value)}
                             min={startDate}
-                            className="border rounded p-2 text-sm dark:bg-gray-800 dark:border-gray-700"
+                            className="border border-gray-300 rounded p-2 text-sm bg-gray-100 text-black 
+                 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                         />
                     </div>
                     {(startDate || endDate) && (
@@ -485,17 +495,19 @@ export default function Servicetable() {
                         </Button>
                     )}
                 </div>
+
             </div>
         );
-    }, [filterValue, onRowsPerPageChange, startDate, endDate]);
+    }, [filterValue, onRowsPerPageChange, startDate, endDate]); 
 
-    const bottomContent = useMemo(() => {
+    const bottomContent = React.useMemo(() => {
         return (
             <div className="py-2 px-2 relative flex justify-between items-center">
                 <span className="text-default-400 text-small">
                     Total {services.length} services
                 </span>
 
+                {/* Centered Pagination */}
                 <div className="absolute left-1/2 transform -translate-x-1/2">
                     <Pagination
                         isCompact
@@ -511,6 +523,7 @@ export default function Servicetable() {
                     />
                 </div>
 
+                {/* Navigation Buttons */}
                 <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
                     <Button
                         className="bg-[hsl(339.92deg_91.04%_52.35%)]"
@@ -533,7 +546,51 @@ export default function Servicetable() {
                 </div>
             </div>
         );
-    }, [page, pages, services.length, onPreviousPage, onNextPage]);
+    }, [selectedKeys, page, pages, onPreviousPage, onNextPage, items.length, hasSearchFilter]);
+
+    const handleSelectionChange = (keys: Selection) => {
+        if (keys === "all") {
+            setSelectedKeys(new Set(services.map(service => service._id)));
+        } else {
+            setSelectedKeys(keys as Set<string>);
+        }
+    };
+
+    const handleVisibleColumnsChange = (keys: Selection) => {
+        setVisibleColumns(keys);
+    };
+
+    const renderCell = React.useCallback((service: Service, columnKey: string): React.ReactNode => {
+        const cellValue = service[columnKey as keyof Service];
+
+        if ((columnKey === "dateOfCalibration" || columnKey === "calibrationDueDate") && cellValue) {
+            return formatDate(cellValue);
+        }
+
+        if (columnKey === "actions") {
+            return (
+                <div className="relative flex items-center gap-2">
+                    <Tooltip content="Download Report">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-lg text-danger cursor-pointer active:opacity-50"
+                            onClick={() => handleDownload(service)}
+                            disabled={isDownloading === service._id}
+                        >
+                            {isDownloading === service._id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Download className="h-6 w-6" />
+                            )}
+                        </Button>
+                    </Tooltip>
+                </div>
+            );
+        }
+
+        return cellValue;
+    }, [handleDownload]);
 
     return (
         <Table
@@ -585,7 +642,7 @@ export default function Servicetable() {
             <TableBody emptyContent={"Create Service and add data"} items={sortedItems}>
                 {(item) => (
                     <TableRow key={item._id}>
-                        {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item, columnKey as string)}</TableCell>}
+                        {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item as Service, columnKey as string)}</TableCell>}
                     </TableRow>
                 )}
             </TableBody>

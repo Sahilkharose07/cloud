@@ -1,7 +1,7 @@
 'use client';
 
 import { AppSidebar } from "@/components/app-sidebar"
-import { Breadcrumb, BreadcrumbPage, BreadcrumbList, BreadcrumbItem } from "@/components/ui/breadcrumb"
+import { Breadcrumb, BreadcrumbSeparator, BreadcrumbPage, BreadcrumbList, BreadcrumbLink, BreadcrumbItem } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import {
     SidebarInset,
@@ -10,13 +10,14 @@ import {
 } from "@/components/ui/sidebar"
 
 import React, { useEffect, useState } from "react"
+import { useRouter } from 'next/navigation';
 import 'react-toastify/dist/ReactToastify.css';
 import { Button } from "@/components/ui/button"
 import { SearchIcon } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Selection } from "@heroui/react"
+import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Selection, ChipProps } from "@heroui/react"
 import { Pagination } from "@heroui/react"
 
 interface Certificate {
@@ -52,6 +53,13 @@ interface Service {
     engineerName: string;
 }
 
+interface User {
+    _id: string;
+    name: string;
+    email: string;
+    contact: number;
+}
+
 type SortDescriptor = {
     column: string;
     direction: 'ascending' | 'descending';
@@ -60,6 +68,18 @@ type SortDescriptor = {
 type sortDescriptorService = {
     column: string;
     direction: 'ascending' | 'descending';
+}
+
+interface CertificateResponse {
+    certificateId: string;
+    message: string;
+    downloadUrl: string;
+}
+
+interface ServiceResponse {
+    serviceId: string;
+    message: string;
+    downloadUrl: string;
 }
 
 const generateUniqueId = () => {
@@ -91,31 +111,49 @@ const columnsservice = [
     { name: "Report Number", uid: "reportNo", sortable: true, width: "120px" },
 ];
 
+export const statusOptions = [
+    { name: "Paused", uid: "paused" },
+    { name: "Vacation", uid: "vacation" },
+];
+
+const statusColorMap: Record<string, ChipProps["color"]> = {
+    active: "success",
+    paused: "danger",
+    vacation: "warning",
+};
+
 export default function Page() {
+
     const [certificates, setCertificates] = useState<Certificate[]>([]);
+    const [certificate, setCertificate] = useState<CertificateResponse | null>(null);
+    const [error, setError] = useState<string | null>(null);
     const [selectedKeys, setSelectedKeys] = React.useState<Set<string>>(new Set([]));
-    const [visibleColumns] = React.useState<Selection>(new Set(columns.map(column => column.uid))); 
-    const rowsPerPage = 10;
+    const [visibleColumns, setVisibleColumns] = React.useState<Selection>(new Set(columns.map(column => column.uid)));
+    const [statusFilter, setStatusFilter] = React.useState<Selection>("all");
+    const [rowsPerPage, setRowsPerPage] = useState(10);
     const [sortDescriptor, setSortDescriptor] = React.useState<SortDescriptor>({
         column: "certificateNo",
         direction: "ascending",
     });
     const [page, setPage] = React.useState(1);
+    const router = useRouter();
+    const [isDownloading, setIsDownloading] = useState<string | null>(null);
 
     const [services, setServices] = useState<Service[]>([]);
+    const [service, setService] = useState<ServiceResponse | null>(null);
+    const [errorService, setErrorService] = useState<string | null>(null);
     const [selectedKeysService, setSelectedKeysService] = React.useState<Set<string>>(new Set([]));
-    const [visibleColumnsService] = React.useState<Selection>(new Set(columnsservice.map(column => column.uid)));
-    const rowsPerPageService = 10;
+    const [visibleColumnsService, setVisibleColumnsService] = React.useState<Selection>(new Set(columnsservice.map(column => column.uid)));
+    const [statusFilterService, setStatusFilterService] = React.useState<Selection>("all");
+    const [rowsPerPageService, setRowsPerPageService] = useState(10);
     const [sortDescriptorService, setSortDescriptorService] = React.useState<sortDescriptorService>({
         column: "nameAndLocation",
         direction: "ascending",
     });
     const [pageService, setPageService] = React.useState(1);
-
-    const [filterValue, setFilterValue] = useState("");
-    const [filterValueservice, setFilterValueservice] = useState("");
-    const hasSearchFilter = Boolean(filterValue);
-    const hasSearchFilterservice = Boolean(filterValueservice);
+    const routerService = useRouter();
+    const [isDownloadingService, setIsDownloadingService] = useState<string | null>(null);
+    const [users, setUsers] = useState<User[]>([]);
 
     const fetchCertificates = async () => {
         try {
@@ -129,6 +167,7 @@ export default function Page() {
                 }
             );
 
+            // Log the response structure
             console.log('Full API Response:', {
                 status: response.status,
                 data: response.data,
@@ -136,10 +175,13 @@ export default function Page() {
                 hasData: 'data' in response.data
             });
 
+            // Handle the response based on its structure
             let certificatesData;
             if (typeof response.data === 'object' && 'data' in response.data) {
+                // Response format: { data: [...certificates] }
                 certificatesData = response.data.data;
             } else if (Array.isArray(response.data)) {
+                // Response format: [...certificates]
                 certificatesData = response.data;
             } else {
                 console.error('Unexpected response format:', response.data);
@@ -156,12 +198,17 @@ export default function Page() {
             }));
 
             setCertificates(certificatesWithKeys);
+            setError(null); // Clear any previous errors
         } catch (error) {
             console.error("Error fetching leads:", error);
-            setCertificates([]);
+            if (axios.isAxiosError(error)) {
+                setError(`Failed to fetch leads: ${error.response?.data?.message || error.message}`);
+            } else {
+                setError("Failed to fetch leads.");
+            }
+            setCertificates([]); // Set empty array on error
         }
     };
-
     useEffect(() => {
         fetchCertificates();
     }, []);
@@ -178,6 +225,7 @@ export default function Page() {
                 }
             );
 
+            // Log the response structure
             console.log('Full API Response:', {
                 status: response.status,
                 data: response.data,
@@ -185,43 +233,96 @@ export default function Page() {
                 hasData: 'data' in response.data
             });
 
+            // Handle the response based on its structure
             let servicesData;
             if (typeof response.data === 'object' && 'data' in response.data) {
+                // Response format: { data: [...services] }
                 servicesData = response.data.data;
             } else if (Array.isArray(response.data)) {
+                // Response format: [...services]
                 servicesData = response.data;
             } else {
                 console.error('Unexpected response format:', response.data);
                 throw new Error('Invalid response format');
             }
 
+            // Ensure servicesData is an array
             if (!Array.isArray(servicesData)) {
                 servicesData = [];
             }
 
+            // Map the data with safe key generation
             const servicesWithKeys = servicesData.map((service: Service) => ({
                 ...service,
                 key: service._id || generateUniqueIdService()
             }));
 
             setServices(servicesWithKeys);
+            setError(null); // Clear any previous errors
         } catch (error) {
             console.error("Error fetching leads:", error);
-            setServices([]);
+            if (axios.isAxiosError(error)) {
+                setError(`Failed to fetch leads: ${error.response?.data?.message || error.message}`);
+            } else {
+                setError("Failed to fetch leads.");
+            }
+            setServices([]); // Set empty array on error
         }
     };
-
     useEffect(() => {
         fetchServices();
     }, []);
 
+    const fetchUsers = async () => {
+        try {
+            const response = await axios.get(
+                "http://localhost:5000/api/v1/users/getusers",
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${localStorage.getItem("token")}`
+                    }
+                }
+            );
+
+            let usersData;
+            if (typeof response.data === 'object' && 'data' in response.data) {
+                usersData = response.data.data;
+            } else if (Array.isArray(response.data)) {
+                usersData = response.data;
+            } else {
+                console.error('Unexpected response format:', response.data);
+                throw new Error('Invalid response format');
+            }
+
+            if (!Array.isArray(usersData)) {
+                usersData = [];
+            }
+
+            setUsers(usersData);
+        } catch (error) {
+            console.error("Error fetching users:", error);
+            setUsers([]);
+        }
+    };
+    useEffect(() => {
+        fetchUsers();
+    }, []);
+
+    const [filterValue, setFilterValue] = useState("");
+    const [filterValueservice, setFilterValueservice] = useState("");
+    const hasSearchFilter = Boolean(filterValue);
+    const hasSearchFilterservice = Boolean(filterValueservice);
+
     const headerColumns = React.useMemo(() => {
         if (visibleColumns === "all") return columns;
+
         return columns.filter((column) => Array.from(visibleColumns).includes(column.uid));
     }, [visibleColumns]);
 
     const headerColumnsservice = React.useMemo(() => {
         if (visibleColumnsService === "all") return columnsservice;
+
         return columnsservice.filter((column) => Array.from(visibleColumnsService).includes(column.uid));
     }, [visibleColumnsService]);
 
@@ -240,7 +341,7 @@ export default function Page() {
         }
 
         return filteredCertificates;
-    }, [certificates, filterValue, hasSearchFilter]);
+    }, [certificates, hasSearchFilter, filterValue]);
 
     const filteredItemsservice = React.useMemo(() => {
         let filteredServices = [...services];
@@ -255,20 +356,23 @@ export default function Page() {
         }
 
         return filteredServices;
-    }, [services, filterValueservice, hasSearchFilterservice]);
+    }, [services, hasSearchFilterservice, filterValueservice]);
 
     const pages = Math.ceil(filteredItems.length / rowsPerPage);
+
     const pageservices = Math.ceil(filteredItemsservice.length / rowsPerPageService);
 
     const items = React.useMemo(() => {
         const start = (page - 1) * rowsPerPage;
         const end = start + rowsPerPage;
+
         return filteredItems.slice(start, end);
     }, [page, filteredItems, rowsPerPage]);
 
     const itemsservice = React.useMemo(() => {
         const start = (pageService - 1) * rowsPerPageService;
         const end = start + rowsPerPageService;
+
         return filteredItemsservice.slice(start, end);
     }, [pageService, filteredItemsservice, rowsPerPageService]);
 
@@ -277,18 +381,20 @@ export default function Page() {
             const first = a[sortDescriptor.column as keyof Certificate];
             const second = b[sortDescriptor.column as keyof Certificate];
             const cmp = first < second ? -1 : first > second ? 1 : 0;
+
             return sortDescriptor.direction === "descending" ? -cmp : cmp;
         });
-    }, [items, sortDescriptor]);
+    }, [sortDescriptor, items]);
 
     const sortedItemsservice = React.useMemo(() => {
         return [...itemsservice].sort((a, b) => {
             const first = a[sortDescriptorService.column as keyof Service];
             const second = b[sortDescriptorService.column as keyof Service];
             const cmp = first < second ? -1 : first > second ? 1 : 0;
+
             return sortDescriptorService.direction === "descending" ? -cmp : cmp;
         });
-    }, [itemsservice, sortDescriptorService]);
+    }, [sortDescriptorService, itemsservice]);
 
     const onNextPage = React.useCallback(() => {
         if (page < pages) {
@@ -314,6 +420,34 @@ export default function Page() {
         }
     }, [pageService]);
 
+    const onRowsPerPageChange = React.useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+        setRowsPerPage(Number(e.target.value));
+        setPage(1);
+    }, []);
+
+    const onRowsPerPageChangeservice = React.useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+        setRowsPerPageService(Number(e.target.value));
+        setPageService(1);
+    }, []);
+
+    const onSearchChange = React.useCallback((value: string) => {
+        if (value) {
+            setFilterValue(value);
+            setPage(1);
+        } else {
+            setFilterValue("");
+        }
+    }, []);
+
+    const onSearchChangeservice = React.useCallback((value: string) => {
+        if (value) {
+            setFilterValueservice(value);
+            setPageService(1);
+        } else {
+            setFilterValueservice("");
+        }
+    }, []);
+
     const topContent = React.useMemo(() => {
         return (
             <div className="flex flex-col gap-4">
@@ -332,7 +466,14 @@ export default function Page() {
                 </div>
             </div>
         );
-    }, [filterValue]);
+    }, [
+        filterValue,
+        statusFilter,
+        visibleColumns,
+        onRowsPerPageChange,
+        certificates.length,
+        onSearchChange,
+    ]);
 
     const topContentservice = React.useMemo(() => {
         return (
@@ -352,24 +493,36 @@ export default function Page() {
                 </div>
             </div>
         );
-    }, [filterValueservice]);
+    }, [
+        filterValueservice,
+        statusFilterService,
+        visibleColumnsService,
+        onRowsPerPageChangeservice,
+        services.length,
+        onSearchChangeservice,
+    ]);
 
     const bottomContent = React.useMemo(() => {
         return (
             <div className="py-2 px-2 flex justify-between items-center">
-                <span className="w-[30%] text-small text-default-400"></span>
+                <span className="w-[30%] text-small text-default-400">
+
+                </span>
                 <Pagination
                     isCompact
+                    // showControlsf
                     showShadow
                     color="success"
                     page={page}
                     total={pages}
                     onChange={setPage}
                     classNames={{
+                        // base: "gap-2 rounded-2xl shadow-lg p-2 dark:bg-default-100",
                         cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
                         item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
                     }}
                 />
+
                 <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
                     <Button
                         className="bg-[hsl(339.92deg_91.04%_52.35%)]"
@@ -380,6 +533,7 @@ export default function Page() {
                     >
                         Previous
                     </Button>
+
                     <Button
                         className="bg-[hsl(339.92deg_91.04%_52.35%)]"
                         variant="default"
@@ -389,23 +543,29 @@ export default function Page() {
                     >
                         Next
                     </Button>
+
+
                 </div>
             </div>
         );
-    }, [page, pages, onPreviousPage, onNextPage]);
+    }, [selectedKeys, items.length, page, pages, hasSearchFilter]);
 
     const bottomContentservice = React.useMemo(() => {
         return (
             <div className="py-2 px-2 flex justify-between items-center">
-                <span className="w-[30%] text-small text-default-400"></span>
+                <span className="w-[30%] text-small text-default-400">
+
+                </span>
                 <Pagination
                     isCompact
+                    // showControlsf
                     showShadow
                     color="success"
                     page={pageService}
                     total={pageservices}
                     onChange={setPageService}
                     classNames={{
+                        // base: "gap-2 rounded-2xl shadow-lg p-2 dark:bg-default-100",
                         cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
                         item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
                     }}
@@ -420,6 +580,7 @@ export default function Page() {
                     >
                         Previous
                     </Button>
+
                     <Button
                         className="bg-[hsl(339.92deg_91.04%_52.35%)]"
                         variant="default"
@@ -432,7 +593,7 @@ export default function Page() {
                 </div>
             </div>
         );
-    }, [pageService, pageservices, onPreviousPageService, onNextPageservice]);
+    }, [selectedKeys, items.length, pageService, pageservices, hasSearchFilterservice]);
 
     const handleSelectionChange = (keys: Selection) => {
         if (keys === "all") {
@@ -452,19 +613,23 @@ export default function Page() {
 
     const renderCell = React.useCallback((certificate: Certificate, columnKey: string): React.ReactNode => {
         const cellValue = certificate[columnKey];
+
         if ((columnKey === "dateOfCalibration" || columnKey === "calibrationDueDate") && cellValue) {
             return formatDate(cellValue);
         }
+
         return cellValue;
-    }, []);
+    }, [isDownloading]);
 
     const renderCellservice = React.useCallback((service: Service, columnKey: string): React.ReactNode => {
         const cellValue = service[columnKey as keyof Service];
+
         if ((columnKey === "dateOfCalibration" || columnKey === "calibrationDueDate") && cellValue) {
             return formatDate(cellValue);
         }
+
         return cellValue;
-    }, []);
+    }, [isDownloadingService]);
 
     return (
         <SidebarProvider>
@@ -473,6 +638,7 @@ export default function Page() {
                 <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
+                        
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>

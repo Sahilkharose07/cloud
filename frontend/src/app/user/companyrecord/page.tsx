@@ -1,19 +1,24 @@
 'use client';
 import React, { useEffect, useState, useCallback } from "react";
-import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { useRouter } from 'next/navigation';
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { SearchIcon } from "lucide-react";
+import {  SearchIcon, Edit, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import axios from "axios";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import {
+    SidebarInset,
+    SidebarProvider,
+    SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
-import { Pagination } from "@heroui/react";
+import { Pagination, Tooltip } from "@heroui/react";
 import { AppSidebar } from "@/components/app-sidebar";
+
 
 interface CompanyDetails {
     _id: string;
@@ -24,6 +29,11 @@ interface CompanyDetails {
     website: string;
     industriesType: string;
     flag: string;
+}
+
+interface SortDescriptor {
+    column: string;  
+    direction: "ascending" | "descending";
 }
 
 const generateUniqueId = () => {
@@ -40,23 +50,24 @@ const columns = [
     { name: "Flag", uid: "flag", sortable: true, width: "120px" },
 ];
 
+const INITIAL_VISIBLE_COLUMNS = ["companyName", "address", "gstNumber", "industries", "website", "industriesType", "flag"];
+
 export default function CompanyDetailsTable() {
     const [companies, setCompanies] = useState<CompanyDetails[]>([]);
+    const [error, setError] = useState<string | null>(null);
     const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set([]));
-    const [filterValue, setFilterValue] = useState("");
-    const [page, setPage] = useState(1);
+    const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(INITIAL_VISIBLE_COLUMNS));
     const [rowsPerPage, setRowsPerPage] = useState(15);
-    const [sortDescriptor, setSortDescriptor] = useState<{
-        column: string;
-        direction: "ascending" | "descending";
-    }>({
-        column: "",
-        direction: "ascending",
+    const [page, setPage] = useState(1);
+    const [filterValue, setFilterValue] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isDownloading, setIsDownloading] = useState<string | null>(null);
+
+    const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
+        column: "createdAt", 
+        direction: "descending",
     });
-
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [contactToDelete, setContactToDelete] = useState<CompanyDetails | null>(null);
-
+    const router = useRouter();
     const hasSearchFilter = Boolean(filterValue);
 
     const fetchCompanies = async () => {
@@ -66,7 +77,7 @@ export default function CompanyDetailsTable() {
                 {
                     headers: {
                         "Content-Type": "application/json",
-                        "Authorization": `Bearer ${localStorage.getItem("token")}`,
+                        "Authorization": `Bearer ${localStorage.getItem("token")}`
                     }
                 }
             );
@@ -78,16 +89,17 @@ export default function CompanyDetailsTable() {
                     : [];
 
             const companiesWithKeys = companiesData
-                .reverse() // Latest added data comes first
+                .reverse() 
                 .map((company: CompanyDetails) => ({
                     ...company,
                     key: company._id || generateUniqueId(),
                 }));
 
             setCompanies(companiesWithKeys);
+            setError(null);
         } catch (error) {
             console.error("Error fetching companies:", error);
-            toast.error("Failed to fetch companies. Please try again.");
+            setError("Failed to fetch companies. Please try again.");
             setCompanies([]);
         }
     };
@@ -96,50 +108,11 @@ export default function CompanyDetailsTable() {
         fetchCompanies();
     }, []);
 
-    const handleConfirmDelete = async () => {
-        if (!contactToDelete) return;
+    
 
-        try {
-            await axios.delete(
-                `http://localhost:5000/api/v1/company/deleteCompany/${contactToDelete._id}`,
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${localStorage.getItem("token")}`,
-                    },
-                }
-            );
-
-            setIsDeleteModalOpen(false);
-            setContactToDelete(null);
-            await fetchCompanies();
-            toast.success("Company deleted successfully");
-        } catch (error) {
-            console.error("Error deleting company:", error);
-            toast.error("Failed to delete company");
-        }
-    };
-
-    const handleCancelDelete = () => {
-        setIsDeleteModalOpen(false);
-        setContactToDelete(null);
-    };
-
-    const ConfirmationDialog = ({ isOpen, onClose, onConfirm }: { isOpen: boolean; onClose: () => void; onConfirm: () => void }) => {
-        if (!isOpen) return null;
-
-        return (
-            <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50">
-                <div className="bg-black p-6 rounded shadow-md max-w-sm w-full">
-                    <h3 className="text-lg font-semibold text-white">Are you sure you want to delete this company?</h3>
-                    <div className="mt-4 flex justify-end gap-4">
-                        <Button onClick={onClose} variant="outline" className="text-white border-white">Cancel</Button>
-                        <Button onClick={onConfirm} className="bg-red-500 text-white">Delete</Button>
-                    </div>
-                </div>
-            </div>
-        );
-    };
+    const headerColumns = React.useMemo(() => {
+        return columns.filter(column => visibleColumns.has(column.uid));
+    }, [visibleColumns]);
 
     const filteredItems = React.useMemo(() => {
         let filtered = [...companies];
@@ -148,31 +121,27 @@ export default function CompanyDetailsTable() {
             const searchLower = filterValue.toLowerCase();
             filtered = filtered.filter(company =>
                 company.companyName.toLowerCase().includes(searchLower) ||
-                company.gstNumber.toLowerCase().includes(searchLower) ||
                 company.address.toLowerCase().includes(searchLower) ||
                 company.industries.toLowerCase().includes(searchLower) ||
                 company.industriesType.toLowerCase().includes(searchLower) ||
+                company.gstNumber.toLowerCase().includes(searchLower) ||
                 company.website.toLowerCase().includes(searchLower) ||
                 company.flag.toLowerCase().includes(searchLower)
             );
         }
 
         return filtered;
-    }, [companies, filterValue, hasSearchFilter]);  // Adding hasSearchFilter to the dependency array.
+    }, [companies, filterValue, hasSearchFilter]);
 
     const sortedItems = React.useMemo(() => {
-        if (!sortDescriptor.column) {
-            return filteredItems;
-        }
-
         return [...filteredItems].sort((a, b) => {
             const first = a[sortDescriptor.column as keyof CompanyDetails] || "";
             const second = b[sortDescriptor.column as keyof CompanyDetails] || "";
-
+    
             let cmp = 0;
             if (first < second) cmp = -1;
             if (first > second) cmp = 1;
-
+    
             return sortDescriptor.direction === "descending" ? -cmp : cmp;
         });
     }, [filteredItems, sortDescriptor]);
@@ -199,7 +168,7 @@ export default function CompanyDetailsTable() {
 
     const topContent = React.useMemo(() => {
         return (
-            <div className="flex justify-between gap-3 items-end">
+            <div className="flex justify-between items-center gap-4">
                 <Input
                     isClearable
                     className="w-full max-w-[300px]"
@@ -212,7 +181,7 @@ export default function CompanyDetailsTable() {
                 <label className="flex items-center text-default-400 text-small">
                     Rows per page:
                     <select
-                        className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small"
+                        className="bg-transparent  outline-none text-default-400 text-small ml-2"
                         onChange={onRowsPerPageChange}
                         defaultValue="5"
                     >
@@ -223,13 +192,13 @@ export default function CompanyDetailsTable() {
                 </label>
             </div>
         );
-    }, [filterValue, onRowsPerPageChange]);
+    }, [filterValue, onRowsPerPageChange, companies.length]);
 
     const bottomContent = React.useMemo(() => {
         return (
-            <div className="py-2 px-2 flex justify-between items-center">
+            <div className="py-2 px-2 relative flex justify-between items-center">
                 <span className="text-default-400 text-small">
-                    Total {filteredItems.length} company
+                    Total {companies.length} company
                 </span>
                 <div className="absolute left-1/2 transform -translate-x-1/2">
                     <Pagination
@@ -267,14 +236,19 @@ export default function CompanyDetailsTable() {
                 </div>
             </div>
         );
-    }, [page, pages, onPreviousPage, onNextPage, filteredItems]);
+    }, [page, pages, onPreviousPage, onNextPage, companies.length]);
 
     const renderCell = useCallback((company: CompanyDetails, columnKey: string) => {
-        if (columnKey === "gstNumber" || columnKey === "website") {
-            return company[columnKey as keyof CompanyDetails] || "N/A";
+        if (columnKey === "actions") {
+            return (
+                <div className="relative flex items-center gap-2">
+                    
+                </div>
+            );
         }
         return company[columnKey as keyof CompanyDetails];
-    }, []);
+    }, [isDownloading, router]);
+
 
     return (
         <SidebarProvider>
@@ -283,6 +257,7 @@ export default function CompanyDetailsTable() {
                 <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
+                        
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
@@ -336,9 +311,10 @@ export default function CompanyDetailsTable() {
                                                 if (!column.sortable) return;
                                                 setSortDescriptor(prev => ({
                                                     column: column.uid,
-                                                    direction: prev.column === column.uid && prev.direction === "ascending"
-                                                        ? "descending"
-                                                        : "ascending",
+                                                    direction:
+                                                        prev.column === column.uid && prev.direction === "ascending"
+                                                            ? "descending"
+                                                            : "ascending",
                                                 }));
                                             }}
                                             style={{ cursor: column.sortable ? "pointer" : "default" }}
@@ -364,11 +340,7 @@ export default function CompanyDetailsTable() {
                     </Card>
                 </div>
             </SidebarInset>
-            <ConfirmationDialog
-                isOpen={isDeleteModalOpen}
-                onClose={handleCancelDelete}
-                onConfirm={handleConfirmDelete}
-            />
+            
         </SidebarProvider>
     );
 }

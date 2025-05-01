@@ -4,7 +4,6 @@ import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { HeroUIProvider } from "@heroui/react";
-import { Suspense } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Certificate Generator",
+  title: "Dashboard",
   description: "Dashboard by admin",
 };
 
@@ -41,9 +40,7 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange>
             <HeroUIProvider>
-            <Suspense>
               {children}
-              </Suspense>
             </HeroUIProvider>
         </ThemeProvider>
         <Toaster/>

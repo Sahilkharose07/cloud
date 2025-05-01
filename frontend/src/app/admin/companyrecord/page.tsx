@@ -3,9 +3,10 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from 'next/navigation';
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { SearchIcon, Edit, Trash2 } from "lucide-react";
+import {  SearchIcon, Edit, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import axios from "axios";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     SidebarInset,
@@ -13,10 +14,11 @@ import {
     SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
 import { Pagination, Tooltip } from "@heroui/react";
 import { AdminSidebar } from "@/components/admin-sidebar";
+import { AiOutlineInsertRowBelow } from "react-icons/ai";
 
 interface CompanyDetails {
     _id: string;
@@ -30,7 +32,7 @@ interface CompanyDetails {
 }
 
 interface SortDescriptor {
-    column: string;
+    column: string;  
     direction: "ascending" | "descending";
 }
 
@@ -39,28 +41,33 @@ const generateUniqueId = () => {
 };
 
 const columns = [
-    { name: "Company Name", uid: "companyName", sortable: true },
-    { name: "Company Address", uid: "address", sortable: true },
-    { name: "Industries", uid: "industries", sortable: true },
-    { name: "Industries Type", uid: "industriesType", sortable: true },
-    { name: "GST Number", uid: "gstNumber", sortable: true },
-    { name: "Website", uid: "website", sortable: true },
-    { name: "Flag", uid: "flag", sortable: true },
-    { name: "Actions", uid: "actions", sortable: false },
+    { name: "Company Name", uid: "companyName", sortable: true, width: "120px" },
+    { name: "Company Address", uid: "address", sortable: true, width: "120px" },
+    { name: "Industries", uid: "industries", sortable: true, width: "120px" },
+    { name: "Industries Type", uid: "industriesType", sortable: true, width: "120px" },
+    { name: "GST Number", uid: "gstNumber", sortable: true, width: "120px" },
+    { name: "Website", uid: "website", sortable: true, width: "120px" },
+    { name: "Flag", uid: "flag", sortable: true, width: "120px" },
+    { name: "Actions", uid: "actions", sortable: false, width: "120px" },
 ];
+
+const INITIAL_VISIBLE_COLUMNS = ["companyName", "address", "gstNumber", "industries", "website", "industriesType", "flag", "actions"];
 
 export default function CompanyDetailsTable() {
     const [companies, setCompanies] = useState<CompanyDetails[]>([]);
+    const [error, setError] = useState<string | null>(null);
     const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set([]));
+    const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(INITIAL_VISIBLE_COLUMNS));
     const [rowsPerPage, setRowsPerPage] = useState(15);
     const [page, setPage] = useState(1);
     const [filterValue, setFilterValue] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isDownloading, setIsDownloading] = useState<string | null>(null);
 
     const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
-        column: "createdAt",
+        column: "createdAt", 
         direction: "descending",
     });
-
     const router = useRouter();
     const hasSearchFilter = Boolean(filterValue);
 
@@ -83,15 +90,17 @@ export default function CompanyDetailsTable() {
                     : [];
 
             const companiesWithKeys = companiesData
-                .reverse()
+                .reverse() 
                 .map((company: CompanyDetails) => ({
                     ...company,
                     key: company._id || generateUniqueId(),
                 }));
 
             setCompanies(companiesWithKeys);
+            setError(null);
         } catch (error) {
             console.error("Error fetching companies:", error);
+            setError("Failed to fetch companies. Please try again.");
             setCompanies([]);
         }
     };
@@ -101,7 +110,9 @@ export default function CompanyDetailsTable() {
     }, []);
 
     const handleDelete = async (companyId: string) => {
-        if (!window.confirm("Are you sure you want to delete this company?")) return;
+        if (!window.confirm("Are you sure you want to delete this company?")) {
+            return;
+        }
 
         try {
             await axios.delete(
@@ -116,17 +127,21 @@ export default function CompanyDetailsTable() {
 
             setCompanies(prev => prev.filter(company => company._id !== companyId));
             toast({
-                title: "Company Deleted",
-                description: "The company has been successfully deleted",
-            });
+                title: "Delete Successful!",
+                description: "Company deleted successfully!",
+            });        
         } catch (error) {
             console.error("Error deleting company:", error);
             toast({
-                title: "Error",
-                description: "Could not delete company. Please try again.",
-            });
-        }
+                title: "Delete Successful!",
+                description: "Company deleted successfully!",
+            });       
+         }
     };
+
+    const headerColumns = React.useMemo(() => {
+        return columns.filter(column => visibleColumns.has(column.uid));
+    }, [visibleColumns]);
 
     const filteredItems = React.useMemo(() => {
         let filtered = [...companies];
@@ -151,11 +166,11 @@ export default function CompanyDetailsTable() {
         return [...filteredItems].sort((a, b) => {
             const first = a[sortDescriptor.column as keyof CompanyDetails] || "";
             const second = b[sortDescriptor.column as keyof CompanyDetails] || "";
-
+    
             let cmp = 0;
             if (first < second) cmp = -1;
             if (first > second) cmp = 1;
-
+    
             return sortDescriptor.direction === "descending" ? -cmp : cmp;
         });
     }, [filteredItems, sortDescriptor]);
@@ -195,9 +210,9 @@ export default function CompanyDetailsTable() {
                 <label className="flex items-center text-default-400 text-small">
                     Rows per page:
                     <select
-                        className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
+                        className="bg-transparent  outline-none text-default-400 text-small ml-2"
                         onChange={onRowsPerPageChange}
-                        defaultValue="15"
+                        defaultValue="5"
                     >
                         <option value="5">5</option>
                         <option value="10">10</option>
@@ -206,7 +221,7 @@ export default function CompanyDetailsTable() {
                 </label>
             </div>
         );
-    }, [filterValue, onRowsPerPageChange]);
+    }, [filterValue, onRowsPerPageChange, companies.length]);
 
     const bottomContent = React.useMemo(() => {
         return (
@@ -281,21 +296,17 @@ export default function CompanyDetailsTable() {
                 </div>
             );
         }
-
-        if (columnKey === "gstNumber" || columnKey === "website") {
-            return company[columnKey as keyof CompanyDetails] || "N/A";
-        }
-
         return company[columnKey as keyof CompanyDetails];
-    }, [router]);
+    }, [isDownloading, router]);
 
     return (
         <SidebarProvider>
             <AdminSidebar />
             <SidebarInset>
-                <header className="flex h-16 items-center gap-2">
+                <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
+                        
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
@@ -322,10 +333,12 @@ export default function CompanyDetailsTable() {
                         <CardContent>
                             <Table
                                 isHeaderSticky
-                                aria-label="Companies table"
+                                aria-label="Companies table with custom cells, pagination and sorting"
                                 bottomContent={bottomContent}
                                 bottomContentPlacement="outside"
-                                classNames={{ wrapper: "max-h-[382px] overflow-y-auto" }}
+                                classNames={{
+                                    wrapper: "max-h-[382px] overflow-y-auto",
+                                }}
                                 selectedKeys={selectedKeys}
                                 sortDescriptor={sortDescriptor}
                                 topContent={topContent}
@@ -368,11 +381,7 @@ export default function CompanyDetailsTable() {
                                 <TableBody emptyContent={"Create company and add data"} items={paginatedItems}>
                                     {(item) => (
                                         <TableRow key={item._id}>
-                                            {(columnKey) => (
-                                                <TableCell style={{ fontSize: "12px", padding: "8px" }}>
-                                                    {renderCell(item, columnKey as string)}
-                                                </TableCell>
-                                            )}
+                                            {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item, columnKey as string)}</TableCell>}
                                         </TableRow>
                                     )}
                                 </TableBody>

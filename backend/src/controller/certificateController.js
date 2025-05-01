@@ -86,7 +86,7 @@ const createCertificate = async (req, res) => {
         console.log("Certificate saved successfully");
 
         res.status(201).json({
-            message: "Click here to download your certificate",
+            message: "Certificate generated successfully!",
             certificateId: newCertificate.certificateId
         });
     } catch (error) {

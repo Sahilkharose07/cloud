@@ -32,6 +32,8 @@ const createService = async (req, res) => {
             makeModelNumberoftheInstrumentQuantity,
             serialNumberoftheInstrumentCalibratedOK,
             serialNumberoftheFaultyNonWorkingInstruments,
+            engineerReport,
+            customerReport,
             engineerRemarks,
             engineerName,
             status
@@ -52,6 +54,8 @@ const createService = async (req, res) => {
             !serialNumberoftheFaultyNonWorkingInstruments?.trim() ||
             !engineerName?.trim() ||
             !status?.trim() ||
+            !engineerReport ||
+            !customerReport ||
             !engineerRemarks ||
             !Array.isArray(engineerRemarks) ||
             engineerRemarks.length === 0 ||
@@ -81,11 +85,14 @@ const createService = async (req, res) => {
             makeModelNumberoftheInstrumentQuantity: makeModelNumberoftheInstrumentQuantity.trim(),
             serialNumberoftheInstrumentCalibratedOK: serialNumberoftheInstrumentCalibratedOK.trim(),
             serialNumberoftheFaultyNonWorkingInstruments: serialNumberoftheFaultyNonWorkingInstruments.trim(),
+            engineerReport: engineerReport.trim(),
+            customerReport: customerReport.trim(),
             engineerRemarks: engineerRemarks.map(remark => ({
                 serviceSpares: remark.serviceSpares.trim(),
                 partNo: remark.partNo.trim(),
                 rate: remark.rate.trim(),
                 quantity: Number(remark.quantity),
+                total: Number(remark.rate) * Number(remark.quantity),
                 poNo: remark.poNo.trim()
             })),
             engineerName: engineerName.trim(),
@@ -173,6 +180,8 @@ const updateService = async (req, res) => {
             makeModelNumberoftheInstrumentQuantity,
             serialNumberoftheInstrumentCalibratedOK,
             serialNumberoftheFaultyNonWorkingInstruments,
+            engineerReport,
+            customerReport,
             engineerRemarks,
             engineerName,
             status
@@ -193,6 +202,8 @@ const updateService = async (req, res) => {
             !serialNumberoftheFaultyNonWorkingInstruments?.trim() ||
             !engineerName?.trim() ||
             !status?.trim() ||
+            !engineerReport?.trim() ||
+            !customerReport?.trim() ||
             !engineerRemarks ||
             !Array.isArray(engineerRemarks) ||
             engineerRemarks.length === 0 ||
@@ -201,6 +212,7 @@ const updateService = async (req, res) => {
                 remark.partNo?.trim() &&
                 remark.rate?.trim() &&
                 !isNaN(remark.quantity) &&
+                !isNaN(remark.total) &&
                 remark.poNo?.trim()
             )
         ) {
@@ -231,11 +243,14 @@ const updateService = async (req, res) => {
         service.makeModelNumberoftheInstrumentQuantity = makeModelNumberoftheInstrumentQuantity.trim();
         service.serialNumberoftheInstrumentCalibratedOK = serialNumberoftheInstrumentCalibratedOK.trim();
         service.serialNumberoftheFaultyNonWorkingInstruments = serialNumberoftheFaultyNonWorkingInstruments.trim();
+        service.engineerReport = engineerReport.trim();
+        service.customerReport = customerReport.trim();
         service.engineerRemarks = engineerRemarks.map(remark => ({
             serviceSpares: remark.serviceSpares.trim(),
             partNo: remark.partNo.trim(),
             rate: remark.rate.trim(),
             quantity: Number(remark.quantity),
+            total: String(remark.total),
             poNo: remark.poNo.trim()
         }));
         service.engineerName = engineerName.trim();

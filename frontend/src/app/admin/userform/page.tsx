@@ -18,6 +18,7 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
+  BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
@@ -30,21 +31,13 @@ import { Eye, EyeOff } from "react-feather";
 import * as z from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 const registerSchema = z
   .object({
     name: z.string().nonempty("Required"),
-    contact: z
-      .string()
+    contact: z.string()
       .regex(/^\d*$/, { message: "Contact number must be numeric" })
       .nonempty({ message: "Required" }),
     email: z.string().email({ message: "Required" }),
@@ -61,7 +54,7 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
-  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
@@ -76,25 +69,22 @@ export default function RegisterPage() {
 
   const handleRegister = async (values: z.infer<typeof registerSchema>) => {
     setLoading(true);
-    setServerError("");
-
+    setServerError(""); // you can still keep this if you want field-level error too
+  
     try {
-      const response = await fetch(
-        "http://localhost:5000/api/v1/users/register",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(values),
-        }
-      );
-
+      const response = await fetch("http://localhost:5000/api/v1/users/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(values),
+      });
+  
       const data = await response.json();
-
+  
       if (!response.ok) {
         toast({
-          title: "Create user failed",
+          title: "Registration failed",
           description: data.message || "Something went wrong.",
           variant: "destructive",
         });
@@ -105,9 +95,8 @@ export default function RegisterPage() {
           description: "The user has been successfully created",
         });
         form.reset();
-        router.push("/admin/userrecord");
       }
-    } catch {
+    } catch (error) {
       toast({
         title: "Error",
         description: "An error occurred during registration.",
@@ -118,6 +107,7 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
+  
 
   return (
     <SidebarProvider>
@@ -125,19 +115,16 @@ export default function RegisterPage() {
       <SidebarInset>
         <header className="flex h-16 items-center gap-2 px-4">
           <SidebarTrigger />
+          
           <Separator orientation="vertical" className="mx-2 h-4" />
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink href="/admin/dashboard">
-                  Dashboard
-                </BreadcrumbLink>
+                <BreadcrumbLink href="/admin/dashboard">Dashboard</BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                <BreadcrumbLink href="/admin/userrecord">
-                  User Record
-                </BreadcrumbLink>
+                <BreadcrumbLink href="/admin/userrecord">User Record</BreadcrumbLink>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -146,9 +133,7 @@ export default function RegisterPage() {
         <div className="container mx-auto py-10 max-w-2xl">
           <Card>
             <CardHeader>
-              <CardTitle className="text-3xl font-bold text-center">
-                Create User
-              </CardTitle>
+              <CardTitle className="text-3xl font-bold text-center">Create User</CardTitle>
               <CardDescription className="text-center">
                 Fill out the form below to create a new user
               </CardDescription>
@@ -180,11 +165,9 @@ export default function RegisterPage() {
                           <Input
                             placeholder="Contact Number"
                             {...field}
+                            disabled={isSubmitting}
                             onChange={(e) => {
-                              const numericValue = e.target.value.replace(
-                                /\D/g,
-                                ""
-                              );
+                              const numericValue = e.target.value.replace(/\D/g, '');
                               field.onChange(numericValue);
                             }}
                           />
@@ -199,11 +182,7 @@ export default function RegisterPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input
-                            type="email"
-                            placeholder="Email Address"
-                            {...field}
-                          />
+                          <Input type="email" placeholder="Email Address" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -226,11 +205,7 @@ export default function RegisterPage() {
                               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
                               onClick={() => setShowPassword(!showPassword)}
                             >
-                              {showPassword ? (
-                                <Eye size={20} />
-                              ) : (
-                                <EyeOff size={20} />
-                              )}
+                              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                             </button>
                           </div>
                         </FormControl>
@@ -253,14 +228,12 @@ export default function RegisterPage() {
                             <button
                               type="button"
                               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
-                              onClick={() =>
-                                setShowConfirmPassword(!showConfirmPassword)
-                              }
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                             >
                               {showConfirmPassword ? (
-                                <Eye size={20} />
-                              ) : (
                                 <EyeOff size={20} />
+                              ) : (
+                                <Eye size={20} />
                               )}
                             </button>
                           </div>
