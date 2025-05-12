@@ -1,6 +1,6 @@
 {
   "name": "dash",
-  "version": "0.1.0",
+  "version": "^14.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -51,6 +51,7 @@
     "pdfkit": "^0.13.0",
     "react": "^19.0.0",
     "react-datepicker": "^8.3.0",
+    "react-day-picker": "^8.10.1",
     "react-dom": "^19.0.0",
     "react-feather": "^2.0.10",
     "react-hook-form": "^7.54.2",
