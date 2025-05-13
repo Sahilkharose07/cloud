@@ -10,14 +10,13 @@ import {
 } from "@/components/ui/collapsible";
 import {
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-  useSidebar,
+  useSidebar
 } from "@/components/ui/sidebar";
 
 export function NavMain({
@@ -36,11 +35,11 @@ export function NavMain({
 }) {
   const [activePath, setActivePath] = React.useState<string>("");
 
-  // ✅ Valid hook usage — at the top level
+
   const { state, toggleSidebar } = useSidebar();
 
   React.useEffect(() => {
-    setActivePath(window.location.pathname); // Get the current URL path
+    setActivePath(window.location.pathname);
   }, []);
 
   const isItemActive = (itemUrl: string) => activePath === itemUrl;

@@ -1,18 +1,9 @@
 'use client';
-
-
-import { useState, useEffect,Suspense } from "react";
-import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle,
-} from "@/components/ui/card";
-import {
-  SidebarInset, SidebarProvider, SidebarTrigger,
-} from "@/components/ui/sidebar";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import {
-  Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AdminSidebar } from "@/components/admin-sidebar";
@@ -21,27 +12,20 @@ import { toast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import axios from "axios";
 
-// Schema definition
 const companiesSchema = z.object({
-  companyName: z.string().min(1, { message: "Company name is required" }),
-  address: z.string().min(1, { message: "Address is required" }),
-  industries: z.string().min(1, { message: "Industries is required" }),
-  industriesType: z.string().min(1, { message: "Industry type is required" }),
-  gstNumber: z.string().min(1, { message: "GST number is required" }),
-  website: z.preprocess(
-    (val) => (val === "" ? undefined : val),
-    z.string().url({ message: "Invalid website URL" }).optional()
-  ),
-  flag: z.enum(["Red", "Yellow", "Green"], {
-    required_error: "Please select a flag color",
-  }),
+  companyName: z.string().nonempty({ message: "Required" }),
+  address: z.string().nonempty({ message: "Required" }),
+  industries: z.string().nonempty({ message: "Required" }),
+  industriesType: z.string().nonempty({ message: "Required" }),
+  gstNumber: z.string().optional(),
+  website: z.preprocess((val) => (val === "" ? undefined : val), z.string().url({ message: "Invalid Website URL" }).optional()),
+  flag: z.enum(["Red", "Yellow", "Green"], { required_error: "Required" }),
 });
+
 
 export default function CompanyFormWrapper() {
     return (
@@ -59,17 +43,10 @@ function CompanyFormLoading() {
         </div>
     );
 }
-
-async function fetchCompanyData(companyId: string) {
-  const res = await axios.get(`/api/companies?id=${companyId}`);
-  return res.data;
-}
-
  function CompanyForm() {
   const searchParams = useSearchParams();
   const companyId = searchParams.get('id');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const form = useForm<z.infer<typeof companiesSchema>>({
     resolver: zodResolver(companiesSchema),
     defaultValues: {
@@ -82,27 +59,27 @@ async function fetchCompanyData(companyId: string) {
       flag: undefined,
     },
   });
-
   useEffect(() => {
     if (companyId) {
       const fetchCompany = async () => {
         try {
           setIsSubmitting(true);
-          const data = await fetchCompanyData(companyId);
-          form.reset({
-            companyName: data.company_name,
-            address: data.address,
-            gstNumber: data.gst_number,
-            industries: data.industries,
-            website: data.website || "",
-            industriesType: data.industries_type,
-            flag: data.flag,
-          });
+          const res = await axios.get(`/api/companies?id=${companyId}`);
+          if (res.data) {
+            form.reset({
+              companyName: res.data.company_name,
+              address: res.data.address,
+              gstNumber: res.data.gst_number,
+              industries: res.data.industries,
+              website: res.data.website || "",
+              industriesType: res.data.industries_type,
+              flag: res.data.flag,
+            });
+          }
         } catch (err) {
           console.error(err);
           toast({
-            title: "Error",
-            description: "Failed to load company",
+            title: "Failed to load company",
             variant: "destructive",
           });
         } finally {
@@ -115,14 +92,13 @@ async function fetchCompanyData(companyId: string) {
 
   const onSubmit = async (values: z.infer<typeof companiesSchema>) => {
     setIsSubmitting(true);
-
     try {
       if (companyId) {
         const res = await axios.put(`/api/companies?id=${companyId}`, values);
         if (res.status === 200) {
-          toast({ title: "Success", description: "Company updated successfully" });
+          toast({ title: "Company updated successfully" });
         } else {
-          throw new Error("Update failed");
+          throw new Error("Failed to update company");
         }
       } else {
         const res = await axios.post("/api/companies", {
@@ -130,10 +106,10 @@ async function fetchCompanyData(companyId: string) {
           id: crypto.randomUUID(),
         });
         if (res.status === 201) {
-          toast({ title: "Success", description: "Company created successfully" });
+          toast({ title: "Company created successfully" });
           form.reset();
         } else {
-          throw new Error("Create failed");
+          throw new Error("Failed to create company");
         }
       }
     } catch (err) {
@@ -147,6 +123,15 @@ async function fetchCompanyData(companyId: string) {
     }
   };
 
+  const fieldLabels: Record<string, string> = {
+    companyName: "Company Name",
+    address: "Company Address",
+    industries: "Industries",
+    industriesType: "Industries Type",
+    gstNumber: "GST Number (Optional)",
+    website: "Website (Optional)",
+  };
+
   return (
     <SidebarProvider>
       <AdminSidebar />
@@ -157,9 +142,7 @@ async function fetchCompanyData(companyId: string) {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink href="/admin/dashboard">
-                  <BreadcrumbPage>Dashboard</BreadcrumbPage>
-                </BreadcrumbLink>
+                <BreadcrumbLink href="/admin/dashboard">Dashboard</BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
@@ -168,7 +151,6 @@ async function fetchCompanyData(companyId: string) {
             </BreadcrumbList>
           </Breadcrumb>
         </header>
-
         <div className="container mx-auto py-10 px-4">
           <Card className="max-w-6xl mx-auto">
             <CardHeader>
@@ -181,22 +163,21 @@ async function fetchCompanyData(companyId: string) {
                   : "Fill out the form to add a new company"}
               </CardDescription>
             </CardHeader>
-
             <CardContent>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    {["companyName", "address", "industries", "industriesType", "gstNumber", "website"].map((name) => (
+                    {Object.entries(fieldLabels).map(([name, label]) => (
                       <FormField
                         key={name}
                         control={form.control}
                         name={name as keyof z.infer<typeof companiesSchema>}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{name.replace(/([A-Z])/g, " $1")}</FormLabel>
+                            <FormLabel>{label}</FormLabel>
                             <FormControl>
                               <Input
-                                placeholder={`Enter ${name}`}
+                                placeholder={`Enter ${label}`}
                                 {...field}
                                 className="bg-white"
                                 disabled={isSubmitting}
@@ -219,7 +200,7 @@ async function fetchCompanyData(companyId: string) {
                               className="bg-white border px-3 py-2 rounded-md w-full"
                               disabled={isSubmitting}
                             >
-                              <option value="">Select flag</option>
+                              <option value="">Select Flag</option>
                               <option value="Red">Red</option>
                               <option value="Yellow">Yellow</option>
                               <option value="Green">Green</option>
@@ -230,8 +211,11 @@ async function fetchCompanyData(companyId: string) {
                       )}
                     />
                   </div>
-
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  <Button
+                    type="submit"
+                    className="w-full bg-purple-950 text-white hover:bg-purple-900"
+                    disabled={isSubmitting}
+                  >
                     {isSubmitting ? (
                       <>
                         <Loader2 className="animate-spin mr-2" />

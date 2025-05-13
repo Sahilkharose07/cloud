@@ -23,7 +23,5 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/app/admin/companydetailstable"],
-  "exclude": ["node_modules",
-  "path/to/your/file/to/ignore/**/*.ts",
-    "app/api/reset-password/route.ts"],
+  "exclude": ["node_modules"]
 }

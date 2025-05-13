@@ -1,9 +1,9 @@
 "use client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { useState, useEffect } from "react";
+import { useState, useEffect,Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import { toast } from '@/hooks/use-toast'
@@ -12,18 +12,15 @@ import { jsPDF } from "jspdf";
 import { AppSidebar } from "@/components/app-sidebar";
 
 interface Company {
-    _id: string;
+    id: string;
     company_name: string;
 }
-
 interface Observation {
     gas: string;
     before: string;
     after: string;
 }
-
 interface Certificate {
-    id: string;
     certificateNo: string;
     customerName: string;
     siteLocation: string;
@@ -38,15 +35,11 @@ interface Certificate {
     engineerName: string;
     status: string;
 }
-
-
-
 interface Model {
     id: string;
     model_name: string;
     range: string;
 }
-
 interface Engineer {
     id: string;
     name: string;
@@ -62,19 +55,34 @@ const generateCertificateNumber = () => {
     return `RPS/CER/${yearRange}/${randomNum}`;
 };
 
-export default function CertificateForm() {
+export default function CertificateFormWrapper() {
+    return (
+        <Suspense fallback={<CertificateFormLoading />}>
+            <CertificateForm />
+        </Suspense>
+    );
+}
+
+function CertificateFormLoading() {
+    return (
+        <div className="flex justify-center items-center h-screen">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
+            <span className="ml-4">Loading certificate form...</span>
+        </div>
+    );
+}
+
+ function CertificateForm() {
     const searchParams = useSearchParams();
     const certificateId = searchParams.get('id');
-
     const [formData, setFormData] = useState<Certificate>({
-        id: "",
         certificateNo: generateCertificateNumber(),
         customerName: "",
         siteLocation: "",
         makeModel: "",
         range: "",
         serialNo: "",
-        calibrationGas: "", 
+        calibrationGas: "",
         gasCanisterDetails: "",
         dateOfCalibration: new Date().toISOString().split('T')[0],
         calibrationDueDate: new Date().toISOString().split('T')[0],
@@ -82,7 +90,6 @@ export default function CertificateForm() {
         engineerName: "",
         status: ""
     });
-
     const [certificate, setCertificate] = useState<Certificate | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -100,13 +107,12 @@ export default function CertificateForm() {
 
     const fetchCompanies = async () => {
         try {
-            const res = await axios.get('/api/companies'); 
-            setCompanies(res.data); 
+            const res = await axios.get('/api/companies');
+            setCompanies(res.data);
         } catch (err: any) {
-            console.error("Error fetching companies:", err);
+            console.error("Error fetching company", err);
             toast({
-                title: 'Error',
-                description: err.response?.data?.error || 'Failed to fetch companies.',
+                title: 'Failed to fetch company',
                 variant: 'destructive',
             });
         }
@@ -123,25 +129,88 @@ export default function CertificateForm() {
                 const data = await res.json();
                 setModels(data);
             } catch {
-                toast({ title: "Error", description: "Failed to load models", variant: "destructive" });
+                toast({ title: "Failed to load models", variant: "destructive" });
             }
         };
-
         const fetchEngineers = async () => {
             try {
                 const res = await fetch("/api/engineers");
                 const data = await res.json();
                 setEngineers(data);
             } catch {
-                toast({ title: "Error", description: "Failed to load engineers", variant: "destructive" });
+                toast({ title: "Failed to load engineers", variant: "destructive" });
             }
         };
-
         fetchModels();
         fetchEngineers();
     }, []);
 
-    
+    useEffect(() => {
+        const fetchCertificateData = async () => {
+            const today = new Date().toISOString().split('T')[0];
+            if (!certificateId) return;
+            try {
+                setLoading(true);
+                setError(null);
+                const response = await axios.get(
+                    `/api/certificates?id=${certificateId}`,
+                    {
+                        headers: {
+                            "Authorization": `Bearer ${localStorage.getItem("token")}`
+                        }
+                    }
+                );
+                if (!response.data) {
+                    throw new Error("No data received from server");
+                }
+                const certificateData = response.data;
+                const transformedData = {
+                    certificateNo: certificateData.certificate_no || generateCertificateNumber(),
+                    customerName: certificateData.customer_name || "",
+                    siteLocation: certificateData.site_location || "",
+                    makeModel: certificateData.make_model || "",
+                    range: certificateData.range || "",
+                    serialNo: certificateData.serial_no || "",
+                    calibrationGas: certificateData.calibration_gas || "",
+                    gasCanisterDetails: certificateData.gas_canister_details || "",
+                    dateOfCalibration: certificateData.date_of_calibration?.split('T')[0] || today,
+                    calibrationDueDate: certificateData.calibration_due_date?.split('T')[0] || today,
+                    observations: Array.isArray(certificateData.observations)
+                        ? certificateData.observations
+                        : typeof certificateData.observations === 'string'
+                            ? JSON.parse(certificateData.observations)
+                            : [{ gas: "", before: "", after: "" }],
+                    engineerName: certificateData.engineer_name || "",
+                    status: certificateData.status || ""
+                };
+                setFormData(prev => ({
+                    ...prev,
+                    certificateNo: transformedData.certificateNo,
+                    customerName: transformedData.customerName,
+                    siteLocation: transformedData.siteLocation,
+                    makeModel: transformedData.makeModel,
+                    range: transformedData.range,
+                    serialNo: transformedData.serialNo,
+                    calibrationGas: transformedData.calibrationGas,
+                    gasCanisterDetails: transformedData.gasCanisterDetails,
+                    observations: transformedData.observations,
+                    engineerName: transformedData.engineerName,
+                    status: transformedData.status
+                }));
+                setStartDate(transformedData.dateOfCalibration);
+                setEndDate(transformedData.calibrationDueDate);
+                setSelectedModelId(transformedData.makeModel);
+                setSelectedRange(transformedData.range);
+            } catch (error) {
+                const err = error as Error;
+                console.error("Error fetching certificate", err);
+                setError(err.message || "Failed to load certificate");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchCertificateData();
+    }, [certificateId]);
 
     const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newStartDate = e.target.value;
@@ -150,7 +219,6 @@ export default function CertificateForm() {
             ...prev,
             dateOfCalibration: newStartDate
         }));
-
         if (timePeriod) {
             const startDateObj = new Date(newStartDate);
             startDateObj.setMonth(startDateObj.getMonth() + timePeriod);
@@ -166,7 +234,6 @@ export default function CertificateForm() {
     const handleTimePeriodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const period = Number(e.target.value);
         setTimePeriod(period);
-
         if (startDate) {
             const startDateObj = new Date(startDate);
             startDateObj.setMonth(startDateObj.getMonth() + period);
@@ -181,7 +248,6 @@ export default function CertificateForm() {
 
     const handleChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-
         setFormData(prev => ({
             ...prev,
             [name]: value
@@ -194,17 +260,8 @@ export default function CertificateForm() {
         const selectedModel = models.find(m => m.id === modelId);
         const modelRange = selectedModel?.range || "";
         const modelName = selectedModel?.model_name || "";
-
         let updatedObservations = [{ gas: "", before: "", after: "" }];
         
-        if (modelName === "GMIleakSurveyor") {
-            updatedObservations = Array(3).fill({ gas: "", before: "", after: "" });
-        } else if (modelName === "GMIGT41Series") {
-            updatedObservations = Array(4).fill({ gas: "", before: "", after: "" });
-        } else if (modelName === "GMIGT44") {
-            updatedObservations = Array(3).fill({ gas: "", before: "", after: "" });
-        }
-
         setSelectedRange(modelRange);
         setFormData(prev => ({
             ...prev,
@@ -239,9 +296,7 @@ export default function CertificateForm() {
         e.preventDefault();
         setLoading(true);
         setError(null);
-    
         try {
-            // Define required fields with their display names
             const requiredFields: Record<string, string> = {
                 customerName: "Customer Name",
                 siteLocation: "Site Location",
@@ -253,17 +308,11 @@ export default function CertificateForm() {
                 status: "Status",
                 engineerName: "Engineer Name"
             };
-    
-            // Validate required fields
             const missingFields = Object.entries(requiredFields)
                 .filter(([field]) => !formData[field as keyof typeof formData]?.toString().trim())
                 .map(([_, label]) => label);
-    
-            // Validate dates
             if (!startDate) missingFields.push("Date of Calibration");
             if (!endDate) missingFields.push("Calibration Due Date");
-    
-            // Validate observations
             const invalidObservations = formData.observations
                 .map((obs, index) => {
                     const missing: string[] = [];
@@ -273,18 +322,15 @@ export default function CertificateForm() {
                     return missing;
                 })
                 .flat();
-    
-            // Combine all validation errors
             const validationErrors = [...missingFields, ...invalidObservations];
             if (validationErrors.length > 0) {
                 setError(`Please fill in: ${validationErrors.join(", ")}`);
                 setLoading(false);
                 return;
             }
-    
-            // Prepare submission data
             const submissionData = {
                 ...formData,
+                id: certificateId || undefined,
                 dateOfCalibration: startDate,
                 calibrationDueDate: endDate,
                 observations: formData.observations.map(obs => ({
@@ -293,40 +339,37 @@ export default function CertificateForm() {
                     after: obs.after.trim()
                 }))
             };
-    
-            // Make API request (always POST)
+            const isEditMode = !!certificateId;
+            const method = isEditMode ? 'put' : 'post';
+            const url = `/api/certificates${isEditMode ? `?id=${certificateId}` : ''}`;
             const response = await axios({
-                method: 'post',
-                url: '/api/certificates', // Always create a new certificate
+                method,
+                url,
                 data: submissionData,
                 headers: {
                     "Authorization": `Bearer ${localStorage.getItem("token")}`,
                     "Content-Type": "application/json"
                 }
             });
-    
-            // Handle success
             setCertificate(response.data);
             toast({
-                title: "Success",
-                description: "Certificate created successfully",
+                title: isEditMode
+                    ? "Certificate updated successfully"
+                    : "Certificate created successfully",
                 variant: "default",
             });
-    
-    
+            if (!isEditMode) {
+            }
         } catch (err: unknown) {
-        
             let errorMessage = "An unexpected error occurred";
-            
             if (axios.isAxiosError(err)) {
-                errorMessage = err.response?.data?.message || 
-                              err.response?.data?.error || 
-                              err.message;
+                errorMessage = err.response?.data?.message ||
+                    err.response?.data?.error ||
+                    err.message;
             } else if (err instanceof Error) {
                 errorMessage = err.message;
             }
-    
-            console.error("Submission error:", errorMessage);
+            console.error("Submission error", errorMessage);
             setError(errorMessage);
             toast({
                 title: "Error",
@@ -337,9 +380,6 @@ export default function CertificateForm() {
             setLoading(false);
         }
     };
-    
-    
-
     const filteredCompanies = companies.filter(company =>
         company.company_name.toLowerCase().includes(companySearchTerm.toLowerCase())
     );
@@ -347,37 +387,29 @@ export default function CertificateForm() {
     const handleDownload = () => {
         const logo = new Image();
         logo.src = "/img/rps.png";
-
         logo.onload = () => {
             const doc = new jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
-
             const leftMargin = 15;
             const rightMargin = 15;
             const topMargin = 20;
             const bottomMargin = 20;
             const contentWidth = pageWidth - leftMargin - rightMargin;
             let y = topMargin;
-
             const logoWidth = 60;
             const logoHeight = 20;
             const logoX = 2;
             const logoY = 10;
-
             doc.addImage(logo, "PNG", logoX, logoY, logoWidth, logoHeight);
-
             y = logoY + logoHeight + 10;
-
             doc.setFont("times", "bold").setFontSize(16).setTextColor(0, 51, 102);
             doc.text("CALIBRATION CERTIFICATE", pageWidth / 2, y, { align: "center" });
             y += 10;
-
             const labelX = leftMargin;
             const labelWidth = 55;
             const valueX = labelX + labelWidth + 2;
             const lineGap = 8;
-
             const formatDate = (inputDateString: string | undefined) => {
                 if (!inputDateString) return "N/A";
                 const inputDate = new Date(inputDateString);
@@ -385,7 +417,6 @@ export default function CertificateForm() {
                 const pad = (n: number) => n.toString().padStart(2, "0");
                 return `${pad(inputDate.getDate())} - ${pad(inputDate.getMonth() + 1)} - ${inputDate.getFullYear()}`;
             };
-
             const addRow = (labelText: string, value: string) => {
                 doc.setFont("times", "bold").setFontSize(11).setTextColor(0);
                 doc.text(labelText, labelX, y);
@@ -393,7 +424,6 @@ export default function CertificateForm() {
                 doc.text(": " + (value || "N/A"), valueX, y);
                 y += lineGap;
             };
-
             addRow("Certificate No.", formData.certificateNo);
             addRow("Customer Name", formData.customerName);
             addRow("Site Location", formData.siteLocation);
@@ -402,26 +432,21 @@ export default function CertificateForm() {
             addRow("Serial No.", formData.serialNo);
             addRow("Calibration Gas", formData.calibrationGas);
             addRow("Gas Canister Details", formData.gasCanisterDetails);
-
             y += 5;
             addRow("Date of Calibration", formatDate(formData.dateOfCalibration));
             addRow("Calibration Due Date", formatDate(formData.calibrationDueDate));
             addRow("Status", formData.status);
-
             y += 5;
             doc.setDrawColor(180);
             doc.setLineWidth(0.3);
             doc.line(leftMargin, y, pageWidth - rightMargin, y);
             y += 10;
-
             doc.setFont("times", "bold").setFontSize(12).setTextColor(0, 51, 102);
             doc.text("OBSERVATIONS", leftMargin, y);
             y += 10;
-
             const colWidths = [20, 70, 40, 40];
             const headers = ["Sr. No.", "Concentration of Gas", "Reading Before", "Reading After"];
             let x = leftMargin;
-
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
             headers.forEach((header, i) => {
                 doc.rect(x, y - 5, colWidths[i], 8);
@@ -429,51 +454,41 @@ export default function CertificateForm() {
                 x += colWidths[i];
             });
             y += 8;
-
             doc.setFont("times", "normal").setFontSize(10);
             formData.observations.forEach((obs, index) => {
                 let x = leftMargin;
                 const rowY = y + index * 8;
-
                 const rowData = [
                     `${index + 1}`,
                     obs.gas || "",
                     obs.before || "",
                     obs.after || ""
                 ];
-
                 rowData.forEach((text, colIndex) => {
                     doc.rect(x, rowY - 6, colWidths[colIndex], 8);
                     doc.text(text, x + 2, rowY);
                     x += colWidths[colIndex];
                 });
             });
-
             y += formData.observations.length * 8 + 15;
-
             const conclusion = "The above-mentioned Gas Detector was calibrated successfully, and the result confirms that the performance of the instrument is within acceptable limits.";
             doc.setFont("times", "normal").setFontSize(10).setTextColor(0);
             const conclusionLines = doc.splitTextToSize(conclusion, contentWidth);
             doc.text(conclusionLines, leftMargin, y);
             y += conclusionLines.length * 6 + 15;
-
             doc.setFont("times", "bold");
             doc.text("Tested & Calibrated By", pageWidth - rightMargin, y, { align: "right" });
             doc.setFont("times", "normal");
             doc.text(formData.engineerName || "________________", pageWidth - rightMargin, y + 10, { align: "right" });
-
             doc.setDrawColor(180);
             doc.line(leftMargin, pageHeight - bottomMargin - 10, pageWidth - rightMargin, pageHeight - bottomMargin - 10);
-
             doc.setFontSize(8).setTextColor(100);
             doc.text("This certificate is electronically generated and does not require a physical signature.", leftMargin, pageHeight - bottomMargin - 5);
             doc.text(`Generated on: ${new Date().toLocaleString()}`, leftMargin, pageHeight - bottomMargin);
-
             doc.save("calibration-certificate.pdf");
         };
-
         logo.onerror = () => {
-            console.error("Failed to load logo image.");
+            console.error("Failed to load logo image");
             alert("Logo image not found. Please check the path.");
         };
     };
@@ -494,7 +509,6 @@ export default function CertificateForm() {
                 <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
-
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
@@ -553,13 +567,12 @@ export default function CertificateForm() {
                                             onBlur={() => setTimeout(() => setShowCompanyDropdown(false), 150)}
                                             className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md w-full text-sm"
                                         />
-
                                         {showCompanyDropdown && (
                                             <ul className="absolute left-0 top-full mt-1 z-20 w-full rounded-md border bg-white text-sm shadow-lg max-h-60 overflow-y-auto">
                                                 {filteredCompanies.length > 0 ? (
                                                     filteredCompanies.map((company) => (
                                                         <li
-                                                            key={company._id}
+                                                            key={company.id}
                                                             className={`px-4 py-2 cursor-pointer transition-colors ${selectedCompanyName === company.company_name ? " font-medium" : ""
                                                                 }`}
                                                             onMouseDown={(e) => e.preventDefault()}
@@ -578,13 +591,12 @@ export default function CertificateForm() {
                                                     ))
                                                 ) : (
                                                     <li className="px-4 py-2 text-gray-500">
-                                                        {companySearchTerm ? "No companies found" : "Start typing to search companies"}
+                                                        {companySearchTerm ? "Go to create company and add data" : "Start typing to search company"}
                                                     </li>
                                                 )}
                                             </ul>
                                         )}
                                     </div>
-
                                     <input
                                         type="text"
                                         name="siteLocation"
@@ -607,11 +619,10 @@ export default function CertificateForm() {
                                             </option>
                                         ))}
                                     </select>
-
                                     <input
                                         value={formData.range}
                                         readOnly
-                                        className="w-full sm:w-1/2 bg-gray-100 border px-3 py-2 rounded-md text-black"
+                                        className="bg-gray-100 text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md w-full sm:w-1/2"
                                         placeholder="Model Range"
                                     />
                                 </div>
@@ -649,11 +660,10 @@ export default function CertificateForm() {
                                         name="dateOfCalibration"
                                         value={startDate}
                                         onChange={handleStartDateChange}
-                                        className="p-2 rounded-md border bg-white"
+                                        className="p-2 rounded-md border bg-gray-300"
                                         min="2000-01-01"
                                         max="2100-12-31"
                                     />
-
                                     <select
                                         onChange={handleTimePeriodChange}
                                         className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
@@ -678,7 +688,7 @@ export default function CertificateForm() {
                                                 calibrationDueDate: e.target.value
                                             }));
                                         }}
-                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                        className="p-2 rounded-md border bg-gray-300"
                                         disabled={timePeriod !== null}
                                         data-date-format="DD-MM-YYYY"
                                         min="2000-01-01"
@@ -706,7 +716,7 @@ export default function CertificateForm() {
                                         value={formData.certificateNo}
                                         onChange={handleChange}
                                         readOnly
-                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                        className="bg-gray-100 text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                     />
                                     <select
                                         name="status"
@@ -719,13 +729,12 @@ export default function CertificateForm() {
                                         <option value="Unchecked">Unchecked</option>
                                     </select>
                                 </div>
-
                                 <h2 className="text-lg font-bold mt-4 text-center">Observation Table</h2>
                                 <div className="flex justify-end mb-4">
                                     <button
                                         type="button"
                                         onClick={addObservation}
-                                        className="bg-purple-950 text-white px-4 py-2 border rounded hover:bg-gray-900"
+                                        className="bg-purple-950 text-white px-4 py-2 border rounded hover:bg-purple-900"
                                         disabled={formData.observations.length >= 5}
                                     >
                                         Create Observation
@@ -751,7 +760,7 @@ export default function CertificateForm() {
                                                         name="gas"
                                                         value={observation.gas}
                                                         onChange={(e) => handleObservationChange(index, 'gas', e.target.value)}
-                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
+                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md w-full"
                                                     />
                                                 </td>
                                                 <td className="border p-2">
@@ -760,7 +769,7 @@ export default function CertificateForm() {
                                                         name="before"
                                                         value={observation.before}
                                                         onChange={(e) => handleObservationChange(index, 'before', e.target.value)}
-                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
+                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md w-full"
                                                     />
                                                 </td>
                                                 <td className="border p-2">
@@ -769,7 +778,7 @@ export default function CertificateForm() {
                                                         name="after"
                                                         value={observation.after}
                                                         onChange={(e) => handleObservationChange(index, 'after', e.target.value)}
-                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
+                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md w-full"
                                                     />
                                                 </td>
                                                 <td className="border p-2">
@@ -798,19 +807,19 @@ export default function CertificateForm() {
                                         )}
                                     </tbody>
                                 </table>
-
                                 <button
                                     type="submit"
-                                    className="bg-blue-950 hover:bg-blue-900 text-white p-2 rounded-md w-full"
+                                    className="bg-purple-950 hover:bg-purple-900 text-white p-2 rounded-md w-full"
                                     disabled={loading}
                                 >
                                     {loading ? "Generating..." : "Generate Certificate"}
                                 </button>
                             </form>
 
+
                             {certificate && (
                                 <div className="mt-4 text-center">
-                                    <p className="text-green-600 mb-2">{certificate.id}</p>
+                                    <p className="text-green-600 mb-2">Certificate Generated Successfully</p>
                                     <button
                                         onClick={handleDownload}
                                         className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"

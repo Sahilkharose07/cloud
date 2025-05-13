@@ -2,8 +2,10 @@
 import * as React from "react";
 import {
   File,
+  Settings,
   CircleUser,
- 
+  InfoIcon,
+  CirclePlay,
   ChevronsUpDown,
   LayoutDashboard,
   Building2,
@@ -17,7 +19,8 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem,  DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { usePathname } from "next/navigation";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { LogOut } from 'lucide-react'
 
 const data = {
@@ -78,7 +81,7 @@ const data = {
       items: [
         {
           title: "Create Certificate",
-          url: "/admin/certificate",
+          url: "/admin/certificateform",
         },
         {
           title: "Certificate Record",

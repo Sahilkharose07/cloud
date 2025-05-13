@@ -12,9 +12,8 @@ const nextConfig: NextConfig = {
     disableStaticImages: false,
   },
   productionBrowserSourceMaps: false,
-
+  output: 'standalone',
   compress: true,
-   output: 'standalone',
   experimental: {
     externalDir: true,
     fallbackNodePolyfills: false,
@@ -35,3 +34,4 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+

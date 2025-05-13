@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, ChangeEvent,Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -7,11 +7,10 @@ import { Separator } from "@/components/ui/separator";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
-import { AdminSidebar } from "@/components/admin-sidebar";
 import { Trash2 } from "lucide-react";
 import { v4 as uuidv4 } from 'uuid';
-import { jsPDF } from "jspdf";
 import { AppSidebar } from "@/components/app-sidebar";
+import { jsPDF } from "jspdf";
 
 interface Contact {
     id: string;
@@ -19,7 +18,6 @@ interface Contact {
     contactNo: string;
     companyName?: string;
 }
-
 interface EngineerRemark {
     serviceSpares: string;
     partNo: string;
@@ -28,7 +26,6 @@ interface EngineerRemark {
     total: string;
     poNo: string;
 }
-
 interface ServiceRequest {
     id: string;
     serviceId?: string;
@@ -53,18 +50,15 @@ interface ServiceRequest {
     engineerId?: string;
     status: string;
 }
-
 interface ServiceResponse {
     serviceId: string;
     message: string;
     downloadUrl: string;
 }
-
 interface Engineer {
     id: string;
     name: string;
 }
-
 interface ServiceEngineer {
     id: string;
     name: string;
@@ -92,18 +86,34 @@ const initialFormData: ServiceRequest = {
     status: "checked"
 };
 
-export default function GenerateService() {
+export default function ServiceFormWrapper() {
+    return (
+        <Suspense fallback={<ServiceFormLoading />}>
+            <GenerateService />
+        </Suspense>
+    );
+}
+
+function ServiceFormLoading() {
+    return (
+        <div className="flex justify-center items-center h-screen">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
+            <span className="ml-4">Loading Service form...</span>
+        </div>
+    );
+}
+
+ function GenerateService() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const serviceId = searchParams.get('id');
     const isEditMode = !!serviceId;
-
+    const today = new Date().toISOString().split('T')[0];
+    const [startDate, setStartDate] = useState<string>(today);
     const [formData, setFormData] = useState<ServiceRequest>(initialFormData);
     const [contactPersons, setContactPersons] = useState<Contact[]>([]);
     const [service, setService] = useState<ServiceResponse | null>(null);
     const [loading, setLoading] = useState(false);
-    const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-    const [isSendingPDF, setIsSendingPDF] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [engineers, setEngineers] = useState<Engineer[]>([]);
     const [serviceEngineers, setServiceEngineers] = useState<ServiceEngineer[]>([]);
@@ -111,9 +121,8 @@ export default function GenerateService() {
     const [showDropdown, setShowDropdown] = useState(false);
     const [isLoadingContacts, setIsLoadingContacts] = useState(false);
     const [isLoadingEngineers, setIsLoadingEngineers] = useState(true);
+    const [isSendingPDF, setIsSendingPDF] = useState(false);
     const [generatedPdfBlob, setGeneratedPdfBlob] = useState<Blob | null>(null);
-
-    // Generate report number if not in edit mode
     const generateReportNo = useCallback(() => {
         const date = new Date();
         const currentYear = date.getFullYear();
@@ -124,7 +133,6 @@ export default function GenerateService() {
         return `RPS/SRV/${yearRange}/${randomNum}`;
     }, []);
 
-    // Fetch contact persons
     const fetchContactPersons = useCallback(async () => {
         setIsLoadingContacts(true);
         try {
@@ -133,20 +141,17 @@ export default function GenerateService() {
                     Authorization: `Bearer ${localStorage.getItem("token")}`,
                 },
             });
-
             const data = Array.isArray(response.data?.data)
                 ? response.data.data
                 : Array.isArray(response.data)
                     ? response.data
                     : [];
-
             setContactPersons(data);
             setFilteredContacts(data);
         } catch (error) {
-            console.error("Error fetching contact persons:", error);
+            console.error("Error fetching contact", error);
             toast({
-                title: "Error",
-                description: "Failed to load contacts",
+                title: "Failed to load contact",
                 variant: "destructive",
             });
             setContactPersons([]);
@@ -156,7 +161,6 @@ export default function GenerateService() {
         }
     }, []);
 
-    // Fetch engineers
     const fetchEngineers = useCallback(async () => {
         try {
             const res = await fetch("/api/engineers");
@@ -164,14 +168,12 @@ export default function GenerateService() {
             setEngineers(Array.isArray(data) ? data : []);
         } catch (error) {
             toast({
-                title: "Error",
-                description: "Failed to load engineers",
+                title: "Failed to load engineers",
                 variant: "destructive"
             });
         }
     }, []);
 
-    // Fetch service engineers
     const fetchServiceEngineers = useCallback(async () => {
         try {
             const res = await fetch("/api/service-engineers");
@@ -179,14 +181,15 @@ export default function GenerateService() {
             setServiceEngineers(Array.isArray(data) ? data : []);
         } catch (error) {
             toast({
-                title: "Error",
-                description: "Failed to load service engineers",
+                title: "Failed to load service engineers",
                 variant: "destructive"
             });
         } finally {
             setIsLoadingEngineers(false);
         }
     }, []);
+
+    
 
     useEffect(() => {
         if (!isEditMode) {
@@ -197,35 +200,31 @@ export default function GenerateService() {
         }
     }, [isEditMode, generateReportNo]);
 
-    // Fetch all required data
     useEffect(() => {
         fetchContactPersons();
         fetchEngineers();
         fetchServiceEngineers();
-    }, [fetchContactPersons, fetchEngineers, fetchServiceEngineers, isEditMode]);
+    }, [fetchContactPersons, fetchEngineers, fetchServiceEngineers]);
 
-    // Filter contacts based on customer name
     useEffect(() => {
         if (!Array.isArray(contactPersons)) {
             setFilteredContacts([]);
             return;
         }
-
         const customerNameInput = formData.customerName.trim().toLowerCase();
-
         setFilteredContacts(
             customerNameInput.length > 0
                 ? contactPersons.filter(person =>
                     (person.companyName || '').toLowerCase().includes(customerNameInput) ||
                     (person.firstName || '').toLowerCase().includes(customerNameInput)
-                ) : contactPersons
+                )
+                : contactPersons
         );
     }, [formData.customerName, contactPersons]);
 
     const handleServiceEngineerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const selectedId = e.target.value;
         const selectedEngineer = serviceEngineers.find(engineer => engineer.id === selectedId);
-
         setFormData(prev => ({
             ...prev,
             serviceEngineerId: selectedId,
@@ -241,13 +240,11 @@ export default function GenerateService() {
     const handleEngineerRemarksChange = (index: number, field: keyof EngineerRemark, value: string) => {
         const updatedEngineerRemarks = [...formData.engineerRemarks];
         updatedEngineerRemarks[index] = { ...updatedEngineerRemarks[index], [field]: value };
-
         if (field === 'rate' || field === 'quantity') {
             const rate = parseFloat(updatedEngineerRemarks[index].rate) || 0;
             const quantity = parseFloat(updatedEngineerRemarks[index].quantity) || 0;
             updatedEngineerRemarks[index].total = (rate * quantity).toString();
         }
-
         setFormData({ ...formData, engineerRemarks: updatedEngineerRemarks });
     };
 
@@ -276,17 +273,14 @@ export default function GenerateService() {
             'makeModelNumberoftheInstrumentQuantity', 'serialNumberoftheInstrumentCalibratedOK',
             'serialNumberoftheFaultyNonWorkingInstruments', 'engineerReport', 'engineerName'
         ];
-
         const missingFields = requiredFields.filter(field => {
             const value = formData[field as keyof typeof formData];
             return typeof value === 'string' ? value.trim() === '' : !value;
         });
-
         if (missingFields.length > 0) {
             setError(`Please fill all required fields: ${missingFields.join(', ')}`);
             return false;
         }
-
         const validRemarks = formData.engineerRemarks.filter(remark =>
             remark.serviceSpares?.trim() &&
             remark.partNo?.trim() &&
@@ -295,12 +289,10 @@ export default function GenerateService() {
             remark.total?.toString().trim() &&
             remark.poNo?.trim()
         );
-
         if (validRemarks.length === 0) {
-            setError("Please add at least one valid engineer remark.");
+            setError("Please add at least one valid engineer remark");
             return false;
         }
-
         return true;
     };
 
@@ -465,90 +457,90 @@ export default function GenerateService() {
         return doc;
     };
 
- const handleDownload = async () => {
-  if (!generatedPdfBlob) {
-    toast({
-      title: "Error",
-      description: "No PDF generated yet",
-      variant: "destructive",
-    });
-    return;
-  }
-
-  // First, download the PDF
-  try {
-    const url = URL.createObjectURL(generatedPdfBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `service-${formData.reportNo}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Revoke the URL after a short delay to ensure download completes
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  } catch (downloadError) {
-    console.error("Download failed:", downloadError);
-    toast({
-      title: "Download Error",
-      description: "Failed to download PDF",
-      variant: "destructive",
-    });
-    return;
-  }
-
-  // Then send the email with the PDF
-  setIsSendingPDF(true);
-  try {
-    // Convert blob to base64
-    const base64data = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result?.toString().split(',')[1];
-        if (result) {
-          resolve(result);
-        } else {
-          reject(new Error("Failed to convert PDF to base64"));
+    const handleDownload = async () => {
+        if (!generatedPdfBlob) {
+            toast({
+                title: "Error",
+                description: "No PDF generated yet",
+                variant: "destructive",
+            });
+            return;
         }
-      };
-      reader.onerror = () => reject(new Error("FileReader error"));
-      reader.readAsDataURL(generatedPdfBlob);
-    });
 
-    // Send to API
-    const response = await axios.post('/api/send-service', {
-      serviceId: formData.id || formData.serviceId || uuidv4(),
-      pdfData: base64data,
-      customerName: formData.customerName,
-      
-    }, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem("token")}`,
-        'Content-Type': 'application/json'
-      }
-    });
+        // First, download the PDF
+        try {
+            const url = URL.createObjectURL(generatedPdfBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `service-${formData.reportNo}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
 
-    toast({
-      title: "Success",
-      description: "PDF downloaded and sent via email successfully",
-      variant: "default",
-    });
+            // Revoke the URL after a short delay to ensure download completes
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch (downloadError) {
+            console.error("Download failed:", downloadError);
+            toast({
+                title: "Download Error",
+                description: "Failed to download PDF",
+                variant: "destructive",
+            });
+            return;
+        }
 
-  } catch (error: any) {
-    console.error("Error sending email:", error);
-    toast({
-      title: "PDF Downloaded",
-      description: "PDF was downloaded but email failed: " + 
-        (error.response?.data?.error || error.message || "Email service error"),
-      variant: "destructive",
-    });
-  } finally {
-    setIsSendingPDF(false);
-  }
-};
+        // Then send the email with the PDF
+        setIsSendingPDF(true);
+        try {
+            // Convert blob to base64
+            const base64data = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const result = reader.result?.toString().split(',')[1];
+                    if (result) {
+                        resolve(result);
+                    } else {
+                        reject(new Error("Failed to convert PDF to base64"));
+                    }
+                };
+                reader.onerror = () => reject(new Error("FileReader error"));
+                reader.readAsDataURL(generatedPdfBlob);
+            });
+
+            // Send to API
+            const response = await axios.post('/api/send-service', {
+                serviceId: formData.id || formData.serviceId || uuidv4(),
+                pdfData: base64data,
+                customerName: formData.customerName,
+
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem("token")}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            toast({
+                title: "Success",
+                description: "PDF downloaded and sent via email successfully",
+                variant: "default",
+            });
+
+        } catch (error: any) {
+            console.error("Error sending email:", error);
+            toast({
+                title: "PDF Downloaded",
+                description: "PDF was downloaded but email failed: " +
+                    (error.response?.data?.error || error.message || "Email service error"),
+                variant: "destructive",
+            });
+        } finally {
+            setIsSendingPDF(false);
+        }
+    };
 
 
-   
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -638,6 +630,10 @@ export default function GenerateService() {
             setLoading(false);
         }
     };
+    function handleStartDateChange(event: ChangeEvent<HTMLInputElement>): void {
+        setStartDate(event.target.value);
+    }
+
     return (
         <SidebarProvider>
             <AppSidebar />
@@ -663,7 +659,6 @@ export default function GenerateService() {
                         </Breadcrumb>
                     </div>
                 </header>
-
                 <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15">
                     <Card className="max-w-6xl mx-auto">
                         <CardHeader>
@@ -676,10 +671,8 @@ export default function GenerateService() {
                                     : "Fill out the form below to create a new service"}
                             </CardDescription>
                         </CardHeader>
-
                         <CardContent>
                             <form onSubmit={handleSubmit} className="space-y-6">
-                                {/* Customer Information Section */}
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                     <div className="relative w-full">
                                         <input
@@ -724,7 +717,7 @@ export default function GenerateService() {
                                                 ) : (
                                                     <li className="px-4 py-2 text-gray-500">
                                                         {contactPersons.length === 0
-                                                            ? "No contacts available"
+                                                            ? "Go to create contact and add data"
                                                             : "No matching contacts found"}
                                                     </li>
                                                 )}
@@ -732,7 +725,6 @@ export default function GenerateService() {
                                         )}
 
                                     </div>
-
                                     <input
                                         type="text"
                                         name="customerLocation"
@@ -744,7 +736,6 @@ export default function GenerateService() {
                                     />
                                 </div>
 
-                                {/* Contact Information Section */}
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                     <input
                                         type="text"
@@ -766,7 +757,6 @@ export default function GenerateService() {
                                     />
                                 </div>
 
-                                {/* Status and Service Engineer Section */}
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                     <select
                                         name="status"
@@ -778,7 +768,6 @@ export default function GenerateService() {
                                         <option value="checked">Checked</option>
                                         <option value="unchecked">Unchecked</option>
                                     </select>
-
                                     <select
                                         name="serviceEngineerId"
                                         value={formData.serviceEngineerId || ""}
@@ -796,17 +785,15 @@ export default function GenerateService() {
                                     </select>
                                 </div>
 
-                                {/* Date and Place Section */}
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                     <input
                                         type="date"
-                                        name="date"
-                                        value={formData.date}
-                                        onChange={handleChange}
-                                        className="p-2 border rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        name="dateOfCalibration"
+                                        value={startDate}
+                                        onChange={handleStartDateChange}
+                                        className="p-2 rounded-md border bg-gray-300"
                                         min="2000-01-01"
                                         max="2100-12-31"
-                                        required
                                     />
                                     <input
                                         type="text"
@@ -819,76 +806,60 @@ export default function GenerateService() {
                                     />
                                 </div>
 
-                                {/* Place Options Section */}
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                     <label className="font-medium text-black">Place :</label>
                                     <div className="flex gap-4">
-                                        <label className="flex items-center cursor-pointer">
-                                            <input
-                                                type="radio"
-                                                name="placeOptions"
-                                                value="At Site"
-                                                checked={formData.placeOptions === "At Site"}
-                                                onChange={handleChange}
-                                                className="mr-2 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <span className="text-black">At Site</span>
-                                        </label>
-                                        <label className="flex items-center cursor-pointer">
-                                            <input
-                                                type="radio"
-                                                name="placeOptions"
-                                                value="In House"
-                                                checked={formData.placeOptions === "In House"}
-                                                onChange={handleChange}
-                                                className="mr-2 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <span className="text-black">In House</span>
-                                        </label>
+                                        {["At Site", "In House"].map((option) => (
+                                            <label key={option} className="flex items-center cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name="placeOptions"
+                                                    value={option}
+                                                    checked={formData.placeOptions === option}
+                                                    onChange={handleChange}
+                                                    className={`
+                        appearance-none w-4 h-4 border border-gray-400 rounded-full mr-2
+                        checked:bg-blue-600 checked:border-blue-600
+                        transition-colors duration-200
+                    `}
+                                                    style={{
+                                                        backgroundColor:
+                                                            formData.placeOptions === option ? "#2563EB" : "#ffffff",
+                                                    }}
+                                                />
+                                                <span className="text-black">{option}</span>
+                                            </label>
+                                        ))}
                                     </div>
                                 </div>
 
-                                {/* Nature of Job Section */}
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                     <label className="font-medium text-black">Nature of Job :</label>
                                     <div className="flex gap-4 flex-wrap">
-                                        <label className="flex items-center cursor-pointer">
-                                            <input
-                                                type="radio"
-                                                name="natureOfJob"
-                                                value="AMC"
-                                                checked={formData.natureOfJob === "AMC"}
-                                                onChange={handleChange}
-                                                className="mr-2 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <span className="text-black">AMC</span>
-                                        </label>
-                                        <label className="flex items-center cursor-pointer">
-                                            <input
-                                                type="radio"
-                                                name="natureOfJob"
-                                                value="Charged"
-                                                checked={formData.natureOfJob === "Charged"}
-                                                onChange={handleChange}
-                                                className="mr-2 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <span className="text-black">Charged</span>
-                                        </label>
-                                        <label className="flex items-center cursor-pointer">
-                                            <input
-                                                type="radio"
-                                                name="natureOfJob"
-                                                value="Warranty"
-                                                checked={formData.natureOfJob === "Warranty"}
-                                                onChange={handleChange}
-                                                className="mr-2 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <span className="text-black">Warranty</span>
-                                        </label>
+                                        {["AMC", "Charged", "Warranty"].map((option) => (
+                                            <label key={option} className="flex items-center cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name="natureOfJob"
+                                                    value={option}
+                                                    checked={formData.natureOfJob === option}
+                                                    onChange={handleChange}
+                                                    className={`
+                        appearance-none w-4 h-4 border border-gray-400 rounded-full mr-2
+                        checked:bg-blue-600 checked:border-blue-600
+                        transition-colors duration-200
+                    `}
+                                                    style={{
+                                                        backgroundColor:
+                                                            formData.natureOfJob === option ? "#2563EB" : "#ffffff",
+                                                    }}
+                                                />
+                                                <span className="text-black">{option}</span>
+                                            </label>
+                                        ))}
                                     </div>
                                 </div>
 
-                                {/* Report Number and Engineer Section */}
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                     <input
                                         type="text"
@@ -897,7 +868,7 @@ export default function GenerateService() {
                                         value={formData.reportNo}
                                         onChange={handleChange}
                                         readOnly
-                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                        className="bg-gray-100 text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                     />
                                     <select
                                         name="engineerName"
@@ -915,52 +886,46 @@ export default function GenerateService() {
                                     </select>
                                 </div>
 
-                                {/* Instrument Details Section */}
                                 <div className="flex flex-col gap-4">
-                                    <textarea
+                                    <input
                                         name="makeModelNumberoftheInstrumentQuantity"
                                         placeholder="Model Number of the Instrument Quantity"
                                         value={formData.makeModelNumberoftheInstrumentQuantity}
                                         onChange={handleChange}
                                         className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        rows={3}
                                         required
                                     />
-                                    <textarea
+                                    <input
                                         name="serialNumberoftheInstrumentCalibratedOK"
                                         placeholder="Serial Number of the Instrument Calibrated & OK"
                                         value={formData.serialNumberoftheInstrumentCalibratedOK}
                                         onChange={handleChange}
                                         className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        rows={3}
                                         required
                                     />
-                                    <textarea
+                                    <input
                                         name="serialNumberoftheFaultyNonWorkingInstruments"
                                         placeholder="Serial Number of Faulty / Non-Working Instruments"
                                         value={formData.serialNumberoftheFaultyNonWorkingInstruments}
                                         onChange={handleChange}
                                         className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        rows={3}
                                         required
                                     />
-                                    <textarea
+                                    <input
                                         name="engineerReport"
                                         placeholder="Engineer Report"
                                         value={formData.engineerReport}
                                         onChange={handleChange}
                                         className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        rows={3}
                                         required
                                     />
                                 </div>
 
-                                {/* Engineer Remarks Section */}
                                 <div className="flex justify-end mb-4">
                                     <button
                                         type="button"
                                         onClick={addEngineerRemark}
-                                        className="bg-purple-950 text-white px-4 py-2 border rounded hover:bg-gray-900 disabled:opacity-50"
+                                        className="bg-purple-950 text-white px-4 py-2 border rounded hover:bg-purple-900"
                                         disabled={formData.engineerRemarks.length >= 10}
                                     >
                                         Add Engineer Remark
@@ -1045,7 +1010,7 @@ export default function GenerateService() {
                                                         <button
                                                             type="button"
                                                             onClick={() => removeEngineerRemark(index)}
-                                                            className="text-red-600 hover:text-red-800"
+                                                            className="text-black-600 hover:text-black-800"
                                                             aria-label="Remove remark"
                                                         >
                                                             <Trash2 className="h-5 w-5" />
@@ -1071,19 +1036,15 @@ export default function GenerateService() {
                                     </table>
                                 </div>
 
-                                {/* Customer Report Section */}
                                 <div className="flex flex-col gap-4">
-                                    <textarea
+                                    <input
                                         name="customerReport"
                                         placeholder="Customer Report"
                                         value={formData.customerReport}
                                         onChange={handleChange}
                                         className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        rows={3}
                                     />
                                 </div>
-
-
                                 {error && (
                                     <div className="text-red-500 text-sm p-2 border border-red-300 rounded bg-red-50">
                                         {error}
@@ -1099,23 +1060,21 @@ export default function GenerateService() {
                                 </button>
                             </form>
 
-                             {service?.serviceId && (
-                    <div className="mt-4 text-center space-y-2">
-                        <p className="text-green-600 mb-2">Service created successfully</p>
-                        <div className="flex gap-4 justify-center">
-                            <button
-                                onClick={handleDownload}
-                                className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
-                                disabled={!generatedPdfBlob}
-                            >
-                                Download PDF & sendMail
-                            </button>
-                            
-                        </div>
-                    </div>
-                )}
+                            {service?.serviceId && (
+                                <div className="mt-4 text-center space-y-2">
+                                    <p className="text-green-600 mb-2">Service created successfully</p>
+                                    <div className="flex gap-4 justify-center">
+                                        <button
+                                            onClick={handleDownload}
+                                            className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
+                                            disabled={!generatedPdfBlob}
+                                        >
+                                            Download PDF & sendMail
+                                        </button>
 
-
+                                    </div>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>

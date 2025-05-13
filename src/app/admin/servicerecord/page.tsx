@@ -1,10 +1,6 @@
 'use client';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-    SidebarInset,
-    SidebarProvider,
-    SidebarTrigger,
-} from "@/components/ui/sidebar"
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 import React, { useEffect, useState } from "react"
@@ -63,12 +59,9 @@ interface ServiceResponse {
     downloadUrl: string;
 }
 
-
 const generateUniqueId = () => {
     return Math.random().toString(36).substring(2) + Date.now().toString(36);
 };
-
-
 
 const columns = [
     { name: "Report Number", uid: "report_no", sortable: true, width: "120px" },
@@ -79,11 +72,6 @@ const columns = [
     { name: "Action", uid: "actions", sortable: true, width: "100px" },
 ];
 
-
-
-
-
-
 const INITIAL_VISIBLE_COLUMNS = ["customer_name", "contact_person", "contact_number", "service_engineer", "report_no", "actions"];
 
 export default function AdminServiceTable() {
@@ -93,32 +81,21 @@ export default function AdminServiceTable() {
     const [selectedKeys, setSelectedKeys] = React.useState<Set<string>>(new Set([]));
     const [visibleColumns, setVisibleColumns] = React.useState<Selection>(new Set(columns.map(column => column.uid)));
     const [statusFilter, setStatusFilter] = React.useState<Selection>("all");
-    const [rowsPerPage, setRowsPerPage] = useState(15);
-    const [sortDescriptor, setSortDescriptor] = React.useState<SortDescriptor>({
-        column: "createdAt",
-        direction: "descending",
-    });
-    const [page, setPage] = React.useState(1);
+    const [sortDescriptor, setSortDescriptor] = React.useState<SortDescriptor>({ column: "createdAt", direction: "descending" });
     const router = useRouter();
     const [startDate, setStartDate] = useState<string>("");
     const [endDate, setEndDate] = useState<string>("");
-
     const [isDownloading, setIsDownloading] = useState<string | null>(null);
-
     const formatDate = (dateString: string | Date): string => {
         if (!dateString) return "N/A";
-
         const date = new Date(dateString);
         if (isNaN(date.getTime())) return "Invalid Date";
-
         const pad = (n: number) => n.toString().padStart(2, "0");
         const day = pad(date.getDate());
         const month = pad(date.getMonth() + 1);
         const year = date.getFullYear();
-
         return `${day}-${month}-${year}`;
     };
-
 
     const fetchServices = async () => {
         try {
@@ -131,7 +108,6 @@ export default function AdminServiceTable() {
                     }
                 }
             );
-
             let servicesData;
             if (typeof response.data === 'object' && 'data' in response.data) {
                 servicesData = response.data.data;
@@ -140,59 +116,50 @@ export default function AdminServiceTable() {
             } else {
                 throw new Error('Invalid response format');
             }
-
-            // Sort by createdAt in descending order (newest first)
             servicesData.sort((a: { createdAt: string | number | Date; }, b: { createdAt: string | number | Date; }) =>
                 new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
             );
-
             const servicesWithKeys = servicesData.map((service: Service) => ({
                 ...service,
                 key: service.id || generateUniqueId()
             }));
-
             setServices(servicesWithKeys);
             setError(null);
         } catch (error) {
-            console.error("Error fetching services:", error);
-            setError("Failed to fetch services.");
+            console.error("Error fetching services", error);
+            setError("Failed to fetch services");
             setServices([]);
         }
     };
-
     useEffect(() => {
         fetchServices();
     }, []);
 
     const [filterValue, setFilterValue] = useState("");
     const hasSearchFilter = Boolean(filterValue);
-
     const headerColumns = React.useMemo(() => {
         if (visibleColumns === "all") return columns;
-
         return columns.filter((column) => Array.from(visibleColumns).includes(column.uid));
     }, [visibleColumns]);
-
-
     const filteredItems = React.useMemo(() => {
         let filteredServices = [...services];
-
         if (hasSearchFilter) {
             filteredServices = filteredServices.filter((service) =>
-                service.customer_name.toLowerCase().includes(filterValue.toLowerCase()) ||
-                service.contact_person.toLowerCase().includes(filterValue.toLowerCase()) ||
-                service.contact_number.toLowerCase().includes(filterValue.toLowerCase()) ||
-                service.service_engineer.toLowerCase().includes(filterValue.toLowerCase()) ||
-                service.report_no.toLowerCase().includes(filterValue.toLowerCase())
+                service.customer_name?.toLowerCase().includes(filterValue.toLowerCase()) ||
+                service.contact_person?.toLowerCase().includes(filterValue.toLowerCase()) ||
+                service.contact_number?.toLowerCase().includes(filterValue.toLowerCase()) ||
+                service.service_engineer?.toLowerCase().includes(filterValue.toLowerCase()) ||
+                service.report_no?.toLowerCase().includes(filterValue.toLowerCase())
             );
         }
-
         if (startDate || endDate) {
             filteredServices = filteredServices.filter((service) => {
                 const serviceDate = new Date(service.date);
+                serviceDate.setHours(0, 0, 0, 0);
                 const start = startDate ? new Date(startDate) : null;
                 const end = endDate ? new Date(endDate) : null;
-
+                if (start) start.setHours(0, 0, 0, 0);
+                if (end) end.setHours(23, 59, 59, 999);
                 if (start && end) {
                     return serviceDate >= start && serviceDate <= end;
                 } else if (start) {
@@ -203,18 +170,9 @@ export default function AdminServiceTable() {
                 return true;
             });
         }
-
         return filteredServices;
     }, [services, filterValue, hasSearchFilter, startDate, endDate]);
-
-    const pages = Math.ceil(filteredItems.length / rowsPerPage);
-
-    const items = React.useMemo(() => {
-        const start = (page - 1) * rowsPerPage;
-        const end = start + rowsPerPage;
-
-        return filteredItems.slice(start, end);
-    }, [page, filteredItems, rowsPerPage]);
+    const items = filteredItems;
 
     const sortedItems = React.useMemo(() => {
         return [...items].sort((a, b) => {
@@ -225,50 +183,39 @@ export default function AdminServiceTable() {
                 const dateB = new Date(
                     sortDescriptor.column === "date" ? b.date : (b as any).createdAt
                 ).getTime();
-
                 const cmp = dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
                 return sortDescriptor.direction === "descending" ? -cmp : cmp;
             }
-
             const first = a[sortDescriptor.column as keyof Service] || '';
             const second = b[sortDescriptor.column as keyof Service] || '';
             const cmp = String(first).localeCompare(String(second));
-
             return sortDescriptor.direction === "descending" ? -cmp : cmp;
         });
     }, [sortDescriptor, items]);
 
-
     const handleDownload = (service: Service) => {
         const logo = new Image();
         logo.src = "/img/rps.png";
-
         logo.onload = () => {
             const infoImage = new Image();
             infoImage.src = "/img/handf.png";
-
             infoImage.onload = () => {
                 const doc = new jsPDF({
                     orientation: "portrait",
                     unit: "mm",
                     format: "a4"
                 });
-
                 const pageWidth = doc.internal.pageSize.getWidth();
                 const pageHeight = doc.internal.pageSize.getHeight();
-
                 const leftMargin = 15;
                 const rightMargin = 15;
                 const topMargin = 20;
                 let y = topMargin;
-
                 doc.addImage(logo, "PNG", 5, 5, 50, 15);
                 y = 40;
-
                 doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
                 doc.text("SERVICE / CALIBRATION / INSTALLATION JOBREPORT", pageWidth / 2, y, { align: "center" });
                 y += 10;
-
                 const addRow = (label: string, value: string) => {
                     const labelOffset = 65;
                     doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
@@ -277,7 +224,6 @@ export default function AdminServiceTable() {
                     doc.text(value || "N/A", leftMargin + labelOffset, y);
                     y += 7;
                 };
-
                 addRow("Report No.", service.report_no);
                 addRow("Customer Name", service.customer_name);
                 addRow("Customer Location", service.customer_location);
@@ -294,43 +240,32 @@ export default function AdminServiceTable() {
                 addRow("Calibrated & Tested OK", service.serial_number_of_the_instrument_calibrated_ok);
                 addRow("Sr.No Faulty/Non-Working", service.serial_number_of_the_faulty_non_working_instruments);
                 y += 10;
-
                 doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
                 doc.text("Engineer Report:", leftMargin, y);
                 y += 5;
-
                 const engineerReportHeight = 30;
                 doc.setDrawColor(0).setLineWidth(0.2);
                 doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, engineerReportHeight);
-
                 const engineerReportLines = doc.splitTextToSize(service.engineer_report || "No report provided", pageWidth - leftMargin - rightMargin - 5);
                 doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
                 doc.text(engineerReportLines, leftMargin + 2, y + 5);
                 y += engineerReportHeight + 5;
-
                 doc.addPage();
                 y = topMargin;
-
                 doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
                 doc.text("ENGINEER REMARKS", leftMargin, y);
                 y += 8;
-
                 const tableHeaders = ["Sr. No.", "Service/Spares", "Part No.", "Rate", "Quantity", "Total", "PO No."];
                 const colWidths = [20, 50, 25, 25, 25, 15, 25];
                 let x = leftMargin;
-
                 doc.setFont("times", "bold").setFontSize(9);
                 tableHeaders.forEach((header, i) => {
                     doc.rect(x, y, colWidths[i], 8);
                     doc.text(header, x + 2, y + 6);
                     x += colWidths[i];
                 });
-
                 y += 8;
-
-                // Ensure engineer_remarks is an array and contains data
                 let engineer_remarks: engineer_remarks[] = [];
-
                 try {
                     if (typeof service.engineer_remarks === "string") {
                         engineer_remarks = JSON.parse(service.engineer_remarks);
@@ -340,14 +275,12 @@ export default function AdminServiceTable() {
                 } catch (error) {
                     console.error("Failed to parse engineer_remarks", error);
                 }
-
                 if (engineer_remarks.length > 0) {
                     engineer_remarks.forEach((remark, index) => {
                         if (y + 10 > pageHeight - 30) {
                             doc.addPage();
                             y = topMargin;
                         }
-
                         x = leftMargin;
                         const values = [
                             String(index + 1),
@@ -358,14 +291,12 @@ export default function AdminServiceTable() {
                             remark.total || "",
                             remark.poNo || ""
                         ];
-
                         doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
                         values.forEach((val, i) => {
                             doc.rect(x, y, colWidths[i], 8);
                             doc.text(val.toString(), x + 2, y + 6);
                             x += colWidths[i];
                         });
-
                         y += 8;
                     });
                 } else {
@@ -373,207 +304,106 @@ export default function AdminServiceTable() {
                     doc.text("No engineer remarks available", leftMargin, y);
                     y += 8;
                 }
-
                 y += 10;
                 doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
                 doc.text("Customer Report:", leftMargin, y);
                 y += 5;
-
                 const customerReportHeight = 30;
                 doc.setDrawColor(0).setLineWidth(0.2);
                 doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, customerReportHeight);
-
                 const customerReportLines = doc.splitTextToSize(service.customer_report || "No report provided", pageWidth - leftMargin - rightMargin - 5);
                 doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
                 doc.text(customerReportLines, leftMargin + 2, y + 5);
                 y += customerReportHeight + 5;
-
                 doc.setFont("times", "normal");
                 doc.text("Service Engineer", pageWidth - rightMargin - 40, y);
                 doc.text(service.service_engineer || "", pageWidth - rightMargin - 40, y + 5);
-
                 const now = new Date();
                 const pad = (n: number) => n.toString().padStart(2, "0");
                 const date = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}`;
                 const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
                 doc.setFontSize(9).setTextColor(100);
-                doc.text(`Report Generated On: ${date} ${time}`, leftMargin, pageHeight - 10);
-
                 const footerY = pageHeight - 25;
                 const footerWidth = 180;
                 const footerHeight = 20;
                 const footerX = (pageWidth - footerWidth) / 2;
-
                 const pageCount = doc.getNumberOfPages();
                 for (let i = 1; i <= pageCount; i++) {
                     doc.setPage(i);
                     doc.addImage(infoImage, "PNG", footerX, footerY, footerWidth, footerHeight);
                 }
-
                 const sanitizedCustomerName = service.customer_name?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'unknown_customer';
                 const reportNumber = service.report_no || service.id;
                 doc.save(`service-${sanitizedCustomerName}-${reportNumber}.pdf`);
             };
-
             infoImage.onerror = () => {
                 console.error("Failed to load footer image.");
                 alert("Company info image not found. Please check the path.");
             };
         };
-
         logo.onerror = () => {
             console.error("Failed to load logo image.");
             alert("Logo image not found. Please check the path.");
         };
     };
 
-
-
-
-
-    const onNextPage = React.useCallback(() => {
-        if (page < pages) {
-            setPage(page + 1);
-        }
-    }, [page, pages]);
-
-    const onPreviousPage = React.useCallback(() => {
-        if (page > 1) {
-            setPage(page - 1);
-        }
-    }, [page]);
-
-    const onRowsPerPageChange = React.useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        setRowsPerPage(Number(e.target.value));
-        setPage(1);
-    }, []);
-
-    const onSearchChange = React.useCallback((value: string) => {
-        if (value) {
-            setFilterValue(value);
-            setPage(1);
-        } else {
-            setFilterValue("");
-        }
-    }, []);
-
-    const onClear = React.useCallback(() => {
-        setFilterValue("");
-        setPage(1);
-    }, []);
-
-
     const topContent = React.useMemo(() => {
         return (
             <div className="flex flex-col gap-4">
-                <div className="flex justify-between items-center">
-                    <Input
-                        isClearable
-                        className="w-full max-w-[300px]"
-                        placeholder="Search"
-                        startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
-                        value={filterValue}
-                        onChange={(e) => setFilterValue(e.target.value)}
-                        onClear={() => setFilterValue("")}
-                    />
-                    <label className="flex items-center text-default-400 text-small">
-                        Rows per page:
-                        <select
-                            className="bg-transparent outline-none text-default-400 text-small ml-2"
-                            onChange={onRowsPerPageChange}
-                            defaultValue="15"
-                        >
-                            <option value="5">5</option>
-                            <option value="10">10</option>
-                            <option value="15">15</option>
-                        </select>
-                    </label>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-default-400">From:</span>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="border border-gray-300 rounded p-2 text-sm bg-gray-100 text-black 
-                 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                <div className="flex flex-wrap justify-between items-center w-full gap-4">
+                    <div className="flex-1 min-w-[200px]">
+                        <Input
+                            isClearable
+                            className="w-full max-w-[300px]"
+                            placeholder="Search"
+                            startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
+                            value={filterValue}
+                            onChange={(e) => setFilterValue(e.target.value)}
+                            onClear={() => setFilterValue("")}
                         />
                     </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-default-400">To:</span>
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            min={startDate}
-                            className="border border-gray-300 rounded p-2 text-sm bg-gray-100 text-black 
-                 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                        />
+                    <div className="flex items-center gap-3 mx-auto">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-default-400">From:</span>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="border border-gray-300 rounded p-2 text-sm bg-white text-black 
+                                dark:bg-white dark:border-gray-700 dark:text-black"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-default-400">To:</span>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                min={startDate}
+                                className="border border-gray-300 rounded p-2 text-sm bg-white text-black 
+                                dark:bg-white dark:border-gray-700 dark:text-black"
+                            />
+                        </div>
+                        {(startDate || endDate) && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    setStartDate("");
+                                    setEndDate("");
+                                }}
+                            >
+                                Clear Dates
+                            </Button>
+                        )}
                     </div>
-                    {(startDate || endDate) && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                setStartDate("");
-                                setEndDate("");
-                            }}
-                        >
-                            Clear Dates
-                        </Button>
-                    )}
-                </div>
-
-            </div>
-        );
-    }, [filterValue, onRowsPerPageChange, startDate, endDate]);
-
-
-    const bottomContent = React.useMemo(() => {
-        return (
-            <div className="py-2 px-2 relative flex justify-between items-center">
-                <span className="text-default-400 text-small">
-                    Total {services.length} services
-                </span>
-                <div className="absolute left-1/2 transform -translate-x-1/2">
-                    <Pagination
-                        isCompact
-                        showShadow
-                        color="success"
-                        page={page}
-                        total={pages}
-                        onChange={setPage}
-                        classNames={{
-                            cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
-                            item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
-                        }}
-                    />
-                </div>
-                <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
-                    <Button
-                        className="bg-[hsl(339.92deg_91.04%_52.35%)]"
-                        variant="default"
-                        size="sm"
-                        disabled={page === 1}
-                        onClick={onPreviousPage}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        className="bg-[hsl(339.92deg_91.04%_52.35%)]"
-                        variant="default"
-                        size="sm"
-                        disabled={page === pages}
-                        onClick={onNextPage}
-                    >
-                        Next
-                    </Button>
+                    <div className="text-sm text-muted-foreground whitespace-nowrap">
+                        Total: <strong>{filteredItems.length}</strong> certificate{filteredItems.length !== 1 ? "s" : ""}
+                    </div>
                 </div>
             </div>
         );
-    }, [selectedKeys, page, pages, onPreviousPage, onNextPage, items.length, hasSearchFilter]);
+    }, [filterValue, startDate, endDate, filteredItems.length]);
 
     const handleSelectionChange = (keys: Selection) => {
         if (keys === "all") {
@@ -587,43 +417,33 @@ export default function AdminServiceTable() {
         setVisibleColumns(keys);
     };
 
-
     const handleDelete = async (serviceId: string) => {
         const confirmDelete = window.confirm("Are you sure you want to delete this service report?");
         if (!confirmDelete) return;
-
         try {
             console.log("Attempting to delete service ID:", serviceId);
-
             const response = await axios.delete(
-                `/api/services?id=${serviceId}`, // Use service ID in the URL path
+                `/api/services?id=${serviceId}`,
                 {
                     headers: {
                         "Authorization": `Bearer ${localStorage.getItem("token")}`
                     }
                 }
             );
-
             console.log("Delete response:", response.data);
-
             toast({
-                title: "Service Deleted",
-                description: "Service successfully deleted",
+                title: "Service deleted successfully",
                 variant: "default",
             });
-
-            await fetchServices(); // Ensure you refresh the services list after deletion
-
+            await fetchServices();
         } catch (error) {
-            console.error("Full delete error:", error);
-
+            console.error("Full delete error", error);
             let errorMessage = "Failed to delete service";
             if (axios.isAxiosError(error)) {
                 errorMessage = error.response?.data?.error ||
                     error.response?.data?.message ||
                     error.message;
             }
-
             toast({
                 title: "Error",
                 description: errorMessage,
@@ -716,7 +536,6 @@ export default function AdminServiceTable() {
                 <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
-
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
@@ -744,7 +563,6 @@ export default function AdminServiceTable() {
                             <Table
                                 isHeaderSticky
                                 aria-label="Leads table with custom cells, pagination and sorting"
-                                bottomContent={bottomContent}
                                 bottomContentPlacement="outside"
                                 classNames={{
                                     wrapper: "max-h-[382px] ower-flow-y-auto",

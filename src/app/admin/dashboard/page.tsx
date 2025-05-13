@@ -1,14 +1,7 @@
 'use client';
-
 import { Breadcrumb, BreadcrumbPage, BreadcrumbList, BreadcrumbItem } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
-import {
-    SidebarInset,
-    SidebarProvider,
-    SidebarTrigger,
-} from "@/components/ui/sidebar"
-
-
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import React, { useEffect, useState } from "react"
 import { useRouter } from 'next/navigation';
 import 'react-toastify/dist/ReactToastify.css';
@@ -36,7 +29,6 @@ interface Certificate {
     engineerName: string;
     [key: string]: string;
 }
-
 interface Service {
     _id: string;
     nameAndLocation: string;
@@ -53,7 +45,6 @@ interface Service {
     serialNumberoftheFaultyNonWorkingInstruments: string;
     engineerName: string;
 }
-
 interface User {
     _id: string;
     name: string;
@@ -65,7 +56,6 @@ type SortDescriptor = {
     column: string;
     direction: 'ascending' | 'descending';
 }
-
 type sortDescriptorService = {
     column: string;
     direction: 'ascending' | 'descending';
@@ -76,7 +66,6 @@ interface CertificateResponse {
     message: string;
     downloadUrl: string;
 }
-
 interface ServiceResponse {
     serviceId: string;
     message: string;
@@ -86,11 +75,9 @@ interface ServiceResponse {
 const generateUniqueId = () => {
     return Math.random().toString(36).substring(2) + Date.now().toString(36);
 };
-
 const generateUniqueIdService = () => {
     return Math.random().toString(36).substring(2) + Date.now().toString(36);
 };
-
 const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     return date.toISOString().split("T")[0];
@@ -104,15 +91,12 @@ const columns = [
     { name: "Serial Number", uid: "serial_no", sortable: true, width: "120px" },
     { name: "Engineer Name", uid: "engineer_name", sortable: true, width: "120px" },
 ];
-
 const columnsservice = [
     { name: "Contact Person", uid: "contact_person", sortable: true, width: "120px" },
     { name: "Contact Number", uid: "contact_number", sortable: true, width: "120px" },
     { name: "Service Engineer", uid: "service_engineer", sortable: true, width: "120px" },
     { name: "Report Number", uid: "report_no", sortable: true, width: "120px" },
 ];
-
-
 
 const statusColorMap: Record<string, ChipProps["color"]> = {
     active: "success",
@@ -128,14 +112,10 @@ export default function Page() {
     const [visibleColumns, setVisibleColumns] = React.useState<Selection>(new Set(columns.map(column => column.uid)));
     const [statusFilter, setStatusFilter] = React.useState<Selection>("all");
     const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [sortDescriptor, setSortDescriptor] = React.useState<SortDescriptor>({
-        column: "certificateNo",
-        direction: "ascending",
-    });
+    const [sortDescriptor, setSortDescriptor] = React.useState<SortDescriptor>({ column: "certificateNo", direction: "ascending" });
     const [page, setPage] = React.useState(1);
     const router = useRouter();
     const [isDownloading, setIsDownloading] = useState<string | null>(null);
-
     const [services, setServices] = useState<Service[]>([]);
     const [service, setService] = useState<ServiceResponse | null>(null);
     const [errorService, setErrorService] = useState<string | null>(null);
@@ -143,10 +123,7 @@ export default function Page() {
     const [visibleColumnsService, setVisibleColumnsService] = React.useState<Selection>(new Set(columnsservice.map(column => column.uid)));
     const [statusFilterService, setStatusFilterService] = React.useState<Selection>("all");
     const [rowsPerPageService, setRowsPerPageService] = useState(10);
-    const [sortDescriptorService, setSortDescriptorService] = React.useState<sortDescriptorService>({
-        column: "nameAndLocation",
-        direction: "ascending",
-    });
+    const [sortDescriptorService, setSortDescriptorService] = React.useState<sortDescriptorService>({ column: "nameAndLocation", direction: "ascending" });
     const [pageService, setPageService] = React.useState(1);
     const routerService = useRouter();
     const [isDownloadingService, setIsDownloadingService] = useState<string | null>(null);
@@ -163,39 +140,30 @@ export default function Page() {
                     }
                 }
             );
-
-            // Log the response structure
             console.log('Full API Response:', {
                 status: response.status,
                 data: response.data,
                 type: typeof response.data,
                 hasData: 'data' in response.data
             });
-
-            // Handle the response based on its structure
             let certificatesData;
             if (typeof response.data === 'object' && 'data' in response.data) {
-                // Response format: { data: [...certificates] }
                 certificatesData = response.data.data;
             } else if (Array.isArray(response.data)) {
-                // Response format: [...certificates]
                 certificatesData = response.data;
             } else {
                 console.error('Unexpected response format:', response.data);
                 throw new Error('Invalid response format');
             }
-
             if (!Array.isArray(certificatesData)) {
                 certificatesData = [];
             }
-
             const certificatesWithKeys = certificatesData.map((certificate: Certificate) => ({
                 ...certificate,
                 key: certificate._id || generateUniqueId()
             }));
-
             setCertificates(certificatesWithKeys);
-            setError(null); // Clear any previous errors
+            setError(null);
         } catch (error) {
             console.error("Error fetching leads:", error);
             if (axios.isAxiosError(error)) {
@@ -203,7 +171,7 @@ export default function Page() {
             } else {
                 setError("Failed to fetch leads.");
             }
-            setCertificates([]); // Set empty array on error
+            setCertificates([]);
         }
     };
     useEffect(() => {
@@ -221,41 +189,30 @@ export default function Page() {
                     }
                 }
             );
-
-            // Log the response structure
             console.log('Full API Response:', {
                 status: response.status,
                 data: response.data,
                 type: typeof response.data,
                 hasData: 'data' in response.data
             });
-
-            // Handle the response based on its structure
             let servicesData;
             if (typeof response.data === 'object' && 'data' in response.data) {
-                // Response format: { data: [...services] }
                 servicesData = response.data.data;
             } else if (Array.isArray(response.data)) {
-                // Response format: [...services]
                 servicesData = response.data;
             } else {
                 console.error('Unexpected response format:', response.data);
                 throw new Error('Invalid response format');
             }
-
-            // Ensure servicesData is an array
             if (!Array.isArray(servicesData)) {
                 servicesData = [];
             }
-
-            // Map the data with safe key generation
             const servicesWithKeys = servicesData.map((service: Service) => ({
                 ...service,
                 key: service._id || generateUniqueIdService()
             }));
-
             setServices(servicesWithKeys);
-            setError(null); // Clear any previous errors
+            setError(null);
         } catch (error) {
             console.error("Error fetching leads:", error);
             if (axios.isAxiosError(error)) {
@@ -263,7 +220,7 @@ export default function Page() {
             } else {
                 setError("Failed to fetch leads.");
             }
-            setServices([]); // Set empty array on error
+            setServices([]);
         }
     };
     useEffect(() => {
@@ -281,7 +238,6 @@ export default function Page() {
                     }
                 }
             );
-
             let usersData;
             if (typeof response.data === 'object' && 'data' in response.data) {
                 usersData = response.data.data;
@@ -291,11 +247,9 @@ export default function Page() {
                 console.error('Unexpected response format:', response.data);
                 throw new Error('Invalid response format');
             }
-
             if (!Array.isArray(usersData)) {
                 usersData = [];
             }
-
             setUsers(usersData);
         } catch (error) {
             console.error("Error fetching users:", error);
@@ -310,22 +264,16 @@ export default function Page() {
     const [filterValueservice, setFilterValueservice] = useState("");
     const hasSearchFilter = Boolean(filterValue);
     const hasSearchFilterservice = Boolean(filterValueservice);
-
     const headerColumns = React.useMemo(() => {
         if (visibleColumns === "all") return columns;
-
         return columns.filter((column) => Array.from(visibleColumns).includes(column.uid));
     }, [visibleColumns]);
-
     const headerColumnsservice = React.useMemo(() => {
         if (visibleColumnsService === "all") return columnsservice;
-
         return columnsservice.filter((column) => Array.from(visibleColumnsService).includes(column.uid));
     }, [visibleColumnsService]);
-
     const filteredItems = React.useMemo(() => {
         let filteredCertificates = [...certificates];
-
         if (hasSearchFilter) {
             filteredCertificates = filteredCertificates.filter((certificate) =>
                 certificate.certificate_no.toLowerCase().includes(filterValue.toLowerCase()) ||
@@ -336,13 +284,11 @@ export default function Page() {
                 certificate.engineer_name.toLowerCase().includes(filterValue.toLowerCase())
             );
         }
-
         return filteredCertificates;
     }, [certificates, hasSearchFilter, filterValue]);
 
     const filteredItemsservice = React.useMemo(() => {
         let filteredServices = [...services];
-
         if (hasSearchFilterservice) {
             filteredServices = filteredServices.filter((service) =>
                 service.contact_person.toLowerCase().includes(filterValueservice.toLowerCase()) ||
@@ -351,7 +297,6 @@ export default function Page() {
                 service.report_no.toLowerCase().includes(filterValueservice.toLowerCase())
             );
         }
-
         return filteredServices;
     }, [services, hasSearchFilterservice, filterValueservice]);
 
@@ -362,14 +307,12 @@ export default function Page() {
     const items = React.useMemo(() => {
         const start = (page - 1) * rowsPerPage;
         const end = start + rowsPerPage;
-
         return filteredItems.slice(start, end);
     }, [page, filteredItems, rowsPerPage]);
 
     const itemsservice = React.useMemo(() => {
         const start = (pageService - 1) * rowsPerPageService;
         const end = start + rowsPerPageService;
-
         return filteredItemsservice.slice(start, end);
     }, [pageService, filteredItemsservice, rowsPerPageService]);
 
@@ -378,7 +321,6 @@ export default function Page() {
             const first = a[sortDescriptor.column as keyof Certificate];
             const second = b[sortDescriptor.column as keyof Certificate];
             const cmp = first < second ? -1 : first > second ? 1 : 0;
-
             return sortDescriptor.direction === "descending" ? -cmp : cmp;
         });
     }, [sortDescriptor, items]);
@@ -388,7 +330,6 @@ export default function Page() {
             const first = a[sortDescriptorService.column as keyof Service];
             const second = b[sortDescriptorService.column as keyof Service];
             const cmp = first < second ? -1 : first > second ? 1 : 0;
-
             return sortDescriptorService.direction === "descending" ? -cmp : cmp;
         });
     }, [sortDescriptorService, itemsservice]);
@@ -503,23 +444,19 @@ export default function Page() {
         return (
             <div className="py-2 px-2 flex justify-between items-center">
                 <span className="w-[30%] text-small text-default-400">
-
                 </span>
                 <Pagination
                     isCompact
-                    // showControlsf
                     showShadow
                     color="success"
                     page={page}
                     total={pages}
                     onChange={setPage}
                     classNames={{
-                        // base: "gap-2 rounded-2xl shadow-lg p-2 dark:bg-default-100",
                         cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
                         item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
                     }}
                 />
-
                 <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
                     <Button
                         className="bg-[hsl(339.92deg_91.04%_52.35%)]"
@@ -530,7 +467,6 @@ export default function Page() {
                     >
                         Previous
                     </Button>
-
                     <Button
                         className="bg-[hsl(339.92deg_91.04%_52.35%)]"
                         variant="default"
@@ -540,8 +476,6 @@ export default function Page() {
                     >
                         Next
                     </Button>
-
-
                 </div>
             </div>
         );
@@ -551,18 +485,15 @@ export default function Page() {
         return (
             <div className="py-2 px-2 flex justify-between items-center">
                 <span className="w-[30%] text-small text-default-400">
-
                 </span>
                 <Pagination
                     isCompact
-                    // showControlsf
                     showShadow
                     color="success"
                     page={pageService}
                     total={pageservices}
                     onChange={setPageService}
                     classNames={{
-                        // base: "gap-2 rounded-2xl shadow-lg p-2 dark:bg-default-100",
                         cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
                         item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
                     }}
@@ -577,7 +508,6 @@ export default function Page() {
                     >
                         Previous
                     </Button>
-
                     <Button
                         className="bg-[hsl(339.92deg_91.04%_52.35%)]"
                         variant="default"
@@ -614,17 +544,14 @@ export default function Page() {
         if ((columnKey === "dateOfCalibration" || columnKey === "calibrationDueDate") && cellValue) {
             return formatDate(cellValue);
         }
-
         return cellValue;
     }, [isDownloading]);
 
     const renderCellservice = React.useCallback((service: Service, columnKey: string): React.ReactNode => {
         const cellValue = service[columnKey as keyof Service];
-
         if ((columnKey === "dateOfCalibration" || columnKey === "calibrationDueDate") && cellValue) {
             return formatDate(cellValue);
         }
-
         return cellValue;
     }, [isDownloadingService]);
 
@@ -635,7 +562,6 @@ export default function Page() {
                 <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
-                        
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
@@ -719,7 +645,7 @@ export default function Page() {
                                                 </TableColumn>
                                             )}
                                         </TableHeader>
-                                        <TableBody emptyContent={"No certificate available"} items={sortedItems}>
+                                        <TableBody emptyContent={"Go to create certificate and add data"} items={sortedItems}>
                                             {(item) => (
                                                 <TableRow key={item._id}>
                                                     {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item as Certificate, columnKey as string)}</TableCell>}
@@ -767,7 +693,7 @@ export default function Page() {
                                                 </TableColumn>
                                             )}
                                         </TableHeader>
-                                        <TableBody emptyContent={"No service available"} items={sortedItemsservice}>
+                                        <TableBody emptyContent={"Go to create certificate and add data"} items={sortedItemsservice}>
                                             {(item) => (
                                                 <TableRow key={item._id}>
                                                     {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCellservice(item as Service, columnKey as string)}</TableCell>}

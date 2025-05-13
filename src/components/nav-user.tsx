@@ -58,7 +58,7 @@ import {
 import {
   Toaster,
   toast
-} from "sonner"; 
+} from "sonner";
 
 interface User {
   id: string;
@@ -139,13 +139,13 @@ export function NavUser() {
           },
         }
       );
-      
+
       setCurrentUser(response.data.user);
       toast.success("Profile updated successfully!");
-    
+
       setIsEditing(false);
       setEditUser(null);
-    
+
       const userId = localStorage.getItem("userId");
       if (userId) {
         const userResponse = await axios.get(`/api/users?id=${userId}`);
@@ -164,8 +164,8 @@ export function NavUser() {
       setIsSubmitting(false);
     }
   };
-  
-  
+
+
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;

@@ -52,7 +52,7 @@ const data = {
         items: [
           {
             title: "Create Certificate",
-            url: "/user/certificate",
+            url: "/user/certificateform",
           },
           {
             title: "Certificate Record",
@@ -60,7 +60,7 @@ const data = {
           },
           {
             title: "Create Service",
-            url: "/user/service",
+            url: "/user/serviceform",
           },
           {
             title: "Service Record",

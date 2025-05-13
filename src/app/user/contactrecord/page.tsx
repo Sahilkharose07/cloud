@@ -2,28 +2,19 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from 'next/navigation';
 import { toast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { SearchIcon } from "lucide-react";
+import { SearchIcon, Edit, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import axios from "axios";
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
-import { Pagination } from "@heroui/react";
 import { AppSidebar } from "@/components/app-sidebar";
 
 interface ContactPerson {
   id: string;
   first_name: string;
-  middle_name: string;
-  last_name: string;
   contact_no: string;
   email: string;
   designation: string;
@@ -31,29 +22,24 @@ interface ContactPerson {
   key?: string;
   createdAt: string;
 }
-
 interface companies {
   id: string;
   company_name?: string;
   companyName?: string;
 }
-
 interface SortDescriptor {
   column: string;
   direction: "ascending" | "descending";
 }
 
 const columns = [
-  { name: "First Name", uid: "first_name", sortable: true, width: "120px" },
-  { name: "Middle Name", uid: "middle_name", sortable: true, width: "120px" },
-  { name: "Last Name", uid: "last_name", sortable: true, width: "120px" },
+  { name: "Customer Name", uid: "first_name", sortable: true, width: "120px" },
+  { name: "Company Name", uid: "company_id", sortable: true, width: "120px" },
   { name: "Contact Number", uid: "contact_no", sortable: true, width: "120px" },
-  { name: "Email", uid: "email", sortable: true, width: "120px" },
+  { name: "Email Address", uid: "email", sortable: true, width: "120px" },
   { name: "Designation", uid: "designation", sortable: true, width: "120px" },
-  { name: "Company", uid: "company_id", sortable: true, width: "120px" }, // Removed actions column
 ];
-
-const INITIAL_VISIBLE_COLUMNS = ["first_name", "middle_name", "last_name", "contact_no", "email", "designation", "company_id"];
+const INITIAL_VISIBLE_COLUMNS = ["first_name", "contact_no", "email", "designation", "company_id"];
 
 export default function ContactRecordTable() {
   const [contactPersons, setContactPersons] = useState<ContactPerson[]>([]);
@@ -61,12 +47,9 @@ export default function ContactRecordTable() {
   const [error, setError] = useState<string | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set([]));
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set(INITIAL_VISIBLE_COLUMNS));
-  const [rowsPerPage, setRowsPerPage] = useState(15);
-  const [page, setPage] = useState(1);
   const [filterValue, setFilterValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({ column: "createdAt", direction: "descending" });
-
   const router = useRouter();
   const hasSearchFilter = Boolean(filterValue);
 
@@ -78,47 +61,57 @@ export default function ContactRecordTable() {
           axios.get('/api/contactPersons'),
           axios.get('/api/companies')
         ]);
-
-        console.log(contactsRes.data);  // Log the data to check if IDs are present
+        console.log(contactsRes.data);
         setContactPersons(contactsRes.data);
         setCompanies(companiesRes.data);
       } catch (err: any) {
-        console.error("Error fetching data:", err);
+        console.error("Error fetching data", err);
         toast({
-          title: 'Error',
-          description: err.response?.data?.error || 'Failed to fetch data.',
+          title: 'Failed to fetch data',
           variant: 'destructive',
         });
       } finally {
         setIsSubmitting(false);
       }
     };
-
     fetchData();
   }, []);
-
 
   const getCompanyName = (companyId: string): string => {
     const company = companies.find(c => c.id === companyId);
     return company?.company_name || company?.companyName || "Unknown";
   };
 
+  const handleDelete = useCallback((contactId: string) => {
+    if (!contactId) return;
+    fetch(`/api/contactpersons?id=${contactId}`, { method: "DELETE" })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.message === "Contact deleted successfully") {
+          alert("Contact deleted successfully");
+          setContactPersons(prev => prev.filter(c => c.id !== contactId));
+        } else {
+          alert("Failed to delete contact");
+        }
+      })
+      .catch((error) => {
+        console.error("Error deleting contact", error);
+        alert("Error deleting contact");
+      });
+  }, []);
+
   const filteredItems = React.useMemo(() => {
     let filtered = [...contactPersons];
-
     if (hasSearchFilter) {
       const searchLower = filterValue.toLowerCase();
       filtered = filtered.filter(contact =>
         contact.first_name.toLowerCase().includes(searchLower) ||
-        contact.middle_name.toLowerCase().includes(searchLower) ||
-        contact.last_name.toLowerCase().includes(searchLower) ||
         contact.contact_no.toLowerCase().includes(searchLower) ||
         contact.email.toLowerCase().includes(searchLower) ||
         contact.designation.toLowerCase().includes(searchLower) ||
         getCompanyName(contact.company_id).toLowerCase().includes(searchLower)
       );
     }
-
     return filtered;
   }, [contactPersons, filterValue, hasSearchFilter, companies]);
 
@@ -126,37 +119,17 @@ export default function ContactRecordTable() {
     return [...filteredItems].sort((a, b) => {
       const first = a[sortDescriptor.column as keyof ContactPerson] || "";
       const second = b[sortDescriptor.column as keyof ContactPerson] || "";
-
       let cmp = 0;
       if (first < second) cmp = -1;
       if (first > second) cmp = 1;
-
       return sortDescriptor.direction === "descending" ? -cmp : cmp;
     });
   }, [filteredItems, sortDescriptor]);
 
-  const paginatedItems = React.useMemo(() => {
-    const start = (page - 1) * rowsPerPage;
-    return sortedItems.slice(start, start + rowsPerPage);
-  }, [sortedItems, page, rowsPerPage]);
-
-  const pages = Math.ceil(filteredItems.length / rowsPerPage) || 1;
-
-  const onNextPage = useCallback(() => {
-    if (page < pages) setPage(page + 1);
-  }, [page, pages]);
-
-  const onPreviousPage = useCallback(() => {
-    if (page > 1) setPage(page - 1);
-  }, [page]);
-
-  const onRowsPerPageChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setRowsPerPage(Number(e.target.value));
-    setPage(1);
-  }, []);
+  const paginatedItems = sortedItems;
 
   const topContent = (
-    <div className="flex justify-between items-center gap-4">
+    <div className="flex justify-between items-center gap-4 w-full">
       <Input
         isClearable
         className="w-full max-w-[300px]"
@@ -166,54 +139,9 @@ export default function ContactRecordTable() {
         onChange={(e) => setFilterValue(e.target.value)}
         onClear={() => setFilterValue("")}
       />
-      <label className="flex items-center text-default-400 text-small">
-        Rows per page:
-        <select
-          className="bg-transparent outline-none text-default-400 text-small ml-2"
-          onChange={onRowsPerPageChange}
-          defaultValue="15"
-        >
-          <option value="5">5</option>
-          <option value="10">10</option>
-          <option value="15">15</option>
-        </select>
-      </label>
-    </div>
-  );
-
-  const bottomContent = (
-    <div className="py-2 px-2 relative flex justify-between items-center">
-      <span className="text-default-400 text-small">
-        Total {contactPersons.length} contacts
+      <span className="text-default-400 text-sm whitespace-nowrap">
+        Total {filteredItems.length} {filteredItems.length === 1 ? "y" : "Contact"}
       </span>
-      <div className="absolute left-1/2 transform -translate-x-1/2">
-        <Pagination
-          isCompact
-          showShadow
-          color="success"
-          page={page}
-          total={pages}
-          onChange={setPage}
-        />
-      </div>
-      <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
-        <Button
-          variant="default"
-          size="sm"
-          disabled={page === 1}
-          onClick={onPreviousPage}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="default"
-          size="sm"
-          disabled={page === pages}
-          onClick={onNextPage}
-        >
-          Next
-        </Button>
-      </div>
     </div>
   );
 
@@ -221,9 +149,8 @@ export default function ContactRecordTable() {
     if (columnKey === "company_id") {
       return getCompanyName(contactPerson.company_id);
     }
-
     return contactPerson[columnKey as keyof ContactPerson];
-  }, [companies]);
+  }, [router, handleDelete, companies]);
 
   return (
     <SidebarProvider>
@@ -240,7 +167,7 @@ export default function ContactRecordTable() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/user/contactpersonform">Create Contact</BreadcrumbLink>
+                  <BreadcrumbLink href="/user/contactform">Create Contact</BreadcrumbLink>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
@@ -255,7 +182,6 @@ export default function ContactRecordTable() {
               <Table
                 isHeaderSticky
                 aria-label="Contact persons table"
-                bottomContent={bottomContent}
                 bottomContentPlacement="outside"
                 classNames={{ wrapper: "max-h-[382px] overflow-y-auto" }}
                 selectedKeys={selectedKeys}
@@ -292,15 +218,23 @@ export default function ContactRecordTable() {
                   ))}
                 </TableHeader>
                 <TableBody>
-                  {paginatedItems.map((contactPerson) => (
-                    <TableRow key={contactPerson.id}>
-                      {columns.map((column) => (
-                        <TableCell key={column.uid}>
-                          {renderCell(contactPerson, column.uid)}
-                        </TableCell>
-                      ))}
+                  {paginatedItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={columns.length} className="text-center text-muted-foreground py-6">
+                        Go to create contact and add data
+                      </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    paginatedItems.map((contactPerson) => (
+                      <TableRow key={contactPerson.id}>
+                        {columns.map((column) => (
+                          <TableCell key={column.uid}>
+                            {renderCell(contactPerson, column.uid)}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

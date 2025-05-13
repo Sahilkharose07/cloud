@@ -1,56 +1,31 @@
-'use client';
-
-import { useState,Suspense } from "react";
+"use client";
 import { toast } from "@/hooks/use-toast";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { Separator } from "@/components/ui/separator";
-
 import { Eye, EyeOff } from "react-feather";
-
 import * as z from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
-
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useState,Suspense } from "react";
 
 const registerSchema = z
   .object({
     name: z.string().nonempty("Required"),
-    contact: z.string()
-      .regex(/^\d*$/, { message: "Contact number must be numeric" })
-      .nonempty({ message: "Required" }),
-    email: z.string().email({ message: "Required" }),
-    password: z.string().min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string().min(6, "Confirm your password"),
+    contact: z.string().regex(/^\d*$/, { message: "Contact number must be numeric" }).nonempty({ message: "Required" }),
+    email: z.string().email({ message: "Invalid email id" }),
+    password: z.string().nonempty({ message: "Required" }),
+    confirmPassword: z.string().nonempty({ message: "Required" }),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
+    message: "Password do not match",
     path: ["confirmPassword"],
   });
-
 
   export default function RegisterFormWrapper() {
       return (
@@ -75,7 +50,6 @@ const registerSchema = z
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -90,7 +64,6 @@ const registerSchema = z
   const handleRegister = async (values: z.infer<typeof registerSchema>) => {
     setLoading(true);
     setServerError('');
-  
     try {
       const response = await fetch('/api/users', {
         method: 'POST',
@@ -99,36 +72,29 @@ const registerSchema = z
         },
         body: JSON.stringify(values),
       });
-  
       const data = await response.json();
-  
       if (!response.ok) {
         toast({
           title: 'Registration failed',
-          description: data.message || 'Something went wrong.',
           variant: 'destructive',
         });
-        setServerError(data.message || 'Something went wrong.');
+        setServerError(data.message || 'Something went wrong');
       } else {
         toast({
-          title: 'User Submitted',
-          description: 'The user has been successfully created',
+          title: 'User created successfully',
         });
         form.reset();
       }
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'An error occurred during registration.',
+        title: 'Registration failed',
         variant: 'destructive',
       });
-      setServerError('An error occurred during registration.');
+      setServerError('An error occurred during registration');
     } finally {
       setLoading(false);
     }
   };
-  
-  
 
   return (
     <SidebarProvider>
@@ -136,7 +102,6 @@ const registerSchema = z
       <SidebarInset>
         <header className="flex h-16 items-center gap-2 px-4">
           <SidebarTrigger />
-          
           <Separator orientation="vertical" className="mx-2 h-4" />
           <Breadcrumb>
             <BreadcrumbList>
@@ -164,15 +129,15 @@ const registerSchema = z
                 <form
                   onSubmit={form.handleSubmit(handleRegister)}
                   className="grid gap-4"
-                  
                 >
                   <FormField
                     name="name"
                     control={form.control}
                     render={({ field }) => (
                       <FormItem>
+                        <FormLabel>User Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="User Name" {...field} />
+                          <Input placeholder="Enter User Name" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -183,9 +148,10 @@ const registerSchema = z
                     name="contact"
                     render={({ field }) => (
                       <FormItem>
+                        <FormLabel>Contact Number</FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="Contact Number"
+                            placeholder="Enter Contact Number"
                             {...field}
                             disabled={isSubmitting}
                             onChange={(e) => {
@@ -203,8 +169,9 @@ const registerSchema = z
                     control={form.control}
                     render={({ field }) => (
                       <FormItem>
+                        <FormLabel>Email Address</FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="Email Address" {...field} />
+                          <Input type="email" placeholder="Enter Email Address" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -215,11 +182,12 @@ const registerSchema = z
                     control={form.control}
                     render={({ field }) => (
                       <FormItem>
+                        <FormLabel>Password</FormLabel>
                         <FormControl>
                           <div className="relative">
                             <Input
                               type={showPassword ? "text" : "password"}
-                              placeholder="Password"
+                              placeholder="Enter Password"
                               {...field}
                             />
                             <button
@@ -240,11 +208,12 @@ const registerSchema = z
                     control={form.control}
                     render={({ field }) => (
                       <FormItem>
+                        <FormLabel>Confirm Password</FormLabel>
                         <FormControl>
                           <div className="relative">
                             <Input
                               type={showConfirmPassword ? "text" : "password"}
-                              placeholder="Confirm Password"
+                              placeholder="Enter Confirm Password"
                               {...field}
                             />
                             <button
@@ -264,13 +233,11 @@ const registerSchema = z
                       </FormItem>
                     )}
                   />
-
                   {serverError && (
                     <p className="text-red-500 text-sm">{serverError}</p>
                   )}
-
                   <CardFooter className="px-0">
-                    <Button type="submit" className="w-full" disabled={loading}>
+                    <Button type="submit" className="w-full bg-purple-950 text-white hover:bg-purple-900" disabled={loading}>
                       {loading ? "Registering..." : "Create"}
                     </Button>
                   </CardFooter>
