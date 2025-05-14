@@ -5,7 +5,6 @@ type CustomExperimentalConfig = NextConfig['experimental'] & {
 };
 
 const nextConfig: NextConfig = {
-  distDir: "build",
   images: {
     domains: ['example.com'],
     unoptimized: true,
@@ -13,6 +12,7 @@ const nextConfig: NextConfig = {
     disableStaticImages: false,
   },
   productionBrowserSourceMaps: false,
+  optimizeFonts: true,
   compress: true,
   experimental: {
     externalDir: true,
@@ -34,4 +34,3 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
-
