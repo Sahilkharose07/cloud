@@ -1,8 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { ChevronRight, type LucideIcon } from "lucide-react";
-
 import {
   Collapsible,
   CollapsibleContent,
@@ -16,7 +15,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-  useSidebar
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 export function NavMain({
@@ -26,23 +25,40 @@ export function NavMain({
     title: string;
     url: string;
     icon?: LucideIcon;
-    isActive?: boolean;
     items?: {
       title: string;
       url: string;
     }[];
   }[];
 }) {
-  const [activePath, setActivePath] = React.useState<string>("");
-
-
   const { state, toggleSidebar } = useSidebar();
+  const [activePath, setActivePath] = useState<string>("");
+  const [openStates, setOpenStates] = useState<Record<string, boolean>>({});
 
-  React.useEffect(() => {
-    setActivePath(window.location.pathname);
-  }, []);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname;
+      setActivePath(path);
 
-  const isItemActive = (itemUrl: string) => activePath === itemUrl;
+      // Auto-open dropdowns whose subitems match the path
+      const newOpenStates: Record<string, boolean> = {};
+      items.forEach((item) => {
+        if (item.items?.some((sub) => sub.url === path)) {
+          newOpenStates[item.title] = true;
+        }
+      });
+      setOpenStates((prev) => ({ ...prev, ...newOpenStates }));
+    }
+  }, [items]);
+
+  const toggleOpen = (title: string) => {
+    setOpenStates((prev) => ({
+      ...prev,
+      [title]: !prev[title],
+    }));
+  };
+
+  const isItemActive = (url: string) => activePath === url;
 
   return (
     <SidebarGroup>
@@ -57,12 +73,15 @@ export function NavMain({
 
       <SidebarMenu>
         {items.map((item) => {
-          if (!item.items || item.items.length <= 1) {
-            const url = item.items?.[0]?.url || item.url;
+          const hasSubItems = item.items && item.items.length > 0;
+          const isOpen = openStates[item.title] || false;
+
+          // If no subitems, create a simple menu item
+          if (!hasSubItems) {
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton asChild tooltip={item.title}>
-                  <a href={url}>
+                  <a href={item.url}>
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>
                   </a>
@@ -71,11 +90,12 @@ export function NavMain({
             );
           }
 
+      
           return (
             <Collapsible
               key={item.title}
               asChild
-              defaultOpen={item.isActive}
+              open={isOpen}
               className="group/collapsible"
             >
               <SidebarMenuItem>
@@ -86,17 +106,22 @@ export function NavMain({
                       if (state === "collapsed") {
                         e.preventDefault();
                         toggleSidebar();
+                      } else {
+                        e.preventDefault();
+                        toggleOpen(item.title); 
                       }
                     }}
                   >
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>
-                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    <ChevronRight
+                      className={`ml-auto transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
+                    />
                   </SidebarMenuButton>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    {item.items.map((subItem) => (
+                    {(item.items || []).map((subItem) => (
                       <SidebarMenuSubItem key={subItem.title}>
                         <SidebarMenuSubButton asChild>
                           <a href={subItem.url}>

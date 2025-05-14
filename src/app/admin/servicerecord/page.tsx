@@ -605,7 +605,7 @@ export default function AdminServiceTable() {
                                         </TableColumn>
                                     )}
                                 </TableHeader>
-                                <TableBody emptyContent={"Create Service and add data"} items={sortedItems}>
+                                <TableBody emptyContent={"No records found"} items={[...sortedItems].reverse()}>
                                     {(item) => (
                                         <TableRow key={item.id}>
                                             {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item as Service, columnKey as string)}</TableCell>}

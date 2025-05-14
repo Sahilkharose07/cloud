@@ -401,41 +401,7 @@ export default function AdminServiceTable() {
         setVisibleColumns(keys);
     };
 
-    const handleDelete = async (serviceId: string) => {
-        const confirmDelete = window.confirm("Are you sure you want to delete this service report?");
-        if (!confirmDelete) return;
-        try {
-            console.log("Attempting to delete service ID:", serviceId);
-
-            const response = await axios.delete(
-                `/api/services?id=${serviceId}`,
-                {
-                    headers: {
-                        "Authorization": `Bearer ${localStorage.getItem("token")}`
-                    }
-                }
-            );
-            console.log("Delete response:", response.data);
-            toast({
-                title: "Service successfully deleted",
-                variant: "default",
-            });
-            await fetchServices();
-        } catch (error) {
-            console.error("Full delete error", error);
-            let errorMessage = "Failed to delete service";
-            if (axios.isAxiosError(error)) {
-                errorMessage = error.response?.data?.error ||
-                    error.response?.data?.message ||
-                    error.message;
-            }
-            toast({
-                title: "Error",
-                description: errorMessage,
-                variant: "destructive",
-            });
-        }
-    };
+    
 
     
     const renderCell = React.useCallback((service: Service, columnKey: string): React.ReactNode => {
@@ -572,7 +538,7 @@ export default function AdminServiceTable() {
                                         </TableColumn>
                                     )}
                                 </TableHeader>
-                                <TableBody emptyContent={"Create Service and add data"} items={sortedItems}>
+                                <TableBody emptyContent={"No records found"} items={[...sortedItems].reverse()}>
                                     {(item) => (
                                         <TableRow key={item.id}>
                                             {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item as Service, columnKey as string)}</TableCell>}
