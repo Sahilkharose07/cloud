@@ -10,14 +10,9 @@ const data = {
   navMain: [
     {
       title: "Dashboard",
-      url: "#",
+      url: "/user/dashboard",
       icon: LayoutDashboard,
-      items: [
-        {
-          title: "Dashboard",
-          url: "/user/dashboard",
-        },
-      ],
+     
     },
     {
       title: "Company Info",
