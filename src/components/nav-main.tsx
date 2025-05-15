@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { ChevronRight, type LucideIcon } from "lucide-react";
 import {
   Collapsible,
@@ -17,6 +17,8 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 
 export function NavMain({
   items,
@@ -32,24 +34,19 @@ export function NavMain({
   }[];
 }) {
   const { state, toggleSidebar } = useSidebar();
-  const [activePath, setActivePath] = useState<string>("");
-  const [openStates, setOpenStates] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const path = window.location.pathname;
-      setActivePath(path);
-
-      // Auto-open dropdowns whose subitems match the path
-      const newOpenStates: Record<string, boolean> = {};
-      items.forEach((item) => {
-        if (item.items?.some((sub) => sub.url === path)) {
-          newOpenStates[item.title] = true;
-        }
-      });
-      setOpenStates((prev) => ({ ...prev, ...newOpenStates }));
-    }
-  }, [items]);
+  const router = useRouter();
+  const pathname = usePathname();
+  
+  // Initialize openStates immediately based on current path
+  const [openStates, setOpenStates] = useState<Record<string, boolean>>(() => {
+    const initialState: Record<string, boolean> = {};
+    items.forEach((item) => {
+      if (item.items?.some((sub) => sub.url === pathname)) {
+        initialState[item.title] = true;
+      }
+    });
+    return initialState;
+  });
 
   const toggleOpen = (title: string) => {
     setOpenStates((prev) => ({
@@ -57,8 +54,6 @@ export function NavMain({
       [title]: !prev[title],
     }));
   };
-
-  const isItemActive = (url: string) => activePath === url;
 
   return (
     <SidebarGroup>
@@ -74,23 +69,25 @@ export function NavMain({
       <SidebarMenu>
         {items.map((item) => {
           const hasSubItems = item.items && item.items.length > 0;
-          const isOpen = openStates[item.title] || false;
+          const isOpen = openStates[item.title];
 
           // If no subitems, create a simple menu item
           if (!hasSubItems) {
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton asChild tooltip={item.title}>
-                  <a href={item.url}>
+                  <Link href={item.url} onClick={(e) => {
+                    e.preventDefault();
+                    router.push(item.url);
+                  }}>
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>
-                  </a>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             );
           }
 
-      
           return (
             <Collapsible
               key={item.title}
@@ -124,9 +121,12 @@ export function NavMain({
                     {(item.items || []).map((subItem) => (
                       <SidebarMenuSubItem key={subItem.title}>
                         <SidebarMenuSubButton asChild>
-                          <a href={subItem.url}>
+                          <Link href={subItem.url} onClick={(e) => {
+                            e.preventDefault();
+                            router.push(subItem.url);
+                          }}>
                             <span>{subItem.title}</span>
-                          </a>
+                          </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
                     ))}
