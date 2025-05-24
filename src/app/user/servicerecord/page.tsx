@@ -204,17 +204,32 @@ export default function AdminServiceTable() {
                         unit: "mm",
                         format: "a4"
                     });
+    
                     const pageWidth = doc.internal.pageSize.getWidth();
                     const pageHeight = doc.internal.pageSize.getHeight();
                     const leftMargin = 15;
                     const rightMargin = 15;
                     const topMargin = 20;
                     let y = topMargin;
-                    doc.addImage(logo, "PNG", 5, 10, 70, 21); 
+    
+                    const formatDate = (inputDateString: string | undefined): string => {
+                        if (!inputDateString) return "N/A";
+                        const inputDate = new Date(inputDateString);
+                        if (isNaN(inputDate.getTime())) return "N/A";
+                        const pad = (n: number) => n.toString().padStart(2, "0");
+                        return `${pad(inputDate.getDate())} - ${pad(inputDate.getMonth() + 1)} - ${inputDate.getFullYear()}`;
+                    };
+    
+                    // Header logo
+                    doc.addImage(logo, "PNG", 5, 5, 50, 15);
                     y = 40;
+    
+                    // Title
                     doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
-                    doc.text("SERVICE / CALIBRATION / INSTALLATION JOBREPORT", pageWidth / 2, y, { align: "center" });
+                    doc.text("SERVICE / CALIBRATION / INSTALLATION JOB REPORT", pageWidth / 2, y, { align: "center" });
                     y += 10;
+    
+                    // Field rows
                     const addRow = (label: string, value: string) => {
                         const labelOffset = 65;
                         doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
@@ -223,6 +238,7 @@ export default function AdminServiceTable() {
                         doc.text(value || "N/A", leftMargin + labelOffset, y);
                         y += 7;
                     };
+    
                     addRow("Report No.", service.report_no);
                     addRow("Customer Name", service.customer_name);
                     addRow("Customer Location", service.customer_location);
@@ -239,24 +255,33 @@ export default function AdminServiceTable() {
                     addRow("Calibrated & Tested OK", service.serial_number_of_the_instrument_calibrated_ok);
                     addRow("Sr.No Faulty/Non-Working", service.serial_number_of_the_faulty_non_working_instruments);
                     y += 10;
+    
+                    // Engineer Report
                     doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
                     doc.text("Engineer Report:", leftMargin, y);
                     y += 5;
+    
                     const engineerReportHeight = 30;
                     doc.setDrawColor(0).setLineWidth(0.2);
                     doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, engineerReportHeight);
+    
                     const engineerReportLines = doc.splitTextToSize(service.engineer_report || "No report provided", pageWidth - leftMargin - rightMargin - 5);
                     doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
                     doc.text(engineerReportLines, leftMargin + 2, y + 5);
                     y += engineerReportHeight + 5;
+    
                     doc.addPage();
                     y = topMargin;
+    
+                    // Engineer Remarks Table
                     doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-                    doc.text("ENGINEER REMARKS", leftMargin, y);
-                    y += 8;
+                    doc.text("ENGINEER REMARKS", leftMargin, y + 8);
+                    y += 10;
+    
                     const tableHeaders = ["Sr. No.", "Service/Spares", "Part No.", "Rate", "Quantity", "Total", "PO No."];
-                    const colWidths = [20, 50, 25, 25, 25, 15, 25];
+                    const colWidths = [15, 50, 25, 20, 20, 25, 25];
                     let x = leftMargin;
+    
                     doc.setFont("times", "bold").setFontSize(9);
                     tableHeaders.forEach((header, i) => {
                         doc.rect(x, y, colWidths[i], 8);
@@ -264,6 +289,7 @@ export default function AdminServiceTable() {
                         x += colWidths[i];
                     });
                     y += 8;
+    
                     let engineer_remarks: engineer_remarks[] = [];
                     try {
                         if (typeof service.engineer_remarks === "string") {
@@ -274,6 +300,7 @@ export default function AdminServiceTable() {
                     } catch (error) {
                         console.error("Failed to parse engineer_remarks", error);
                     }
+    
                     if (engineer_remarks.length > 0) {
                         engineer_remarks.forEach((remark, index) => {
                             if (y + 10 > pageHeight - 30) {
@@ -290,7 +317,7 @@ export default function AdminServiceTable() {
                                 remark.total || "",
                                 remark.poNo || ""
                             ];
-                            doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
+                            doc.setFont("times", "normal").setFontSize(9);
                             values.forEach((val, i) => {
                                 doc.rect(x, y, colWidths[i], 8);
                                 doc.text(val.toString(), x + 2, y + 6);
@@ -303,43 +330,52 @@ export default function AdminServiceTable() {
                         doc.text("No engineer remarks available", leftMargin, y);
                         y += 8;
                     }
+    
                     y += 10;
+    
+                    // Customer Report
                     doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
                     doc.text("Customer Report:", leftMargin, y);
                     y += 5;
+    
                     const customerReportHeight = 30;
                     doc.setDrawColor(0).setLineWidth(0.2);
                     doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, customerReportHeight);
+    
                     const customerReportLines = doc.splitTextToSize(service.customer_report || "No report provided", pageWidth - leftMargin - rightMargin - 5);
                     doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
                     doc.text(customerReportLines, leftMargin + 2, y + 5);
                     y += customerReportHeight + 5;
+    
+                    // Footer: Service Engineer
                     doc.setFont("times", "normal");
                     doc.text("Service Engineer", pageWidth - rightMargin - 40, y);
                     doc.text(service.service_engineer || "", pageWidth - rightMargin - 40, y + 5);
-                    const now = new Date();
-                    const pad = (n: number) => n.toString().padStart(2, "0");
-                    const date = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}`;
-                    const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-                    doc.setFontSize(9).setTextColor(100);
-                    const footerY = pageHeight - 25;
+    
+                    // Add footer images to all pages
+                    const footerY = pageHeight - 20;
                     const footerWidth = 180;
-                    const footerHeight = 20;
+                    const footerHeight = 15;
                     const footerX = (pageWidth - footerWidth) / 2;
                     const pageCount = doc.getNumberOfPages();
+    
                     for (let i = 1; i <= pageCount; i++) {
                         doc.setPage(i);
+                        doc.addImage(logo, "PNG", 5, 5, 50, 15);
                         doc.addImage(infoImage, "PNG", footerX, footerY, footerWidth, footerHeight);
                     }
+    
                     const sanitizedCustomerName = service.customer_name?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'unknown_customer';
                     const reportNumber = service.report_no || service.id;
                     doc.save(`service-${sanitizedCustomerName}-${reportNumber}.pdf`);
                 };
+    
                 infoImage.onerror = () => {
                     console.error("Failed to load footer image.");
                     alert("Company info image not found. Please check the path.");
                 };
             };
+    
             logo.onerror = () => {
                 console.error("Failed to load logo image.");
                 alert("Logo image not found. Please check the path.");
