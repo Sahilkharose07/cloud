@@ -596,8 +596,9 @@ function GenerateService() {
             doc.text(customerReportLines, leftMargin + 2, y + 5);
             y += customerReportHeight + 5;
             doc.setFont("times", "normal");
+            y += 35;
             doc.text("Customer Name,Seal & Sign", leftMargin, y);
-            doc.text(formData.customerName || "", leftMargin, y + 5);
+            
             
 
             // Right side: Service Engineer
