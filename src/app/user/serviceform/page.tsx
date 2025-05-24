@@ -426,7 +426,7 @@ function GenerateService() {
         y += 10;
 
         doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-        doc.text("Customer Report:", leftMargin, y);
+        doc.text("Customer Remark:", leftMargin, y);
         y += 5;
 
         const customerReportHeight = 30;
