@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, ChangeEvent,Suspense } from "react";
+import { useState, useEffect, useCallback, ChangeEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -103,7 +103,7 @@ function ServiceFormLoading() {
     );
 }
 
- function GenerateService() {
+function GenerateService() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const serviceId = searchParams.get('id');
@@ -189,7 +189,7 @@ function ServiceFormLoading() {
         }
     }, []);
 
-    
+
 
     useEffect(() => {
         if (!isEditMode) {
@@ -297,184 +297,190 @@ function ServiceFormLoading() {
     };
 
     const generatePDFDocument = async (): Promise<jsPDF> => {
-    const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4"
-    });
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-
-    // Load images asynchronously
-    const loadImage = (src: string): Promise<HTMLImageElement> => {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.src = src;
-            img.onload = () => resolve(img);
-            img.onerror = () => reject(`Failed to load image: ${src}`);
+        const doc = new jsPDF({
+            orientation: "portrait",
+            unit: "mm",
+            format: "a4"
         });
-    };
 
-    // Await images to load
-    const logo = await loadImage("/img/rps.png");
-    const infoImage = await loadImage("/img/handf.png");
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
 
-    const formatDate = (inputDateString: string | undefined): string => {
-        if (!inputDateString) return "N/A";
-        const inputDate = new Date(inputDateString);
-        if (isNaN(inputDate.getTime())) return "N/A";
-        const pad = (n: number) => n.toString().padStart(2, "0");
-        return `${pad(inputDate.getDate())} - ${pad(inputDate.getMonth() + 1)} - ${inputDate.getFullYear()}`;
-    };
+        // Load images asynchronously
+        const loadImage = (src: string): Promise<HTMLImageElement> => {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.src = src;
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(`Failed to load image: ${src}`);
+            });
+        };
 
-    const leftMargin = 15;
-    const rightMargin = 15;
-    const topMargin = 20;
-    let y = topMargin;
+        // Await images to load
+        const logo = await loadImage("/img/rps.png");
+        const infoImage = await loadImage("/img/handf.png");
 
-    // Add first page logo
-    doc.addImage(logo, "PNG", 5, 5, 50, 15);
-    y = 40;
+        const formatDate = (inputDateString: string | undefined): string => {
+            if (!inputDateString) return "N/A";
+            const inputDate = new Date(inputDateString);
+            if (isNaN(inputDate.getTime())) return "N/A";
+            const pad = (n: number) => n.toString().padStart(2, "0");
+            return `${pad(inputDate.getDate())} - ${pad(inputDate.getMonth() + 1)} - ${inputDate.getFullYear()}`;
+        };
 
-    doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
-    doc.text("SERVICE / CALIBRATION / INSTALLATION JOB REPORT", pageWidth / 2, y, { align: "center" });
-    y += 10;
+        const leftMargin = 15;
+        const rightMargin = 15;
+        const topMargin = 20;
+        let y = topMargin;
 
-    const addRow = (label: string, value: string) => {
-        const labelOffset = 65;
+        // Add first page logo
+        doc.addImage(logo, "PNG", 5, 5, 50, 15);
+        y = 40;
+
+        doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
+        doc.text("SERVICE / CALIBRATION / INSTALLATION JOB REPORT", pageWidth / 2, y, { align: "center" });
+        y += 10;
+
+        const addRow = (label: string, value: string) => {
+            const labelOffset = 65;
+            doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+            doc.text(label + ":", leftMargin, y);
+            doc.setFont("times", "normal").setTextColor(50);
+            doc.text(value || "N/A", leftMargin + labelOffset, y);
+            y += 7;
+        };
+
+        addRow("Report No.", formData.reportNo);
+        addRow("Customer Name", formData.customerName);
+        addRow("Customer Location", formData.customerLocation);
+        addRow("Contact Person", formData.contactPerson);
+        addRow("Status", formData.status);
+        addRow("Contact Number", formData.contactNumber);
+        addRow("Service Engineer", formData.serviceEngineer);
+        addRow("Date", formatDate(formData.date));
+        addRow("Place", formData.place);
+        addRow("Place Options", formData.placeOptions);
+        addRow("Nature of Job", formData.natureOfJob);
+        addRow("Make & Model Number", formData.makeModelNumberoftheInstrumentQuantity);
+        y += 5;
+        addRow("Calibrated & Tested OK", formData.serialNumberoftheInstrumentCalibratedOK);
+        addRow("Sr.No Faulty/Non-Working", formData.serialNumberoftheFaultyNonWorkingInstruments);
+        y += 10;
+
         doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-        doc.text(label + ":", leftMargin, y);
-        doc.setFont("times", "normal").setTextColor(50);
-        doc.text(value || "N/A", leftMargin + labelOffset, y);
-        y += 7;
-    };
+        doc.text("Engineer Report:", leftMargin, y);
+        y += 5;
 
-    addRow("Report No.", formData.reportNo);
-    addRow("Customer Name", formData.customerName);
-    addRow("Customer Location", formData.customerLocation);
-    addRow("Contact Person", formData.contactPerson);
-    addRow("Status", formData.status);
-    addRow("Contact Number", formData.contactNumber);
-    addRow("Service Engineer", formData.serviceEngineer);
-    addRow("Date", formatDate(formData.date));
-    addRow("Place", formData.place);
-    addRow("Place Options", formData.placeOptions);
-    addRow("Nature of Job", formData.natureOfJob);
-    addRow("Make & Model Number", formData.makeModelNumberoftheInstrumentQuantity);
-    y += 5;
-    addRow("Calibrated & Tested OK", formData.serialNumberoftheInstrumentCalibratedOK);
-    addRow("Sr.No Faulty/Non-Working", formData.serialNumberoftheFaultyNonWorkingInstruments);
-    y += 10;
+        const engineerReportHeight = 30;
+        doc.setDrawColor(0);
+        doc.setLineWidth(0.2);
+        doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, engineerReportHeight);
 
-    doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-    doc.text("Engineer Report:", leftMargin, y);
-    y += 5;
+        const engineerReportLines = doc.splitTextToSize(formData.engineerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
+        doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
+        doc.text(engineerReportLines, leftMargin + 2, y + 5);
+        y += engineerReportHeight + 5;
 
-    const engineerReportHeight = 30;
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.2);
-    doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, engineerReportHeight);
+        doc.addPage();
+        y = topMargin;
 
-    const engineerReportLines = doc.splitTextToSize(formData.engineerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
-    doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
-    doc.text(engineerReportLines, leftMargin + 2, y + 5);
-    y += engineerReportHeight + 5;
+        doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+        doc.text("ENGINEER REMARKS", leftMargin, y + 8);
+        y += 10;
 
-    doc.addPage();
-    y = topMargin;
+        const tableHeaders = ["Sr. No.", "Service/Spares", "Part No.", "Rate", "Quantity", "Total", "PO No."];
+        const colWidths = [15, 50, 25, 20, 20, 25, 25];
+        let x = leftMargin;
 
-    doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-    doc.text("ENGINEER REMARKS", leftMargin, y + 8);
-    y += 10;
-
-    const tableHeaders = ["Sr. No.", "Service/Spares", "Part No.", "Rate", "Quantity", "Total", "PO No."];
-    const colWidths = [15, 50, 25, 20, 20, 25, 25];
-    let x = leftMargin;
-
-    tableHeaders.forEach((header, i) => {
-        doc.rect(x, y, colWidths[i], 8);
-        doc.text(header, x + 2, y + 6);
-        x += colWidths[i];
-    });
-
-    y += 8;
-
-    formData.engineerRemarks.forEach((item, index) => {
-        x = leftMargin;
-        const values = [
-            String(index + 1),
-            item.serviceSpares || "",
-            item.partNo || "",
-            item.rate || "",
-            item.quantity || "",
-            item.total || "",
-            item.poNo || ""
-        ];
-        values.forEach((val, i) => {
+        tableHeaders.forEach((header, i) => {
             doc.rect(x, y, colWidths[i], 8);
-            doc.text(val, x + 2, y + 6);
+            doc.text(header, x + 2, y + 6);
             x += colWidths[i];
         });
+
         y += 8;
-        if (y + 50 > pageHeight) {
-            doc.addPage();
-            y = topMargin;
-        }
-    });
 
-    y += 10;
+        formData.engineerRemarks.forEach((item, index) => {
+            x = leftMargin;
+            const values = [
+                String(index + 1),
+                item.serviceSpares || "",
+                item.partNo || "",
+                item.rate || "",
+                item.quantity || "",
+                item.total || "",
+                item.poNo || ""
+            ];
+            values.forEach((val, i) => {
+                doc.rect(x, y, colWidths[i], 8);
+                doc.text(val, x + 2, y + 6);
+                x += colWidths[i];
+            });
+            y += 8;
+            if (y + 50 > pageHeight) {
+                doc.addPage();
+                y = topMargin;
+            }
+        });
 
-    doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-    doc.text("Customer Report:", leftMargin, y);
-    y += 5;
+        y += 10;
 
-    const customerReportHeight = 30;
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.2);
-    doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, customerReportHeight);
+        doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+        doc.text("Customer Report:", leftMargin, y);
+        y += 5;
 
-    const customerReportLines = doc.splitTextToSize(formData.customerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
-    doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
-    doc.text(customerReportLines, leftMargin + 2, y + 5);
-    y += customerReportHeight + 5;
+        const customerReportHeight = 30;
+        doc.setDrawColor(0);
+        doc.setLineWidth(0.2);
+        doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, customerReportHeight);
 
-    doc.setFont("times", "normal");
-    doc.text("Service Engineer", pageWidth - rightMargin - 40, y);
-    doc.text(formData.serviceEngineer || "", pageWidth - rightMargin - 40, y + 5);
 
-    // Add logo to all pages (same as your first code)
-    const addLogoToAllPages = () => {
-        const logoX = 5;
-        const logoY = 5;
-        const logoWidth = 50;
-        const logoHeight = 15;
-        const pageCount = doc.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-            doc.setPage(i);
-            doc.addImage(logo, "PNG", logoX, logoY, logoWidth, logoHeight);
-        }
+        const customerReportLines = doc.splitTextToSize(formData.customerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
+        doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
+        doc.text(customerReportLines, leftMargin + 2, y + 5);
+        y += customerReportHeight + 5;
+        doc.setFont("times", "normal");
+        doc.text("Customer Name,Seal & Sign", leftMargin, y);
+        doc.text(formData.customerName || "", leftMargin, y + 5);
+
+
+        // Right side: Service Engineer
+        doc.text("Service Engineer,Seal & Sign", pageWidth - rightMargin - 40, y);
+        doc.text(formData.serviceEngineer || "", pageWidth - rightMargin - 40, y + 5);
+        doc.text(formData.serviceEngineer || "", pageWidth - rightMargin - 40, y + 5);
+
+        // Add logo to all pages (same as your first code)
+        const addLogoToAllPages = () => {
+            const logoX = 5;
+            const logoY = 5;
+            const logoWidth = 50;
+            const logoHeight = 15;
+            const pageCount = doc.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.addImage(logo, "PNG", logoX, logoY, logoWidth, logoHeight);
+            }
+        };
+
+        addLogoToAllPages();
+
+        // Add footer image to all pages
+        const addFooterImage = () => {
+            const footerY = pageHeight - 20;
+            const footerWidth = 180;
+            const footerHeight = 15;
+            const footerX = (pageWidth - footerWidth) / 2;
+            const pageCount = doc.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.addImage(infoImage, "PNG", footerX, footerY, footerWidth, footerHeight);
+            }
+        };
+
+        addFooterImage();
+
+        return doc;
     };
-
-    addLogoToAllPages();
-
-    // Add footer image to all pages
-    const addFooterImage = () => {
-        const footerY = pageHeight - 20;
-        const footerWidth = 180;
-        const footerHeight = 15;
-        const footerX = (pageWidth - footerWidth) / 2;
-        const pageCount = doc.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-            doc.setPage(i);
-            doc.addImage(infoImage, "PNG", footerX, footerY, footerWidth, footerHeight);
-        }
-    };
-
-    addFooterImage();
-
-    return doc;
-};
 
 
     const handleDownload = async () => {
@@ -497,7 +503,7 @@ function ServiceFormLoading() {
             link.click();
             document.body.removeChild(link);
 
-        
+
             setTimeout(() => URL.revokeObjectURL(url), 1000);
         } catch (downloadError) {
             console.error("Download failed:", downloadError);
@@ -509,10 +515,10 @@ function ServiceFormLoading() {
             return;
         }
 
-    
+
         setIsSendingPDF(true);
         try {
-            
+
             const base64data = await new Promise<string>((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = () => {
@@ -573,7 +579,7 @@ function ServiceFormLoading() {
         }
 
         try {
-        
+
             const doc = await generatePDFDocument();
             const pdfBlob = doc.output('blob');
             setGeneratedPdfBlob(pdfBlob);

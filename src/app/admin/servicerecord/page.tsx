@@ -347,11 +347,16 @@ export default function AdminServiceTable() {
                 doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
                 doc.text(customerReportLines, leftMargin + 2, y + 5);
                 y += customerReportHeight + 5;
-
-                // Footer: Service Engineer
                 doc.setFont("times", "normal");
-                doc.text("Service Engineer", pageWidth - rightMargin - 40, y);
+                doc.text("Customer Name,Seal & Sign", leftMargin, y);
+                doc.text(service.customer_name || "", leftMargin, y + 5);
+
+
+                // Right side: Service Engineer
+                doc.text("Service Engineer,Seal & Sign", pageWidth - rightMargin - 40, y);
                 doc.text(service.service_engineer || "", pageWidth - rightMargin - 40, y + 5);
+                doc.text(service.service_engineer || "", pageWidth - rightMargin - 40, y + 5);
+    
 
                 // Add footer images to all pages
                 const footerY = pageHeight - 20;

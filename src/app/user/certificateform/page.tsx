@@ -385,113 +385,197 @@ function CertificateFormLoading() {
     );
 
     const handleDownload = () => {
-        const logo = new Image();
-        logo.src = "/img/rps.png";
-        logo.onload = () => {
-            const doc = new jsPDF();
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const pageHeight = doc.internal.pageSize.getHeight();
-            const leftMargin = 15;
-            const rightMargin = 15;
-            const topMargin = 20;
-            const bottomMargin = 20;
-            const contentWidth = pageWidth - leftMargin - rightMargin;
-            let y = topMargin;
-            const logoWidth = 60;
-            const logoHeight = 20;
-            const logoX = 2;
-            const logoY = 10;
+    const logo = new Image();
+    logo.src = "/img/rps.png";
+
+    const footerImg = new Image();
+    footerImg.src = "/img/handf.png";
+
+    const loadImages = new Promise<void>((resolve, reject) => {
+        let loaded = 0;
+        const checkLoaded = () => {
+            loaded++;
+            if (loaded === 2) resolve();
+        };
+        logo.onload = checkLoaded;
+        footerImg.onload = checkLoaded;
+        logo.onerror = footerImg.onerror = () => reject("Failed to load images");
+    });
+
+    loadImages.then(() => {
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const leftMargin = 15;
+        const rightMargin = 15;
+        const bottomMargin = 20;
+        const contentWidth = pageWidth - leftMargin - rightMargin;
+
+        const logoWidth = 60;
+        const logoHeight = 20;
+        const logoX = 2;
+        const logoY = 10;
+        const contentStartY = logoY + logoHeight + 10;
+
+        let y = contentStartY;
+
+        const addLogo = () => {
             doc.addImage(logo, "PNG", logoX, logoY, logoWidth, logoHeight);
-            y = logoY + logoHeight + 10;
-            doc.setFont("times", "bold").setFontSize(16).setTextColor(0, 51, 102);
-            doc.text("CALIBRATION CERTIFICATE", pageWidth / 2, y, { align: "center" });
-            y += 10;
-            const labelX = leftMargin;
-            const labelWidth = 55;
-            const valueX = labelX + labelWidth + 2;
-            const lineGap = 8;
-            const formatDate = (inputDateString: string | undefined) => {
-                if (!inputDateString) return "N/A";
-                const inputDate = new Date(inputDateString);
-                if (isNaN(inputDate.getTime())) return "N/A";
-                const pad = (n: number) => n.toString().padStart(2, "0");
-                return `${pad(inputDate.getDate())} - ${pad(inputDate.getMonth() + 1)} - ${inputDate.getFullYear()}`;
-            };
-            const addRow = (labelText: string, value: string) => {
-                doc.setFont("times", "bold").setFontSize(11).setTextColor(0);
-                doc.text(labelText, labelX, y);
-                doc.setFont("times", "normal").setTextColor(50);
-                doc.text(": " + (value || "N/A"), valueX, y);
-                y += lineGap;
-            };
-            addRow("Certificate No.", formData.certificateNo);
-            addRow("Customer Name", formData.customerName);
-            addRow("Site Location", formData.siteLocation);
-            addRow("Make & Model", formData.makeModel);
-            addRow("Range", formData.range);
-            addRow("Serial No.", formData.serialNo);
-            addRow("Calibration Gas", formData.calibrationGas);
-            addRow("Gas Canister Details", formData.gasCanisterDetails);
-            y += 5;
-            addRow("Date of Calibration", formatDate(formData.dateOfCalibration));
-            addRow("Calibration Due Date", formatDate(formData.calibrationDueDate));
-            addRow("Status", formData.status);
-            y += 5;
-            doc.setDrawColor(180);
-            doc.setLineWidth(0.3);
-            doc.line(leftMargin, y, pageWidth - rightMargin, y);
-            y += 10;
-            doc.setFont("times", "bold").setFontSize(12).setTextColor(0, 51, 102);
-            doc.text("OBSERVATIONS", leftMargin, y);
-            y += 10;
-            const colWidths = [20, 70, 40, 40];
-            const headers = ["Sr. No.", "Concentration of Gas", "Reading Before", "Reading After"];
+        };
+
+        addLogo(); // Add logo to first page
+
+        doc.setFont("times", "bold").setFontSize(16).setTextColor(0, 51, 102);
+        doc.text("CALIBRATION CERTIFICATE", pageWidth / 2, y, { align: "center" });
+        y += 10;
+
+        const labelX = leftMargin;
+        const labelWidth = 55;
+        const valueX = labelX + labelWidth + 2;
+        const lineGap = 8;
+
+        const formatDate = (inputDateString: string | undefined) => {
+            if (!inputDateString) return "N/A";
+            const inputDate = new Date(inputDateString);
+            if (isNaN(inputDate.getTime())) return "N/A";
+            const pad = (n: number) => n.toString().padStart(2, "0");
+            return `${pad(inputDate.getDate())} - ${pad(inputDate.getMonth() + 1)} - ${inputDate.getFullYear()}`;
+        };
+
+        const checkPageBreak = (blockHeight = 10) => {
+            if (y + blockHeight > pageHeight - bottomMargin) {
+                doc.addPage();
+                addLogo();
+                y = contentStartY;
+            }
+        };
+
+        const addRow = (labelText: string, value: string) => {
+            const lines = (value || "N/A").split(/\r?\n/);
+            const blockHeight = lines.length * lineGap;
+            checkPageBreak(blockHeight);
+
+            doc.setFont("times", "bold").setFontSize(11).setTextColor(0);
+            doc.text(labelText, labelX, y);
+            doc.setFont("times", "normal").setTextColor(50);
+
+            lines.forEach((line, i) => {
+                doc.text(": " + line, valueX, y + i * lineGap);
+            });
+
+            y += blockHeight;
+        };
+
+        // Certificate details
+        addRow("Certificate No.", formData.certificateNo);
+        addRow("Customer Name", formData.customerName);
+        addRow("Site Location", formData.siteLocation);
+        addRow("Make & Model", formData.makeModel);
+        addRow("Range", formData.range);
+        addRow("Serial No.", formData.serialNo);
+        addRow("Calibration Gas", formData.calibrationGas);
+        addRow("Gas Canister Details", formData.gasCanisterDetails);
+
+        y += 5;
+        addRow("Date of Calibration", formatDate(formData.dateOfCalibration));
+        addRow("Calibration Due Date", formatDate(formData.calibrationDueDate));
+        addRow("Status", formData.status);
+        y += 5;
+
+        // Section Divider
+        checkPageBreak(10);
+        doc.setDrawColor(180);
+        doc.setLineWidth(0.3);
+        doc.line(leftMargin, y, pageWidth - rightMargin, y);
+        y += 10;
+
+        doc.setFont("times", "bold").setFontSize(12).setTextColor(0, 51, 102);
+        doc.text("OBSERVATIONS", leftMargin, y);
+        y += 10;
+
+        const colWidths = [20, 70, 40, 40];
+        const headers = ["Sr. No.", "Concentration of Gas", "Reading Before", "Reading After"];
+
+        // Table Header
+        checkPageBreak(10);
+        let x = leftMargin;
+        doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+        headers.forEach((header, i) => {
+            doc.rect(x, y - 5, colWidths[i], 8);
+            doc.text(header, x + 2, y);
+            x += colWidths[i];
+        });
+        y += 8;
+
+        // Table Data
+        doc.setFont("times", "normal").setFontSize(10);
+        formData.observations.forEach((obs, index) => {
+            checkPageBreak(10);
             let x = leftMargin;
-            doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-            headers.forEach((header, i) => {
-                doc.rect(x, y - 5, colWidths[i], 8);
-                doc.text(header, x + 2, y);
-                x += colWidths[i];
+            const rowY = y;
+            const rowData = [
+                `${index + 1}`,
+                obs.gas || "",
+                obs.before || "",
+                obs.after || ""
+            ];
+            rowData.forEach((text, colIndex) => {
+                doc.rect(x, rowY - 6, colWidths[colIndex], 8);
+                doc.text(text, x + 2, rowY);
+                x += colWidths[colIndex];
             });
             y += 8;
-            doc.setFont("times", "normal").setFontSize(10);
-            formData.observations.forEach((obs, index) => {
-                let x = leftMargin;
-                const rowY = y + index * 8;
-                const rowData = [
-                    `${index + 1}`,
-                    obs.gas || "",
-                    obs.before || "",
-                    obs.after || ""
-                ];
-                rowData.forEach((text, colIndex) => {
-                    doc.rect(x, rowY - 6, colWidths[colIndex], 8);
-                    doc.text(text, x + 2, rowY);
-                    x += colWidths[colIndex];
-                });
-            });
-            y += formData.observations.length * 8 + 15;
-            const conclusion = "The above-mentioned Gas Detector was calibrated successfully, and the result confirms that the performance of the instrument is within acceptable limits.";
-            doc.setFont("times", "normal").setFontSize(10).setTextColor(0);
-            const conclusionLines = doc.splitTextToSize(conclusion, contentWidth);
-            doc.text(conclusionLines, leftMargin, y);
-            y += conclusionLines.length * 6 + 15;
-            doc.setFont("times", "bold");
-            doc.text("Tested & Calibrated By", pageWidth - rightMargin, y, { align: "right" });
-            doc.setFont("times", "normal");
-            doc.text(formData.engineerName || "________________", pageWidth - rightMargin, y + 10, { align: "right" });
-            doc.setDrawColor(180);
-            doc.line(leftMargin, pageHeight - bottomMargin - 10, pageWidth - rightMargin, pageHeight - bottomMargin - 10);
-            doc.setFontSize(8).setTextColor(100);
-            doc.text("This certificate is electronically generated and does not require a physical signature.", leftMargin, pageHeight - bottomMargin - 5);
-            doc.text(`Generated on: ${new Date().toLocaleString()}`, leftMargin, pageHeight - bottomMargin);
-            doc.save("calibration-certificate.pdf");
+        });
+
+        y += 15;
+
+        // Conclusion
+        const conclusion = "The above-mentioned Gas Detector was calibrated successfully, and the result confirms that the performance of the instrument is within acceptable limits.";
+        const conclusionLines = doc.splitTextToSize(conclusion, contentWidth);
+        checkPageBreak(conclusionLines.length * 6 + 10);
+        doc.setFont("times", "normal").setFontSize(10).setTextColor(0);
+        doc.text(conclusionLines, leftMargin, y);
+        y += conclusionLines.length * 6 + 15;
+
+        // Engineer Info
+        checkPageBreak(20);
+        doc.setFont("times", "bold");
+        doc.text("Tested & Calibrated By", pageWidth - rightMargin, y, { align: "right" });
+        doc.setFont("times", "normal");
+        doc.text(formData.engineerName || "________________", pageWidth - rightMargin, y + 10, { align: "right" });
+        y += 20;
+
+        // Footer Note
+        checkPageBreak(20);
+        doc.setDrawColor(180);
+        doc.line(leftMargin, y, pageWidth - rightMargin, y);
+        y += 5;
+        doc.setFontSize(8).setTextColor(100);
+        doc.text("This certificate is electronically generated and does not require a physical signature.", leftMargin, y);
+        y += 5;
+        doc.text(`Generated on: ${new Date().toLocaleString()}`, leftMargin, y);
+
+        // ✅ Add footer image to all pages
+        const addFooterToAllPages = () => {
+            const footerY = pageHeight - 20;
+            const footerWidth = 180;
+            const footerHeight = 15;
+            const footerX = (pageWidth - footerWidth) / 2;
+            const pageCount = doc.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.addImage(footerImg, "PNG", footerX, footerY, footerWidth, footerHeight);
+            }
         };
-        logo.onerror = () => {
-            console.error("Failed to load logo image");
-            alert("Logo image not found. Please check the path.");
-        };
-    };
+
+        addFooterToAllPages();
+
+        doc.save("calibration-certificate.pdf");
+    }).catch(err => {
+        console.error(err);
+        alert("Error loading images. Please check your image paths.");
+    });
+};
 
     if (loading && certificateId) {
         return (
