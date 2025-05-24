@@ -555,7 +555,7 @@ function CertificateFormLoading() {
         y += 5;
         doc.text(`Generated on: ${new Date().toLocaleString()}`, leftMargin, y);
 
-        // ✅ Add footer image to all pages
+
         const addFooterToAllPages = () => {
             const footerY = pageHeight - 20;
             const footerWidth = 180;

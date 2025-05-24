@@ -367,6 +367,7 @@ export default function CertificateTable() {
             y = checkPageBreak(y, 20);
             doc.setFont("times", "bold");
             doc.text("Tested & Calibrated By", pageWidth - rightMargin, y, { align: "right" });
+            doc.text(certificateToDownload.engineer_name || "________________", pageWidth - rightMargin, y + 10, { align: "right" });
             doc.setFont("times", "normal");
     
             doc.save(`calibration-certificate-${certificateToDownload.certificate_no}.pdf`);
