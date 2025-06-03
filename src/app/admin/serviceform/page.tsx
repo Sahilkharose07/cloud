@@ -125,15 +125,24 @@ function GenerateService() {
     const [isLoadingContacts, setIsLoadingContacts] = useState(false);
     const [isLoadingEngineers, setIsLoadingEngineers] = useState(true);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [isSubmitted, setIsSubmitted] = useState(false);
     const generateReportNo = useCallback(() => {
-        const date = new Date();
-        const currentYear = date.getFullYear();
-        const shortStartYear = String(currentYear).slice(-2);
-        const shortEndYear = String(currentYear + 1).slice(-2);
-        const yearRange = `${shortStartYear}-${shortEndYear}`;
-        const randomNum = Math.floor(1000 + Math.random() * 9000);
-        return `RPS/SRV/${yearRange}/${randomNum}`;
-    }, []);
+    const date = new Date();
+    const currentYear = date.getFullYear();
+    const shortStartYear = String(currentYear).slice(-2);
+    const shortEndYear = String(currentYear + 1).slice(-2);
+    const yearRange = `${shortStartYear}-${shortEndYear}`;
+
+    const key = `report-seq-${yearRange}`;
+
+
+    const lastNumber = parseInt(localStorage.getItem(key) || '0', 10);
+    const newNumber = lastNumber + 1;
+    localStorage.setItem(key, String(newNumber));
+    const formattedNum = String(newNumber).padStart(4, '0');
+
+    return `RPS/SRV/${yearRange}/${formattedNum}`;
+}, []);
 
     const fetchContactPersons = useCallback(async () => {
         setIsLoadingContacts(true);
@@ -193,65 +202,85 @@ function GenerateService() {
     }, []);
 
     const fetchServiceData = useCallback(async () => {
-        if (!isEditMode) return;
+    if (!isEditMode) return;
+    try {
+        setLoading(true);
+        const response = await axios.get(`/api/services?id=${serviceId}`);
+        const serviceData = response.data;
+        
+        // Handle engineer_remarks - it might be a string or already parsed array
+        let engineerRemarks = [];
         try {
-            setLoading(true);
-            const response = await axios.get(`/api/services?id=${serviceId}`);
-            const serviceData = response.data;
-            setFormData({
-                id: serviceData.id || serviceData._id || '',
-                serviceId: serviceData.serviceId || serviceData.id || serviceData._id || '',
-                customerName: serviceData.customer_name || '',
-                customerLocation: serviceData.customer_location || '',
-                contactPerson: serviceData.contact_person || '',
-                contactNumber: serviceData.contact_number || serviceData.contactNo || '',
-                serviceEngineer: serviceData.service_engineer || '',
-                serviceEngineerId: serviceData.serviceEngineerId || serviceData.service_engineer_id || '',
-                date: serviceData.date
-                    ? new Date(serviceData.date).toISOString().split('T')[0]
-                    : new Date().toISOString().split('T')[0],
-                place: serviceData.place || '',
-                placeOptions: serviceData.place_options || "At Site",
-                natureOfJob: serviceData.nature_of_Job || "AMC",
-                reportNo: serviceData.report_no || generateReportNo(),
-                makeModelNumberoftheInstrumentQuantity:
-                    serviceData.make_model_number_of_the_instrument_quantity ||
-                    serviceData.makeModelNumber ||
-                    serviceData.instrumentDetails || '',
-                serialNumberoftheInstrumentCalibratedOK:
-                    serviceData.serial_number_of_the_instrument_calibrated_ok ||
-                    serviceData.serialNumberCalibrated ||
-                    serviceData.calibratedInstruments || '',
-                serialNumberoftheFaultyNonWorkingInstruments:
-                    serviceData.serial_number_of_the_faulty_non_working_instruments ||
-                    serviceData.serialNumberFaulty ||
-                    serviceData.faultyInstruments || '',
-                engineerReport: serviceData.engineer_report || '',
-                customerReport: serviceData.customer_report || '',
-                engineerRemarks: serviceData.engineerRemarks?.length > 0
-                    ? serviceData.engineerRemarks.map((remark: any) => ({
-                        serviceSpares: remark.serviceSpares || '',
-                        partNo: remark.partNo || '',
-                        rate: remark.rate || '0',
-                        quantity: remark.quantity?.toString() || '0',
-                        total: remark.total || (Number(remark.rate || 0) * Number(remark.quantity || 0)).toString(),
-                        poNo: remark.poNo || ''
-                    }))
-                    : [{ serviceSpares: "", partNo: "", rate: "", quantity: "", poNo: "", total: "" }],
-                engineerName: serviceData.engineer_name || '',
-                engineerId: serviceData.engineerId || '',
-                status: serviceData.status || "checked"
-            });
-        } catch (error) {
-            console.error("Error fetching service data", error);
-            toast({
-                title: "Failed to load service data",
-                variant: "destructive",
-            });
-        } finally {
-            setLoading(false);
+            if (typeof serviceData.engineer_remarks === 'string') {
+                engineerRemarks = JSON.parse(serviceData.engineer_remarks);
+            } else if (Array.isArray(serviceData.engineer_remarks)) {
+                engineerRemarks = serviceData.engineer_remarks;
+            } else if (Array.isArray(serviceData.engineerRemarks)) {
+                engineerRemarks = serviceData.engineerRemarks;
+            }
+        } catch (e) {
+            console.error("Error parsing engineer remarks", e);
+            engineerRemarks = [{ serviceSpares: "", partNo: "", rate: "", quantity: "", total: "", poNo: "" }];
         }
-    }, [isEditMode, serviceId, generateReportNo]);
+
+        // Ensure we have at least one empty remark if none exist
+        if (engineerRemarks.length === 0) {
+            engineerRemarks = [{ serviceSpares: "", partNo: "", rate: "", quantity: "", total: "", poNo: "" }];
+        }
+
+        setFormData({
+            id: serviceData.id || serviceData._id || '',
+            serviceId: serviceData.serviceId || serviceData.id || serviceData._id || '',
+            customerName: serviceData.customer_name || '',
+            customerLocation: serviceData.customer_location || '',
+            contactPerson: serviceData.contact_person || '',
+            contactNumber: serviceData.contact_number || serviceData.contactNo || '',
+            serviceEngineer: serviceData.service_engineer || '',
+            serviceEngineerId: serviceData.serviceEngineerId || serviceData.service_engineer_id || '',
+            date: serviceData.date
+                ? new Date(serviceData.date).toISOString().split('T')[0]
+                : new Date().toISOString().split('T')[0],
+            place: serviceData.place || '',
+            placeOptions: serviceData.place_options || "At Site",
+            natureOfJob: serviceData.nature_of_Job || "AMC",
+            reportNo: serviceData.report_no || generateReportNo(),
+            makeModelNumberoftheInstrumentQuantity:
+                serviceData.make_model_number_of_the_instrument_quantity ||
+                serviceData.makeModelNumber ||
+                serviceData.instrumentDetails || '',
+            serialNumberoftheInstrumentCalibratedOK:
+                serviceData.serial_number_of_the_instrument_calibrated_ok ||
+                serviceData.serialNumberCalibrated ||
+                serviceData.calibratedInstruments || '',
+            serialNumberoftheFaultyNonWorkingInstruments:
+                serviceData.serial_number_of_the_faulty_non_working_instruments ||
+                serviceData.serialNumberFaulty ||
+                serviceData.faultyInstruments || '',
+            engineerReport: serviceData.engineer_report || '',
+            customerReport: serviceData.customer_report || '',
+            engineerRemarks: engineerRemarks.map((remark: any) => ({
+                serviceSpares: remark.serviceSpares || '',
+                partNo: remark.partNo || '',
+                rate: remark.rate?.toString() || '0',
+                quantity: remark.quantity?.toString() || '0',
+                total: remark.total?.toString() || 
+                      (Number(remark.rate || 0) * Number(remark.quantity || 0)).toString(),
+                poNo: remark.poNo || ''
+            })),
+            engineerName: serviceData.engineer_name || '',
+            engineerId: serviceData.engineerId || '',
+            status: serviceData.status || "checked"
+        });
+    } catch (error) {
+        console.error("Error fetching service data", error);
+        toast({
+            title: "Failed to load service data",
+            variant: "destructive",
+        });
+    } finally {
+        setLoading(false);
+    }
+}, [isEditMode, serviceId, generateReportNo]);
 
     useEffect(() => {
         if (!isEditMode) {
@@ -357,6 +386,14 @@ function GenerateService() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitted) {
+            toast({
+                title: "Already Submitted",
+                description: "This certificate has already been submitted. Please create a new certificate if needed.",
+                variant: "destructive",
+            });
+            return;
+        }
         setLoading(true);
         setError(null);
         if (!validateForm()) {
@@ -408,7 +445,7 @@ function GenerateService() {
                     'Content-Type': 'application/json',
                 }
             });
-
+            setIsSubmitted(true);
             setService({
                 serviceId: response.data.id || formData.id || uuidv4(),
                 message: isEditMode ? "Service updated successfully" : "Service created successfully",
@@ -441,6 +478,18 @@ function GenerateService() {
         }
     };
 
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            // Optionally show a message
+            toast({
+                title: "Error Form Submission",
+                description: "Please use the submit button to submit the form",
+                variant: "destructive",
+            });
+        }
+    };
+
 
     const handleDownload = async (serviceId: string) => {
         if (!serviceId) {
@@ -455,11 +504,7 @@ function GenerateService() {
         setIsGeneratingPDF(true);
 
         try {
-            const doc = new jsPDF({
-                orientation: "portrait",
-                unit: "mm",
-                format: "a4"
-            });
+            const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
@@ -488,24 +533,42 @@ function GenerateService() {
             const leftMargin = 15;
             const rightMargin = 15;
             const topMargin = 20;
+            const contentWidth = pageWidth - leftMargin - rightMargin;
             let y = topMargin;
+
+            const checkPageBreak = (blockHeight = 10) => {
+                if (y + blockHeight > pageHeight - 30) {
+                    doc.addPage();
+                    y = topMargin;
+                    doc.addImage(logo, "PNG", 5, 5, 50, 15);
+                    y = 40;
+                }
+            };
+
+            const addRow = (label: string, value: string) => {
+                const labelOffset = 65;
+                const lines = doc.splitTextToSize(value || "N/A", contentWidth - labelOffset);
+                const blockHeight = lines.length * 6;
+                checkPageBreak(blockHeight);
+
+                doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+                doc.text(label + ":", leftMargin, y);
+                doc.setFont("times", "normal").setTextColor(50);
+                lines.forEach((line: string, i: number) => {
+                    doc.text(line, leftMargin + labelOffset, y + i * 6);
+                });
+
+                y += blockHeight;
+            };
 
             doc.addImage(logo, "PNG", 5, 5, 50, 15);
             y = 40;
 
             doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
-            doc.text("SERVICE / CALIBRATION / INSTALLATION JOB REPORT", pageWidth / 2, y, { align: "center" });
+            doc.text("SERVICE / CALIBRATION / INSTALLATION JOBREPORT", pageWidth / 2, y, { align: "center" });
             y += 10;
 
-            const addRow = (label: string, value: string) => {
-                const labelOffset = 65;
-                doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-                doc.text(label + ":", leftMargin, y);
-                doc.setFont("times", "normal").setTextColor(50);
-                doc.text(value || "N/A", leftMargin + labelOffset, y);
-                y += 7;
-            };
-
+            // Certificate Info
             addRow("Report No.", formData.reportNo);
             addRow("Customer Name", formData.customerName);
             addRow("Customer Location", formData.customerLocation);
@@ -523,16 +586,17 @@ function GenerateService() {
             addRow("Sr.No Faulty/Non-Working", formData.serialNumberoftheFaultyNonWorkingInstruments);
             y += 10;
 
+            // Engineer Report
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
             doc.text("Engineer Report:", leftMargin, y);
             y += 5;
 
-            const engineerReportHeight = 30;
-            doc.setDrawColor(0);
-            doc.setLineWidth(0.2);
-            doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, engineerReportHeight);
+            const engineerReportLines = doc.splitTextToSize(formData.engineerReport || "No report provided", contentWidth - 5);
+            const engineerReportHeight = engineerReportLines.length * 6 + 5;
+            checkPageBreak(engineerReportHeight);
 
-            const engineerReportLines = doc.splitTextToSize(formData.engineerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
+            doc.setDrawColor(0).setLineWidth(0.2);
+            doc.rect(leftMargin, y, contentWidth, engineerReportHeight);
             doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
             doc.text(engineerReportLines, leftMargin + 2, y + 5);
             y += engineerReportHeight + 5;
@@ -540,9 +604,10 @@ function GenerateService() {
             doc.addPage();
             y = topMargin;
 
+            // Engineer Remarks Table
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-            doc.text("ENGINEER REMARKS", leftMargin, y + 8);
-            y += 10;
+            doc.text("ENGINEER REMARKS", leftMargin, y);
+            y += 8;
 
             const tableHeaders = ["Sr. No.", "Service/Spares", "Part No.", "Rate", "Quantity", "Total", "PO No."];
             const colWidths = [15, 50, 25, 20, 20, 25, 25];
@@ -553,12 +618,11 @@ function GenerateService() {
                 doc.text(header, x + 2, y + 6);
                 x += colWidths[i];
             });
-
             y += 8;
 
+            doc.setFont("times", "normal").setFontSize(9);
             formData.engineerRemarks.forEach((item, index) => {
-                x = leftMargin;
-                const values = [
+                const rowData = [
                     String(index + 1),
                     item.serviceSpares || "",
                     item.partNo || "",
@@ -567,62 +631,60 @@ function GenerateService() {
                     item.total || "",
                     item.poNo || ""
                 ];
-                values.forEach((val, i) => {
-                    doc.rect(x, y, colWidths[i], 8);
-                    doc.text(val, x + 2, y + 6);
-                    x += colWidths[i];
+
+                // Wrap and calculate row height
+                const cellLines = rowData.map((text, i) =>
+                    doc.splitTextToSize(text, colWidths[i] - 4)
+                );
+                const rowHeight = Math.max(...cellLines.map(lines => lines.length)) * 5;
+
+                checkPageBreak(rowHeight);
+
+                x = leftMargin;
+                cellLines.forEach((lines, colIndex) => {
+                    doc.rect(x, y, colWidths[colIndex], rowHeight);
+                    doc.text(lines, x + 2, y + 5);
+                    x += colWidths[colIndex];
                 });
-                y += 8;
-                if (y + 50 > pageHeight) {
-                    doc.addPage();
-                    y = topMargin;
-                }
+
+                y += rowHeight;
             });
 
             y += 10;
 
+            // Customer Report
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-            doc.text("Customer Remarks:", leftMargin, y);
+            doc.text("Customer Report:", leftMargin, y);
             y += 5;
 
-            const customerReportHeight = 30;
-            doc.setDrawColor(0);
-            doc.setLineWidth(0.2);
-            doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, customerReportHeight);
-            y += 5;
+            const customerReportLines = doc.splitTextToSize(formData.customerReport || "No report provided", contentWidth - 5);
+            const customerReportHeight = customerReportLines.length * 6 + 5;
+            checkPageBreak(customerReportHeight);
 
-            const customerReportLines = doc.splitTextToSize(formData.customerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
-            doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
+            doc.setDrawColor(0).setLineWidth(0.2);
+            doc.rect(leftMargin, y, contentWidth, customerReportHeight);
+            doc.setFont("times", "normal").setFontSize(9);
             doc.text(customerReportLines, leftMargin + 2, y + 5);
-            y += customerReportHeight + 5;
-            doc.setFont("times", "normal");
-            y += 35;
-            doc.text("Customer Name,Seal & Sign", leftMargin, y);
-            
-            
+            y += customerReportHeight + 35;
 
-            // Right side: Service Engineer
+            doc.text("Customer Name,Seal & Sign", leftMargin, y);
+
+
+
+        
             doc.text("Service Engineer,Seal & Sign", pageWidth - rightMargin - 40, y);
             doc.text(formData.serviceEngineer || "", pageWidth - rightMargin - 40, y + 5);
             doc.text(formData.serviceEngineer || "", pageWidth - rightMargin - 40, y + 5);
-
-            // Removed: Report Generated On timestamp
-
-            const addLogoToAllPages = () => {
-                const logoX = 5;
-                const logoY = 5;
-                const logoWidth = 50;
-                const logoHeight = 15;
-                const pageCount = doc.getNumberOfPages();
-                for (let i = 1; i <= pageCount; i++) {
-                    doc.setPage(i);
-                    doc.addImage(logo, "PNG", logoX, logoY, logoWidth, logoHeight);
-                }
-            };
+            const now = new Date();
+            const pad = (n: number) => n.toString().padStart(2, "0");
+            const date = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}`;
+            const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+            doc.setFontSize(9).setTextColor(100);
+            doc.text(`Report Generated On: ${date} ${time}`, leftMargin, pageHeight - 30);
 
             const addFooterImage = () => {
                 const footerY = pageHeight - 20;
-                const footerWidth = 180;
+                const footerWidth = 180;    
                 const footerHeight = 15;
                 const footerX = (pageWidth - footerWidth) / 2;
                 const pageCount = doc.getNumberOfPages();
@@ -632,7 +694,6 @@ function GenerateService() {
                 }
             };
 
-            addLogoToAllPages();
             addFooterImage();
 
             doc.save(`service-${serviceId}.pdf`);
@@ -654,7 +715,6 @@ function GenerateService() {
             setIsGeneratingPDF(false);
         }
     };
-
 
 
     function handleStartDateChange(event: ChangeEvent<HTMLInputElement>): void {
@@ -701,7 +761,7 @@ function GenerateService() {
                         </CardHeader>
 
                         <CardContent>
-                            <form onSubmit={handleSubmit} className="space-y-6">
+                            <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-6">
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                     <div className="relative w-full">
                                         <input
@@ -938,7 +998,7 @@ function GenerateService() {
                                     />
                                     <input
                                         name="engineerReport"
-                                        placeholder="Engineer Remark"
+                                        placeholder="Engineer Report"
                                         value={formData.engineerReport}
                                         onChange={handleChange}
                                         className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
@@ -1076,12 +1136,13 @@ function GenerateService() {
                                         {error}
                                     </div>
                                 )}
-                                <button
+                               <button
                                     type="submit"
-                                    className="bg-blue-950 hover:bg-blue-900 text-white p-2 rounded-md w-full"
-                                    disabled={loading}
+                                    className={`bg-purple-950 text-white p-2 rounded-md w-full ${loading ? "opacity-75" : isSubmitted ? "bg-purple-950950" : "hover:bg-purple-900"
+                                        }`}
+                                    disabled={loading || isSubmitted}
                                 >
-                                    {loading ? "Processing..." : "Generate Service Report"}
+                                    {loading ? "Generating..." : "Generate Certificate"}
                                 </button>
                             </form>
 

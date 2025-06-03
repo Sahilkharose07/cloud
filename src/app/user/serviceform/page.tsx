@@ -123,15 +123,26 @@ function GenerateService() {
     const [isLoadingEngineers, setIsLoadingEngineers] = useState(true);
     const [isSendingPDF, setIsSendingPDF] = useState(false);
     const [generatedPdfBlob, setGeneratedPdfBlob] = useState<Blob | null>(null);
-    const generateReportNo = useCallback(() => {
-        const date = new Date();
-        const currentYear = date.getFullYear();
-        const shortStartYear = String(currentYear).slice(-2);
-        const shortEndYear = String(currentYear + 1).slice(-2);
-        const yearRange = `${shortStartYear}-${shortEndYear}`;
-        const randomNum = Math.floor(1000 + Math.random() * 9000);
-        return `RPS/SRV/${yearRange}/${randomNum}`;
-    }, []);
+    const [isSubmitted, setIsSubmitted] = useState(false);
+   const generateReportNo = useCallback(() => {
+    const date = new Date();
+    const currentYear = date.getFullYear();
+    const shortStartYear = String(currentYear).slice(-2);
+    const shortEndYear = String(currentYear + 1).slice(-2);
+    const yearRange = `${shortStartYear}-${shortEndYear}`;
+
+    const key = `report-seq-${yearRange}`;
+
+
+    const lastNumber = parseInt(localStorage.getItem(key) || '0', 10);
+    const newNumber = lastNumber + 1;
+    localStorage.setItem(key, String(newNumber));
+    const formattedNum = String(newNumber).padStart(4, '0');
+
+    return `RPS/SRV/${yearRange}/${formattedNum}`;
+}, []);
+
+
 
     const fetchContactPersons = useCallback(async () => {
         setIsLoadingContacts(true);
@@ -188,6 +199,7 @@ function GenerateService() {
             setIsLoadingEngineers(false);
         }
     }, []);
+    
 
 
 
@@ -296,29 +308,38 @@ function GenerateService() {
         return true;
     };
 
-    const generatePDFDocument = async (): Promise<jsPDF> => {
-        const doc = new jsPDF({
-            orientation: "portrait",
-            unit: "mm",
-            format: "a4"
+
+
+    const handleDownload = async (serviceId: string) => {
+    if (!serviceId) {
+        toast({
+            title: "Error",
+            description: "No service ID available",
+            variant: "destructive",
         });
+        return;
+    }
+
+    setIsSendingPDF(true);
+
+    try {
+        const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
 
-        // Load images asynchronously
-        const loadImage = (src: string): Promise<HTMLImageElement> => {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.src = src;
-                img.onload = () => resolve(img);
-                img.onerror = () => reject(`Failed to load image: ${src}`);
-            });
-        };
+        const logo = new Image();
+        logo.src = "/img/rps.png";
+        const infoImage = new Image();
+        infoImage.src = "/img/handf.png";
 
-        // Await images to load
-        const logo = await loadImage("/img/rps.png");
-        const infoImage = await loadImage("/img/handf.png");
+        await new Promise<void>((resolve, reject) => {
+            logo.onload = () => {
+                infoImage.onload = () => resolve();
+                infoImage.onerror = () => reject("Failed to load footer image");
+            };
+            logo.onerror = () => reject("Failed to load logo image");
+        });
 
         const formatDate = (inputDateString: string | undefined): string => {
             if (!inputDateString) return "N/A";
@@ -331,25 +352,42 @@ function GenerateService() {
         const leftMargin = 15;
         const rightMargin = 15;
         const topMargin = 20;
+        const contentWidth = pageWidth - leftMargin - rightMargin;
         let y = topMargin;
 
-        // Add first page logo
+        const checkPageBreak = (blockHeight = 10) => {
+            if (y + blockHeight > pageHeight - 30) {
+                doc.addPage();
+                y = topMargin;
+                doc.addImage(logo, "PNG", 5, 5, 50, 15);
+                y = 40;
+            }
+        };
+
+        const addRow = (label: string, value: string) => {
+            const labelOffset = 65;
+            const lines = doc.splitTextToSize(value || "N/A", contentWidth - labelOffset);
+            const blockHeight = lines.length * 6;
+            checkPageBreak(blockHeight);
+
+            doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+            doc.text(label + ":", leftMargin, y);
+            doc.setFont("times", "normal").setTextColor(50);
+            lines.forEach((line: string, i: number) => {
+                doc.text(line, leftMargin + labelOffset, y + i * 6);
+            });
+
+            y += blockHeight;
+        };
+
         doc.addImage(logo, "PNG", 5, 5, 50, 15);
         y = 40;
 
         doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
-        doc.text("SERVICE / CALIBRATION / INSTALLATION JOB REPORT", pageWidth / 2, y, { align: "center" });
+        doc.text("SERVICE / CALIBRATION / INSTALLATION JOBREPORT", pageWidth / 2, y, { align: "center" });
         y += 10;
 
-        const addRow = (label: string, value: string) => {
-            const labelOffset = 65;
-            doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-            doc.text(label + ":", leftMargin, y);
-            doc.setFont("times", "normal").setTextColor(50);
-            doc.text(value || "N/A", leftMargin + labelOffset, y);
-            y += 7;
-        };
-
+        // Certificate Info
         addRow("Report No.", formData.reportNo);
         addRow("Customer Name", formData.customerName);
         addRow("Customer Location", formData.customerLocation);
@@ -367,16 +405,17 @@ function GenerateService() {
         addRow("Sr.No Faulty/Non-Working", formData.serialNumberoftheFaultyNonWorkingInstruments);
         y += 10;
 
+        // Engineer Report
         doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
         doc.text("Engineer Report:", leftMargin, y);
         y += 5;
 
-        const engineerReportHeight = 30;
-        doc.setDrawColor(0);
-        doc.setLineWidth(0.2);
-        doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, engineerReportHeight);
+        const engineerReportLines = doc.splitTextToSize(formData.engineerReport || "No report provided", contentWidth - 5);
+        const engineerReportHeight = engineerReportLines.length * 6 + 5;
+        checkPageBreak(engineerReportHeight);
 
-        const engineerReportLines = doc.splitTextToSize(formData.engineerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
+        doc.setDrawColor(0).setLineWidth(0.2);
+        doc.rect(leftMargin, y, contentWidth, engineerReportHeight);
         doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
         doc.text(engineerReportLines, leftMargin + 2, y + 5);
         y += engineerReportHeight + 5;
@@ -384,25 +423,27 @@ function GenerateService() {
         doc.addPage();
         y = topMargin;
 
+        // Engineer Remarks Table
         doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-        doc.text("ENGINEER REMARKS", leftMargin, y + 8);
-        y += 10;
+        doc.text("ENGINEER REMARKS", leftMargin, y);
+        y += 8;
 
         const tableHeaders = ["Sr. No.", "Service/Spares", "Part No.", "Rate", "Quantity", "Total", "PO No."];
         const colWidths = [15, 50, 25, 20, 20, 25, 25];
         let x = leftMargin;
 
+        // Draw Header Row
+        doc.setFont("times", "bold").setFontSize(10);
         tableHeaders.forEach((header, i) => {
             doc.rect(x, y, colWidths[i], 8);
-            doc.text(header, x + 2, y + 6);
+            doc.text(header, x + colWidths[i] / 2, y + 5.5, { align: "center" });
             x += colWidths[i];
         });
-
         y += 8;
 
+        doc.setFont("times", "normal").setFontSize(9);
         formData.engineerRemarks.forEach((item, index) => {
-            x = leftMargin;
-            const values = [
+            const rowData = [
                 String(index + 1),
                 item.serviceSpares || "",
                 item.partNo || "",
@@ -411,61 +452,68 @@ function GenerateService() {
                 item.total || "",
                 item.poNo || ""
             ];
-            values.forEach((val, i) => {
-                doc.rect(x, y, colWidths[i], 8);
-                doc.text(val, x + 2, y + 6);
-                x += colWidths[i];
+
+            const cellPadding = 3;
+            const lineHeight = 5.5;
+            const cellLines = rowData.map((text, i) =>
+                doc.splitTextToSize(text, colWidths[i] - 2 * cellPadding)
+            );
+
+            const rowHeight = Math.max(...cellLines.map(lines => lines.length)) * lineHeight + 2 * cellPadding;
+
+            checkPageBreak(rowHeight);
+            x = leftMargin;
+
+            cellLines.forEach((lines, colIndex) => {
+                const colX = x;
+                const colW = colWidths[colIndex];
+
+                // Draw cell border
+                doc.rect(colX, y, colW, rowHeight);
+
+                const totalTextHeight = lines.length * lineHeight;
+                const verticalOffset = (rowHeight - totalTextHeight) / 2;
+
+                lines.forEach((line: string, lineIndex: number) => {
+                    const lineY = y + verticalOffset + lineIndex * lineHeight + lineHeight / 2;
+                    const centerX = colX + colW / 2;
+                    doc.text(line, centerX, lineY, { align: "center" });
+                });
+
+                x += colW;
             });
-            y += 8;
-            if (y + 50 > pageHeight) {
-                doc.addPage();
-                y = topMargin;
-            }
+
+            y += rowHeight;
         });
 
         y += 10;
 
+        // Customer Report
         doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-        doc.text("Customer Remark:", leftMargin, y);
+        doc.text("Customer Report:", leftMargin, y);
         y += 5;
 
-        const customerReportHeight = 30;
-        doc.setDrawColor(0);
-        doc.setLineWidth(0.2);
-        doc.rect(leftMargin, y, pageWidth - leftMargin - rightMargin, customerReportHeight);
+        const customerReportLines = doc.splitTextToSize(formData.customerReport || "No report provided", contentWidth - 5);
+        const customerReportHeight = customerReportLines.length * 6 + 5;
+        checkPageBreak(customerReportHeight);
 
-
-        const customerReportLines = doc.splitTextToSize(formData.customerReport || "No report provided", pageWidth - leftMargin - rightMargin - 5);
-        doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
+        doc.setDrawColor(0).setLineWidth(0.2);
+        doc.rect(leftMargin, y, contentWidth, customerReportHeight);
+        doc.setFont("times", "normal").setFontSize(9);
         doc.text(customerReportLines, leftMargin + 2, y + 5);
-        y += customerReportHeight + 5;
-        doc.setFont("times", "normal");
-        y += 35;
+        y += customerReportHeight + 35;
+
         doc.text("Customer Name,Seal & Sign", leftMargin, y);
-        
-
-
-        // Right side: Service Engineer
         doc.text("Service Engineer,Seal & Sign", pageWidth - rightMargin - 40, y);
         doc.text(formData.serviceEngineer || "", pageWidth - rightMargin - 40, y + 5);
-        doc.text(formData.serviceEngineer || "", pageWidth - rightMargin - 40, y + 5);
 
-        // Add logo to all pages (same as your first code)
-        const addLogoToAllPages = () => {
-            const logoX = 5;
-            const logoY = 5;
-            const logoWidth = 50;
-            const logoHeight = 15;
-            const pageCount = doc.getNumberOfPages();
-            for (let i = 1; i <= pageCount; i++) {
-                doc.setPage(i);
-                doc.addImage(logo, "PNG", logoX, logoY, logoWidth, logoHeight);
-            }
-        };
+        const now = new Date();
+        const pad = (n: number) => n.toString().padStart(2, "0");
+        const date = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}`;
+        const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+        doc.setFontSize(9).setTextColor(100);
+        doc.text(`Report Generated On: ${date} ${time}`, leftMargin, pageHeight - 30);
 
-        addLogoToAllPages();
-
-        // Add footer image to all pages
         const addFooterImage = () => {
             const footerY = pageHeight - 20;
             const footerWidth = 180;
@@ -480,97 +528,40 @@ function GenerateService() {
 
         addFooterImage();
 
-        return doc;
-    };
+        doc.save(`service-${serviceId}.pdf`);
 
+        toast({
+            title: "Success",
+            description: "PDF generated successfully",
+            variant: "default",
+        });
 
-    const handleDownload = async () => {
-        if (!generatedPdfBlob) {
-            toast({
-                title: "Error",
-                description: "No PDF generated yet",
-                variant: "destructive",
-            });
-            return;
-        }
+    } catch (err: any) {
+        console.error("Error generating PDF:", err);
+        toast({
+            title: "Error",
+            description: err.response?.data?.error || "Failed to generate PDF",
+            variant: "destructive",
+        });
+    } finally {
+        setIsSendingPDF(false);
+    }
+};
 
-        // First, download the PDF
-        try {
-            const url = URL.createObjectURL(generatedPdfBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `service-${formData.reportNo}.pdf`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
-        } catch (downloadError) {
-            console.error("Download failed:", downloadError);
-            toast({
-                title: "Download Error",
-                description: "Failed to download PDF",
-                variant: "destructive",
-            });
-            return;
-        }
-
-
-        setIsSendingPDF(true);
-        try {
-
-            const base64data = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    const result = reader.result?.toString().split(',')[1];
-                    if (result) {
-                        resolve(result);
-                    } else {
-                        reject(new Error("Failed to convert PDF to base64"));
-                    }
-                };
-                reader.onerror = () => reject(new Error("FileReader error"));
-                reader.readAsDataURL(generatedPdfBlob);
-            });
-
-            // Send to API
-            const response = await axios.post('/api/send-service', {
-                serviceId: formData.id || formData.serviceId || uuidv4(),
-                pdfData: base64data,
-                customerName: formData.customerName,
-
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem("token")}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            toast({
-                title: "Success",
-                description: "PDF downloaded and sent via email successfully",
-                variant: "default",
-            });
-
-        } catch (error: any) {
-            console.error("Error sending email:", error);
-            toast({
-                title: "PDF Downloaded",
-                description: "PDF was downloaded but email failed: " +
-                    (error.response?.data?.error || error.message || "Email service error"),
-                variant: "destructive",
-            });
-        } finally {
-            setIsSendingPDF(false);
-        }
-    };
 
 
 
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitted) {
+            toast({
+                title: "Already Submitted",
+                description: "This certificate has already been submitted. Please create a new certificate if needed.",
+                variant: "destructive",
+            });
+            return;
+        }
         setLoading(true);
         setError(null);
 
@@ -581,7 +572,12 @@ function GenerateService() {
 
         try {
 
-            const doc = await generatePDFDocument();
+            const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+            doc.text("Service Report", 10, 10);
+            doc.text(`Report No.: ${formData.reportNo}`, 10, 20);
+            doc.text(`Customer Name: ${formData.customerName}`, 10, 30);
+
             const pdfBlob = doc.output('blob');
             setGeneratedPdfBlob(pdfBlob);
 
@@ -638,6 +634,7 @@ function GenerateService() {
                 message: "Service created successfully",
                 downloadUrl: pdfUrl
             });
+            setIsSubmitted(true);
 
             toast({
                 title: "Success",
@@ -655,6 +652,18 @@ function GenerateService() {
             });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            // Optionally show a message
+            toast({
+                title: "Error Form Submission",
+                description: "Please use the submit button to submit the form",
+                variant: "destructive",
+            });
         }
     };
     function handleStartDateChange(event: ChangeEvent<HTMLInputElement>): void {
@@ -699,7 +708,7 @@ function GenerateService() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <form onSubmit={handleSubmit} className="space-y-6">
+                            <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-6">
                                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                     <div className="relative w-full">
                                         <input
@@ -1077,13 +1086,13 @@ function GenerateService() {
                                         {error}
                                     </div>
                                 )}
-
                                 <button
                                     type="submit"
-                                    className="bg-blue-950 hover:bg-blue-900 text-white p-2 rounded-md w-full"
-                                    disabled={loading}
+                                    className={`bg-purple-950 text-white p-2 rounded-md w-full ${loading ? "opacity-75" : isSubmitted ? "bg-purple-950950" : "hover:bg-purple-900"
+                                        }`}
+                                    disabled={loading || isSubmitted}
                                 >
-                                    {loading ? "Generating..." : "Generate Service Report"}
+                                    {loading ? "Generating..." : "Generate Certificate"}
                                 </button>
                             </form>
 
@@ -1092,7 +1101,7 @@ function GenerateService() {
                                     <p className="text-green-600 mb-2">Service created successfully</p>
                                     <div className="flex gap-4 justify-center">
                                         <button
-                                            onClick={handleDownload}
+                                            onClick={() => handleDownload(service?.serviceId)}
                                             className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
                                             disabled={!generatedPdfBlob}
                                         >

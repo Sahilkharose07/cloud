@@ -177,215 +177,229 @@ export default function CertificateTable() {
     const items = filteredItems;
 
     const sortedItems = React.useMemo(() => {
-            return [...items].sort((a, b) => {
-                if (
-                    sortDescriptor.column === 'dateOfCalibration' ||
-                    sortDescriptor.column === 'calibrationDueDate'
-                ) {
-                    const dateA = new Date(a[sortDescriptor.column as keyof Certificate] as string).getTime();
-                    const dateB = new Date(b[sortDescriptor.column as keyof Certificate] as string).getTime();
-                    const cmp = dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
-                    return sortDescriptor.direction === "descending" ? -cmp : cmp;
-                }
-    
-    
-                const first = a[sortDescriptor.column as keyof Certificate] || '';
-                const second = b[sortDescriptor.column as keyof Certificate] || '';
-                const cmp = String(first).localeCompare(String(second));
-    
+        return [...items].sort((a, b) => {
+            if (
+                sortDescriptor.column === 'dateOfCalibration' ||
+                sortDescriptor.column === 'calibrationDueDate'
+            ) {
+                const dateA = new Date(a[sortDescriptor.column as keyof Certificate] as string).getTime();
+                const dateB = new Date(b[sortDescriptor.column as keyof Certificate] as string).getTime();
+                const cmp = dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
                 return sortDescriptor.direction === "descending" ? -cmp : cmp;
-            });
-        }, [sortDescriptor, items]);
-
- const handleDownload = async (certificateId: string) => {
-    try {
-        setIsDownloading(certificateId);
-        const certificateToDownload = certificates.find(cert => cert.id === certificateId);
-        if (!certificateToDownload) throw new Error("Certificate data not found");
-
-        // Load logo image
-        const logo = new Image();
-        logo.src = "/img/rps.png";
-        await new Promise<void>((resolve, reject) => {
-            logo.onload = () => resolve();
-            logo.onerror = () => reject(new Error("Failed to load logo image"));
-        });
-
-        // Load footer image
-        const footerImg = new Image();
-        footerImg.src = "/img/handf.png";
-        await new Promise<void>((resolve, reject) => {
-            footerImg.onload = () => resolve();
-            footerImg.onerror = () => reject(new Error("Failed to load footer image"));
-        });
-
-        const doc = new jsPDF({
-            orientation: "portrait",
-            unit: "mm",
-            format: "a4"
-        });
-
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const leftMargin = 15;
-        const rightMargin = 15;
-        const topMargin = 20;
-        const bottomMargin = 20;
-        const contentWidth = pageWidth - leftMargin - rightMargin;
-
-        const addLogo = () => {
-            doc.addImage(logo, "PNG", 2, 10, 60, 20);
-        };
-
-        const addFooter = () => {
-            const footerWidth = 180;
-            const footerHeight = 15;
-            const footerX = (pageWidth - footerWidth) / 2;
-            const footerY = pageHeight - bottomMargin - footerHeight + 5;
-
-            doc.addImage(footerImg, "PNG", footerX, footerY, footerWidth, footerHeight);
-
-            if (doc.getCurrentPageInfo().pageNumber === doc.getNumberOfPages()) {
-                doc.setDrawColor(180);
-                doc.line(leftMargin, footerY - 5, pageWidth - rightMargin, footerY - 5);
-                doc.setFontSize(8);
-                doc.setTextColor(100);
             }
-        };
 
-        const checkPageBreak = (y: number, buffer = 20): number => {
-            if (y + buffer > pageHeight - bottomMargin) {
-                doc.addPage();
-                addLogo();
-                addFooter();
-                return topMargin;
-            }
-            return y;
-        };
 
-        const formatDate = (dateString: string | null | undefined): string => {
-            if (!dateString) return "N/A";
-            try {
-                const date = new Date(dateString);
-                if (isNaN(date.getTime())) return "Invalid Date";
+            const first = a[sortDescriptor.column as keyof Certificate] || '';
+            const second = b[sortDescriptor.column as keyof Certificate] || '';
+            const cmp = String(first).localeCompare(String(second));
 
-                const day = String(date.getDate()).padStart(2, '0');
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const year = date.getFullYear();
-                return `${day} - ${month} - ${year}`;
-            } catch {
-                return "Invalid Date";
-            }
-        };
+            return sortDescriptor.direction === "descending" ? -cmp : cmp;
+        });
+    }, [sortDescriptor, items]);
 
-        addLogo();
-        addFooter();
+    const handleDownload = async (certificateId: string) => {
+        try {
+            setIsDownloading(certificateId);
 
-        let y = 40;
+            const certificateToDownload = certificates.find(cert => cert.id === certificateId);
+            if (!certificateToDownload) throw new Error("Certificate data not found");
 
-        doc.setFont("times", "bold").setFontSize(16).setTextColor(0, 51, 102);
-        doc.text("CALIBRATION CERTIFICATE", pageWidth / 2, y, { align: "center" });
-        y += 10;
-
-        const labelX = leftMargin;
-        const valueX = leftMargin + 50;
-        const lineGap = 7;
-
-        const addRow = (labelText: string, value: string, yPos: number) => {
-            const lines = (value || "N/A").split(/\r?\n/);
-            const blockHeight = lines.length * lineGap;
-            yPos = checkPageBreak(yPos, blockHeight);
-
-            doc.setFont("times", "bold").setFontSize(11).setTextColor(0);
-            doc.text(labelText, labelX, yPos);
-            doc.setFont("times", "normal").setTextColor(0); // font set to black
-
-            lines.forEach((line, i) => {
-                doc.text(": " + line, valueX, yPos + i * lineGap);
+            // Load logo
+            const logo = new Image();
+            logo.src = "/img/rps.png";
+            await new Promise<void>((resolve, reject) => {
+                logo.onload = () => resolve();
+                logo.onerror = () => reject(new Error("Failed to load logo image"));
             });
 
-            return yPos + blockHeight;
-        };
-
-        y = addRow("Certificate No.", certificateToDownload.certificate_no, y);
-        y = addRow("Customer Name", certificateToDownload.customer_name, y);
-        y = addRow("Site Location", certificateToDownload.site_location, y);
-        y = addRow("Make & Model", certificateToDownload.make_model, y);
-        y = addRow("Range", certificateToDownload.range, y);
-        y = addRow("Serial No.", certificateToDownload.serial_no, y);
-        y = addRow("Calibration Gas", certificateToDownload.calibration_gas, y);
-        y = addRow("Gas Canister Details", certificateToDownload.gas_canister_details || "N/A", y);
-        y += 5;
-
-        y = addRow("Date of Calibration", formatDate(certificateToDownload.date_of_calibration), y);
-        y = addRow("Calibration Due Date", formatDate(certificateToDownload.calibration_due_date), y);
-        y = addRow("Status", certificateToDownload.status, y);
-        y += 5;
-
-        doc.setDrawColor(180);
-        doc.setLineWidth(0.3);
-        doc.line(leftMargin, y, pageWidth - rightMargin, y);
-        y += 10;
-
-        y = checkPageBreak(y, 20);
-        doc.setFont("times", "bold").setFontSize(12).setTextColor(0);
-        doc.text("OBSERVATIONS", leftMargin, y);
-        y += 10;
-
-        const colWidths = [20, 70, 40, 40];
-        const headers = ["Sr. No.", "Concentration of Gas", "Reading Before", "Reading After"];
-        let x = leftMargin;
-
-        doc.setFont("times", "bold").setFontSize(10);
-        headers.forEach((header, i) => {
-            doc.rect(x, y - 5, colWidths[i], 8, 'S');
-            doc.text(header, x + colWidths[i] / 2, y, { align: "center" });
-            x += colWidths[i];
-        });
-        y += 8;
-
-        doc.setFont("times", "normal").setFontSize(10);
-        certificateToDownload.observations.forEach((obs, index) => {
-            y = checkPageBreak(y, 15);
-            x = leftMargin;
-            const rowY = y;
-            const rowData = [
-                `${index + 1}`,
-                obs.gas || "-",
-                obs.before || "-",
-                obs.after || "-"
-            ];
-            rowData.forEach((text, colIndex) => {
-                doc.rect(x, rowY - 6, colWidths[colIndex], 8, 'S');
-                doc.text(text, x + colWidths[colIndex] / 2, rowY, { align: "center" });
-                x += colWidths[colIndex];
+            // Load footer
+            const footerImg = new Image();
+            footerImg.src = "/img/handf.png";
+            await new Promise<void>((resolve, reject) => {
+                footerImg.onload = () => resolve();
+                footerImg.onerror = () => reject(new Error("Failed to load footer image"));
             });
-            y += 8;
-        });
 
-        y += 10;
-        y = checkPageBreak(y, 20);
-        doc.setFont("times", "bold");
-        doc.text("Tested & Calibrated By", pageWidth - rightMargin, y, { align: "right" });
-        doc.text(certificateToDownload.engineer_name || "________________", pageWidth - rightMargin, y + 10, { align: "right" });
-        doc.setFont("times", "normal");
+            const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
 
-        doc.save(`calibration-certificate-${certificateToDownload.certificate_no}.pdf`);
-    } catch (error) {
-        console.error("Error generating PDF", error);
-        toast({
-            title: "Failed to generate certificate",
-            variant: "destructive",
-        });
-    } finally {
-        setIsDownloading(null);
-    }
-};
+            const leftMargin = 15, rightMargin = 15, topMargin = 20, bottomMargin = 20;
+            const contentWidth = pageWidth - leftMargin - rightMargin;
+            const contentStartY = 40;
+            let y = contentStartY;
+
+            const addLogo = () => {
+                doc.addImage(logo, "PNG", 2, 10, 60, 20);
+            };
+
+            const addFooter = () => {
+                const footerWidth = 180;
+                const footerHeight = 15;
+                const footerX = (pageWidth - footerWidth) / 2;
+                const footerY = pageHeight - 20;
+                doc.addImage(footerImg, "PNG", footerX, footerY, footerWidth, footerHeight);
+            };
+
+            const checkPageBreak = (blockHeight = 10): void => {
+                if (y + blockHeight > pageHeight - bottomMargin) {
+                    doc.addPage();
+                    addLogo();
+                    y = contentStartY;
+                }
+            };
+
+            const formatDate = (dateString?: string | null): string => {
+                if (!dateString) return "N/A";
+                const d = new Date(dateString);
+                return isNaN(d.getTime()) ? "Invalid Date" : `${d.getDate().toString().padStart(2, '0')} - ${(d.getMonth() + 1).toString().padStart(2, '0')} - ${d.getFullYear()}`;
+            };
+
+            const addRow = (label: string, value?: string) => {
+                const labelWidth = 55;
+                const valueX = leftMargin + labelWidth + 2;
+                const lines = doc.splitTextToSize(value || "N/A", contentWidth - labelWidth - 10);
+                const blockHeight = lines.length * 8;
+                checkPageBreak(blockHeight);
+
+                doc.setFont("times", "bold").setFontSize(11).setTextColor(0);
+                doc.text(label, leftMargin, y);
+                doc.setFont("times", "normal").setTextColor(50);
+                lines.forEach((line: string, i: number) => {
+                    doc.text(": " + line, valueX, y + i * 8);
+                });
+                y += blockHeight;
+            };
+
+            addLogo();
+
+            doc.setFont("times", "bold").setFontSize(16).setTextColor(0, 51, 102);
+            doc.text("CALIBRATION CERTIFICATE", pageWidth / 2, y, { align: "center" });
+            y += 12;
+
+            addRow("Certificate No.", certificateToDownload.certificate_no);
+            addRow("Customer Name", certificateToDownload.customer_name);
+            addRow("Site Location", certificateToDownload.site_location);
+            addRow("Make & Model", certificateToDownload.make_model);
+            addRow("Range", certificateToDownload.range);
+            addRow("Serial No.", certificateToDownload.serial_no);
+            addRow("Calibration Gas", certificateToDownload.calibration_gas);
+            addRow("Gas Canister Details", certificateToDownload.gas_canister_details);
+            y += 5;
+            addRow("Date of Calibration", formatDate(certificateToDownload.date_of_calibration));
+            addRow("Calibration Due Date", formatDate(certificateToDownload.calibration_due_date));
+            addRow("Status", certificateToDownload.status);
+            y += 5;
+
+            checkPageBreak(10);
+            doc.setDrawColor(180);
+            doc.setLineWidth(0.3);
+            doc.line(leftMargin, y, pageWidth - rightMargin, y);
+            y += 10;
+
+            doc.setFont("times", "bold").setFontSize(12).setTextColor(0, 51, 102);
+            doc.text("OBSERVATIONS", leftMargin, y);
+            y += 10;
+
+            const colWidths = [20, 70, 40, 40];
+            const headers = ["Sr. No.", "Concentration of Gas", "Reading Before", "Reading After"];
+
+            checkPageBreak(10);
+            let x = leftMargin;
+            doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+            headers.forEach((header, i) => {
+                doc.rect(x, y - 5, colWidths[i], 8);
+                doc.text(header, x + 2, y);
+                x += colWidths[i];
+            });
+            y += 2;
+
+            doc.setFont("times", "normal").setFontSize(10);
+            certificateToDownload.observations.forEach((obs, index) => {
+                const rowData = [
+                    `${index + 1}`,
+                    obs.gas || "",
+                    obs.before || "",
+                    obs.after || ""
+                ];
+
+                const cellPadding = 2;
+
+                const cellLines = rowData.map((text, i) =>
+                    doc.splitTextToSize(text, colWidths[i] - 2 * cellPadding)
+                );
+                const rowHeight = Math.max(...cellLines.map(lines => lines.length)) * 6;
+                checkPageBreak(rowHeight);
+                x = leftMargin;
+
+                cellLines.forEach((lines, colIndex) => {
+                    const colX = x;
+                    const colW = colWidths[colIndex];
+
+                    // Draw cell border
+                    doc.rect(colX, y, colW, rowHeight);
+
+                    const totalTextHeight = lines.length * 6;
+                    const verticalOffset = (rowHeight - totalTextHeight) / 2;
+
+                    lines.forEach((line: string, lineIndex: number) => {
+                        const lineY = y + verticalOffset + lineIndex * 6 + 4; // +4 for font height correction
+                        const centerX = colX + colW / 2;
+
+                        doc.text(line, centerX, lineY, {
+                            align: "center",
+                            maxWidth: colW - 6, // respect padding
+                        });
+                    });
+
+                    x += colW;
+                });
 
 
+                y += rowHeight;
+            });
 
 
+            y += 15;
 
+            const conclusion = "The above-mentioned Gas Detector was calibrated successfully, and the result confirms that the performance of the instrument is within acceptable limits.";
+            const conclusionLines = doc.splitTextToSize(conclusion, contentWidth);
+            checkPageBreak(conclusionLines.length * 6 + 10);
+            doc.setFont("times", "normal").setFontSize(10).setTextColor(0);
+            doc.text(conclusionLines, leftMargin, y);
+            y += conclusionLines.length * 6 + 15;
+
+            checkPageBreak(20);
+            doc.setFont("times", "bold");
+            doc.text("Tested & Calibrated By", pageWidth - rightMargin, y, { align: "right" });
+            doc.setFont("times", "normal");
+            doc.text(certificateToDownload.engineer_name || "________________", pageWidth - rightMargin, y + 10, { align: "right" });
+            y += 20;
+
+            const addFooterToAllPages = () => {
+                const pageCount = doc.getNumberOfPages();
+                for (let i = 1; i <= pageCount; i++) {
+                    doc.setPage(i);
+                    addFooter();
+                    doc.setFontSize(8).setTextColor(100);
+                    doc.text("This certificate is electronically generated and does not require a physical signature.", leftMargin, pageHeight - bottomMargin - 5);
+                    doc.text(`Generated on: ${new Date().toLocaleString()}`, leftMargin, pageHeight - bottomMargin);
+                }
+            };
+
+            addFooterToAllPages();
+
+            doc.save(`calibration-certificate-${certificateToDownload.certificate_no}.pdf`);
+        } catch (error) {
+            console.error("Error generating PDF", error);
+            toast({
+                title: "Failed to generate certificate",
+                variant: "destructive",
+            });
+        } finally {
+            setIsDownloading(null);
+        }
+    };
 
 
 
@@ -393,12 +407,14 @@ export default function CertificateTable() {
         return (
             <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap justify-between items-center w-full gap-4">
-                    <div className="flex-1 min-w-[200px]">
+                    <div className="relative w-full sm:max-w-[20%]">
                         <Input
                             isClearable
-                            className="w-full max-w-[300px]"
+                            className="w-full pr-12 sm:pr-14 pl-12"
+                            startContent={
+                                <SearchIcon className="h-4 w-5 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />
+                            }
                             placeholder="Search"
-                            startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
                             value={filterValue}
                             onChange={(e) => setFilterValue(e.target.value)}
                             onClear={() => setFilterValue("")}
@@ -467,49 +483,49 @@ export default function CertificateTable() {
         setVisibleColumns(keys);
     };
 
-    
- const renderCell = React.useCallback(
-  (certificate: Certificate, columnKey: string): React.ReactNode => {
-    // Handle actions column separately
-    if (columnKey === "actions") {
-      return (
-        <div className="relative flex items-center gap-2">
-          <Tooltip>
-            <span
-              className="text-lg text-danger cursor-pointer active:opacity-50"
-              onClick={() => handleDownload(certificate.id)}
-            >
-              <Download className="h-6 w-6" />
-            </span>
-          </Tooltip>
 
-          
-        </div>
-      );
-    }
+    const renderCell = React.useCallback(
+        (certificate: Certificate, columnKey: string): React.ReactNode => {
+            // Handle actions column separately
+            if (columnKey === "actions") {
+                return (
+                    <div className="relative flex items-center gap-2">
+                        <Tooltip>
+                            <span
+                                className="text-lg text-danger cursor-pointer active:opacity-50"
+                                onClick={() => handleDownload(certificate.id)}
+                            >
+                                <Download className="h-6 w-6" />
+                            </span>
+                        </Tooltip>
 
-    // For all other columns, ensure we're accessing valid properties
-    const cellValue = certificate[columnKey as keyof Certificate];
 
-    // Handle date columns
-    if ((columnKey === "date_of_calibration" || columnKey === "calibration_due_date") && cellValue) {
-      return formatDate(cellValue as string);
-    }
+                    </div>
+                );
+            }
 
-    // Handle observations column
-    if (columnKey === "observations" && Array.isArray(cellValue)) {
-      return (cellValue as Observation[]).map((obs, index) => (
-        <div key={index}>
-          <span>{obs.gas || '-'}</span> - <span>{obs.before || '-'}</span> - <span>{obs.after || '-'}</span>
-        </div>
-      ));
-    }
+            // For all other columns, ensure we're accessing valid properties
+            const cellValue = certificate[columnKey as keyof Certificate];
 
-    // Return default cell value
-    return (cellValue as string) || "N/A";
-  },
-  [handleDownload, handleDelete, router]
-);
+            // Handle date columns
+            if ((columnKey === "date_of_calibration" || columnKey === "calibration_due_date") && cellValue) {
+                return formatDate(cellValue as string);
+            }
+
+            // Handle observations column
+            if (columnKey === "observations" && Array.isArray(cellValue)) {
+                return (cellValue as Observation[]).map((obs, index) => (
+                    <div key={index}>
+                        <span>{obs.gas || '-'}</span> - <span>{obs.before || '-'}</span> - <span>{obs.after || '-'}</span>
+                    </div>
+                ));
+            }
+
+            // Return default cell value
+            return (cellValue as string) || "N/A";
+        },
+        [handleDownload, handleDelete, router]
+    );
 
     return (
         <SidebarProvider>
