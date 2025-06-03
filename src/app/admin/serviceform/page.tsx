@@ -998,7 +998,7 @@ function GenerateService() {
                                     />
                                     <input
                                         name="engineerReport"
-                                        placeholder="Engineer Report"
+                                        placeholder="Engineer Remark"
                                         value={formData.engineerReport}
                                         onChange={handleChange}
                                         className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
