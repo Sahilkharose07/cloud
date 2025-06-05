@@ -131,5 +131,19 @@ export const admin = sqliteTable("admin", {
   password: text("password").notNull(),
 });
 
+export const certificate_report = sqliteTable("certificate_report", {
+  id: text("id").primaryKey().notNull(),
+  certificateNo: text("genrate_num"),
+  lastNumber: integer("last_number").default(0), 
+});
+
+export const service_report = sqliteTable("service_report", {
+  id: text("id").primaryKey().notNull(),
+  reportNo: text("genrate_num"), // or rename if needed
+  lastNumber: integer("last_number").default(0),
+});
+
+
+
 export type InsertUser = typeof usersTable.$inferInsert;
 export type SelectUser = typeof usersTable.$inferSelect;

@@ -1,26 +1,30 @@
 "use client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+
+import { Suspense, useState, useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { useState, useEffect,Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import { toast } from '@/hooks/use-toast'
+import { AdminSidebar } from "@/components/admin-sidebar";
 import { Trash2 } from "lucide-react";
 import { jsPDF } from "jspdf";
-import { AppSidebar } from "@/components/app-sidebar";
 
 interface Company {
-    id: string;
+    _id: string;
     company_name: string;
 }
+
 interface Observation {
     gas: string;
     before: string;
     after: string;
 }
+
 interface Certificate {
+    id: string;
     certificateNo: string;
     customerName: string;
     siteLocation: string;
@@ -35,46 +39,26 @@ interface Certificate {
     engineerName: string;
     status: string;
 }
+
 interface Model {
     id: string;
     model_name: string;
     range: string;
 }
+
 interface Engineer {
     id: string;
     name: string;
 }
 
-const generateCertificateNumber = async () => {
-  try {
-    const response = await fetch('/api/certificate_report', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to generate certificate number');
-    }
-
-    const data = await response.json();
-    return data.certificateNumber;
-  } catch (error) {
-    console.error('Error generating certificate number:', error);
-
-
+const generateCertificateNumber = () => {
     const now = new Date();
     const currentYear = now.getFullYear();
     const shortStartYear = String(currentYear).slice(-2);
     const shortEndYear = String(currentYear + 1).slice(-2);
     const yearRange = `${shortStartYear}-${shortEndYear}`;
-
-    const randomNum = Math.floor(Math.random() * 9999) + 1; // 1 to 9999
-    const padded = String(randomNum).padStart(4, "0");
-
-    return `RPS/CER/${yearRange}/${padded}`;
-  }
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    return `RPS/CER/${yearRange}/${randomNum}`;
 };
 
 export default function CertificateFormWrapper() {
@@ -94,35 +78,27 @@ function CertificateFormLoading() {
     );
 }
 
- function CertificateForm() {
+function CertificateForm() {
     const searchParams = useSearchParams();
     const certificateId = searchParams.get('id');
+
     const [formData, setFormData] = useState<Certificate>({
-        certificateNo: "",
+        id: "",
+        certificateNo: generateCertificateNumber(),
         customerName: "",
         siteLocation: "",
         makeModel: "",
         range: "",
         serialNo: "",
-        calibrationGas: "",
+        calibrationGas: "", 
         gasCanisterDetails: "",
         dateOfCalibration: new Date().toISOString().split('T')[0],
         calibrationDueDate: new Date().toISOString().split('T')[0],
         observations: [{ gas: "", before: "", after: "" }],
         engineerName: "",
-        status: ""
+        status: "",
     });
 
-    useEffect(() => {
-        if (!certificateId) {
-            generateCertificateNumber().then((number) => {
-                setFormData(prev => ({
-                    ...prev,
-                    certificateNo: number
-                }));
-            });
-        }
-    }, [certificateId]);
     const [certificate, setCertificate] = useState<Certificate | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -136,17 +112,16 @@ function CertificateFormLoading() {
     const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
     const [selectedCompanyName, setSelectedCompanyName] = useState<string | null>(null);
     const [selectedModelId, setSelectedModelId] = useState<string>("");
-    const [selectedRange, setSelectedRange] = useState<string>("");
-    const [isSubmitted, setIsSubmitted] = useState(false);
 
     const fetchCompanies = async () => {
         try {
-            const res = await axios.get('/api/companies');
-            setCompanies(res.data);
+            const res = await axios.get('/api/companies'); 
+            setCompanies(res.data); 
         } catch (err: any) {
-            console.error("Error fetching company", err);
+            console.error("Error fetching companies:", err);
             toast({
-                title: 'Failed to fetch company',
+                title: 'Error',
+                description: err.response?.data?.error || 'Failed to fetch companies.',
                 variant: 'destructive',
             });
         }
@@ -163,18 +138,20 @@ function CertificateFormLoading() {
                 const data = await res.json();
                 setModels(data);
             } catch {
-                toast({ title: "Failed to load models", variant: "destructive" });
+                toast({ title: "Error", description: "Failed to load models", variant: "destructive" });
             }
         };
+
         const fetchEngineers = async () => {
             try {
                 const res = await fetch("/api/engineers");
                 const data = await res.json();
                 setEngineers(data);
             } catch {
-                toast({ title: "Failed to load engineers", variant: "destructive" });
+                toast({ title: "Error", description: "Failed to load engineers", variant: "destructive" });
             }
         };
+
         fetchModels();
         fetchEngineers();
     }, []);
@@ -182,10 +159,13 @@ function CertificateFormLoading() {
     useEffect(() => {
         const fetchCertificateData = async () => {
             const today = new Date().toISOString().split('T')[0];
+    
             if (!certificateId) return;
+    
             try {
                 setLoading(true);
                 setError(null);
+    
                 const response = await axios.get(
                     `/api/certificates?id=${certificateId}`,
                     {
@@ -194,10 +174,13 @@ function CertificateFormLoading() {
                         }
                     }
                 );
+    
                 if (!response.data) {
                     throw new Error("No data received from server");
                 }
+    
                 const certificateData = response.data;
+    
                 const transformedData = {
                     certificateNo: certificateData.certificate_no || generateCertificateNumber(),
                     customerName: certificateData.customer_name || "",
@@ -209,14 +192,15 @@ function CertificateFormLoading() {
                     gasCanisterDetails: certificateData.gas_canister_details || "",
                     dateOfCalibration: certificateData.date_of_calibration?.split('T')[0] || today,
                     calibrationDueDate: certificateData.calibration_due_date?.split('T')[0] || today,
-                    observations: Array.isArray(certificateData.observations)
-                        ? certificateData.observations
+                    observations: Array.isArray(certificateData.observations) 
+                        ? certificateData.observations 
                         : typeof certificateData.observations === 'string'
                             ? JSON.parse(certificateData.observations)
                             : [{ gas: "", before: "", after: "" }],
                     engineerName: certificateData.engineer_name || "",
                     status: certificateData.status || ""
                 };
+    
                 setFormData(prev => ({
                     ...prev,
                     certificateNo: transformedData.certificateNo,
@@ -231,18 +215,20 @@ function CertificateFormLoading() {
                     engineerName: transformedData.engineerName,
                     status: transformedData.status
                 }));
+                
                 setStartDate(transformedData.dateOfCalibration);
                 setEndDate(transformedData.calibrationDueDate);
                 setSelectedModelId(transformedData.makeModel);
-                setSelectedRange(transformedData.range);
+    
             } catch (error) {
                 const err = error as Error;
-                console.error("Error fetching certificate", err);
-                setError(err.message || "Failed to load certificate");
+                console.error("Error fetching certificate:", err);
+                setError(err.message || "Failed to load certificate data");
             } finally {
                 setLoading(false);
             }
         };
+    
         fetchCertificateData();
     }, [certificateId]);
 
@@ -253,6 +239,7 @@ function CertificateFormLoading() {
             ...prev,
             dateOfCalibration: newStartDate
         }));
+
         if (timePeriod) {
             const startDateObj = new Date(newStartDate);
             startDateObj.setMonth(startDateObj.getMonth() + timePeriod);
@@ -268,6 +255,7 @@ function CertificateFormLoading() {
     const handleTimePeriodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const period = Number(e.target.value);
         setTimePeriod(period);
+
         if (startDate) {
             const startDateObj = new Date(startDate);
             startDateObj.setMonth(startDateObj.getMonth() + period);
@@ -282,6 +270,7 @@ function CertificateFormLoading() {
 
     const handleChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
+
         setFormData(prev => ({
             ...prev,
             [name]: value
@@ -294,9 +283,17 @@ function CertificateFormLoading() {
         const selectedModel = models.find(m => m.id === modelId);
         const modelRange = selectedModel?.range || "";
         const modelName = selectedModel?.model_name || "";
+
         let updatedObservations = [{ gas: "", before: "", after: "" }];
         
-        setSelectedRange(modelRange);
+        if (modelName === "GMIleakSurveyor") {
+            updatedObservations = Array(3).fill({ gas: "", before: "", after: "" });
+        } else if (modelName === "GMIGT41Series") {
+            updatedObservations = Array(4).fill({ gas: "", before: "", after: "" });
+        } else if (modelName === "GMIGT44") {
+            updatedObservations = Array(3).fill({ gas: "", before: "", after: "" });
+        }
+    
         setFormData(prev => ({
             ...prev,
             makeModel: modelName,
@@ -328,16 +325,9 @@ function CertificateFormLoading() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (isSubmitted) {
-            toast({
-                title: "Already Submitted",
-                description: "This certificate has already been submitted. Please create a new certificate if needed.",
-                variant: "destructive",
-            });
-            return;
-        }
         setLoading(true);
         setError(null);
+
         try {
             const requiredFields: Record<string, string> = {
                 customerName: "Customer Name",
@@ -350,11 +340,14 @@ function CertificateFormLoading() {
                 status: "Status",
                 engineerName: "Engineer Name"
             };
+
             const missingFields = Object.entries(requiredFields)
                 .filter(([field]) => !formData[field as keyof typeof formData]?.toString().trim())
                 .map(([_, label]) => label);
+
             if (!startDate) missingFields.push("Date of Calibration");
             if (!endDate) missingFields.push("Calibration Due Date");
+
             const invalidObservations = formData.observations
                 .map((obs, index) => {
                     const missing: string[] = [];
@@ -364,12 +357,14 @@ function CertificateFormLoading() {
                     return missing;
                 })
                 .flat();
+
             const validationErrors = [...missingFields, ...invalidObservations];
             if (validationErrors.length > 0) {
                 setError(`Please fill in: ${validationErrors.join(", ")}`);
                 setLoading(false);
                 return;
             }
+
             const submissionData = {
                 ...formData,
                 id: certificateId || undefined,
@@ -381,9 +376,11 @@ function CertificateFormLoading() {
                     after: obs.after.trim()
                 }))
             };
+
             const isEditMode = !!certificateId;
             const method = isEditMode ? 'put' : 'post';
             const url = `/api/certificates${isEditMode ? `?id=${certificateId}` : ''}`;
+
             const response = await axios({
                 method,
                 url,
@@ -393,26 +390,28 @@ function CertificateFormLoading() {
                     "Content-Type": "application/json"
                 }
             });
-            setIsSubmitted(true);
+
             setCertificate(response.data);
             toast({
-                title: isEditMode
-                    ? "Certificate updated successfully"
+                title: "Success",
+                description: isEditMode 
+                    ? "Certificate updated successfully" 
                     : "Certificate created successfully",
                 variant: "default",
             });
-            if (!isEditMode) {
-            }
+
         } catch (err: unknown) {
             let errorMessage = "An unexpected error occurred";
+            
             if (axios.isAxiosError(err)) {
-                errorMessage = err.response?.data?.message ||
-                    err.response?.data?.error ||
-                    err.message;
+                errorMessage = err.response?.data?.message || 
+                              err.response?.data?.error || 
+                              err.message;
             } else if (err instanceof Error) {
                 errorMessage = err.message;
             }
-            console.error("Submission error", errorMessage);
+
+            console.error("Submission error:", errorMessage);
             setError(errorMessage);
             toast({
                 title: "Error",
@@ -424,94 +423,39 @@ function CertificateFormLoading() {
         }
     };
 
-     const handleKeyDown = (e: React.KeyboardEvent) => {
-        const target = e.target as HTMLElement;
-
-        if (target.tagName.toLowerCase() === 'textarea') return;
-
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            toast({
-                title: "Error Form Submission",
-                description: "Please use the submit button to submit the form",
-                variant: "destructive",
-            });
-        }
-    };
-    const filteredCompanies = companies.filter(company =>
-        company.company_name.toLowerCase().includes(companySearchTerm.toLowerCase())
-    );
-
-    const resetForm = () => {
-        setFormData({
-            customerName: "",
-            siteLocation: "",
-            range: "",
-            serialNo: "",
-            calibrationGas: "",
-            gasCanisterDetails: "",
-            dateOfCalibration: "",
-            calibrationDueDate: "",
-            engineerName: "",
-            certificateNo: "",
-            makeModel: "",
-            status: "",
-            observations: [],
-        });
-
-        setStartDate("");
-        setEndDate("");
-        setSelectedModelId("");
-        setSelectedCompanyName("");
-        setTimePeriod(null);
-        setCertificate(null);
-        setIsSubmitted(false);
-    };
-
-
-
-
-     const handleDownload = () => {
+    const handleDownload = () => {
         const logo = new Image();
         logo.src = "/img/rps.png";
 
-        const footerImg = new Image();
-        footerImg.src = "/img/handf.png";
-
-        const loadImages = new Promise<void>((resolve, reject) => {
-            let loaded = 0;
-            const checkLoaded = () => {
-                loaded++;
-                if (loaded === 2) resolve();
-            };
-            logo.onload = checkLoaded;
-            footerImg.onload = checkLoaded;
-            logo.onerror = footerImg.onerror = () => reject("Failed to load images");
-        });
-
-        loadImages.then(() => {
-            const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+        logo.onload = () => {
+            const doc = new jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
 
-            const leftMargin = 15, rightMargin = 15, topMargin = 20, bottomMargin = 20;
+            const leftMargin = 15;
+            const rightMargin = 15;
+            const topMargin = 20;
+            const bottomMargin = 20;
             const contentWidth = pageWidth - leftMargin - rightMargin;
-            const contentStartY = 40;
+            let y = topMargin;
+
+            const logoWidth = 60;
+            const logoHeight = 20;
+            const logoX = 2;
+            const logoY = 10;
+
+            doc.addImage(logo, "PNG", logoX, logoY, logoWidth, logoHeight);
+
+            y = logoY + logoHeight + 10;
+
+            doc.setFont("times", "bold").setFontSize(16).setTextColor(0, 51, 102);
+            doc.text("CALIBRATION CERTIFICATE", pageWidth / 2, y, { align: "center" });
+            y += 10;
+
+            const labelX = leftMargin;
+            const labelWidth = 55;
+            const valueX = labelX + labelWidth + 2;
             const lineGap = 8;
-
-            let y = contentStartY;
-
-            const addLogo = () => {
-                doc.addImage(logo, "PNG", 2, 10, 60, 20);
-            };
-
-            const checkPageBreak = (blockHeight = 10) => {
-                if (y + blockHeight > pageHeight - bottomMargin) {
-                    doc.addPage();
-                    addLogo();
-                    y = contentStartY;
-                }
-            };
 
             const formatDate = (inputDateString: string | undefined) => {
                 if (!inputDateString) return "N/A";
@@ -522,28 +466,13 @@ function CertificateFormLoading() {
             };
 
             const addRow = (labelText: string, value: string) => {
-                const labelWidth = 55;
-                const valueX = leftMargin + labelWidth + 2;
-                const lines = doc.splitTextToSize(value || "N/A", contentWidth - labelWidth - 10);
-                const blockHeight = lines.length * lineGap;
-                checkPageBreak(blockHeight);
-
                 doc.setFont("times", "bold").setFontSize(11).setTextColor(0);
-                doc.text(labelText, leftMargin, y);
+                doc.text(labelText, labelX, y);
                 doc.setFont("times", "normal").setTextColor(50);
-                lines.forEach((line: string, i: number) => {
-                    doc.text(": " + line, valueX, y + i * lineGap);
-                });
-
-                y += blockHeight;
+                doc.text(": " + (value || "N/A"), valueX, y);
+                y += lineGap;
             };
 
-            addLogo();
-            doc.setFont("times", "bold").setFontSize(16).setTextColor(0, 51, 102);
-            doc.text("CALIBRATION CERTIFICATE", pageWidth / 2, y, { align: "center" });
-            y += 12;
-
-            // Fields
             addRow("Certificate No.", formData.certificateNo);
             addRow("Customer Name", formData.customerName);
             addRow("Site Location", formData.siteLocation);
@@ -552,49 +481,39 @@ function CertificateFormLoading() {
             addRow("Serial No.", formData.serialNo);
             addRow("Calibration Gas", formData.calibrationGas);
             addRow("Gas Canister Details", formData.gasCanisterDetails);
+
             y += 5;
             addRow("Date of Calibration", formatDate(formData.dateOfCalibration));
             addRow("Calibration Due Date", formatDate(formData.calibrationDueDate));
             addRow("Status", formData.status);
-            y += 5;
 
-            // Divider
-            checkPageBreak(10);
+            y += 5;
             doc.setDrawColor(180);
             doc.setLineWidth(0.3);
             doc.line(leftMargin, y, pageWidth - rightMargin, y);
             y += 10;
 
-            // Table
             doc.setFont("times", "bold").setFontSize(12).setTextColor(0, 51, 102);
             doc.text("OBSERVATIONS", leftMargin, y);
             y += 10;
 
-            // Table Setup
-            // Table Setup
             const colWidths = [20, 70, 40, 40];
             const headers = ["Sr. No.", "Concentration of Gas", "Reading Before", "Reading After"];
-
-            // Header Styling
-            checkPageBreak(10);
             let x = leftMargin;
-            doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
 
-            // Draw Header Row with thicker border and vertical center
-            const headerHeight = 10;
+            doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
             headers.forEach((header, i) => {
-                doc.setLineWidth(0.5); // Thicker border
-                doc.rect(x, y, colWidths[i], headerHeight);
-                doc.text(header, x + 2, y + headerHeight / 2 + 2.5); // vertically center
+                doc.rect(x, y - 5, colWidths[i], 8);
+                doc.text(header, x + 2, y);
                 x += colWidths[i];
             });
-            y += headerHeight;
+            y += 8;
 
-            // Table Body Styling
             doc.setFont("times", "normal").setFontSize(10);
-            doc.setLineWidth(0.2); // Normal border
-
             formData.observations.forEach((obs, index) => {
+                let x = leftMargin;
+                const rowY = y + index * 8;
+
                 const rowData = [
                     `${index + 1}`,
                     obs.gas || "",
@@ -602,123 +521,69 @@ function CertificateFormLoading() {
                     obs.after || ""
                 ];
 
-                const cellPadding = 3;
-                const cellLines = rowData.map((text, i) =>
-                    doc.splitTextToSize(text, colWidths[i] - 2 * cellPadding)
-                );
-                const rowHeight = Math.max(...cellLines.map(lines => lines.length)) * 6 + 2;
-
-                checkPageBreak(rowHeight);
-
-                let x = leftMargin;
-                cellLines.forEach((lines, colIndex) => {
-                    const colX = x;
-                    const colW = colWidths[colIndex];
-
-                    // Cell border
-                    doc.rect(colX, y, colW, rowHeight);
-
-                    const totalTextHeight = lines.length * 6;
-                    const verticalOffset = (rowHeight - totalTextHeight) / 2;
-
-                    lines.forEach((line: string, lineIndex: number) => {
-                        const lineY = y + verticalOffset + lineIndex * 6 + 4;
-                        const centerX = colX + colW / 2;
-                        doc.text(line, centerX, lineY, {
-                            align: "center",
-                            maxWidth: colW - 6,
-                        });
-                    });
-
-                    x += colW;
+                rowData.forEach((text, colIndex) => {
+                    doc.rect(x, rowY - 6, colWidths[colIndex], 8);
+                    doc.text(text, x + 2, rowY);
+                    x += colWidths[colIndex];
                 });
-
-                y += rowHeight;
             });
 
-
-
-            y += 15;
+            y += formData.observations.length * 8 + 15;
 
             const conclusion = "The above-mentioned Gas Detector was calibrated successfully, and the result confirms that the performance of the instrument is within acceptable limits.";
-            const conclusionLines = doc.splitTextToSize(conclusion, contentWidth);
-            checkPageBreak(conclusionLines.length * 6 + 10);
             doc.setFont("times", "normal").setFontSize(10).setTextColor(0);
+            const conclusionLines = doc.splitTextToSize(conclusion, contentWidth);
             doc.text(conclusionLines, leftMargin, y);
             y += conclusionLines.length * 6 + 15;
 
-            // Engineer Info
-            checkPageBreak(20);
             doc.setFont("times", "bold");
             doc.text("Tested & Calibrated By", pageWidth - rightMargin, y, { align: "right" });
             doc.setFont("times", "normal");
             doc.text(formData.engineerName || "________________", pageWidth - rightMargin, y + 10, { align: "right" });
-            y += 20;
 
-            // Footer text only on last page
-            const addFooterToAllPages = () => {
-                const footerWidth = 180;
-                const footerHeight = 15;
-                const footerX = (pageWidth - footerWidth) / 2;
-                const pageCount = doc.getNumberOfPages();
+            doc.setDrawColor(180);
+            doc.line(leftMargin, pageHeight - bottomMargin - 10, pageWidth - rightMargin, pageHeight - bottomMargin - 10);
 
-                for (let i = 1; i <= pageCount; i++) {
-                    doc.setPage(i);
-                    doc.addImage(footerImg, "PNG", footerX, pageHeight - 20, footerWidth, footerHeight);
+            doc.setFontSize(8).setTextColor(100);
+            doc.text("This certificate is electronically generated and does not require a physical signature.", leftMargin, pageHeight - bottomMargin - 5);
+            doc.text(`Generated on: ${new Date().toLocaleString()}`, leftMargin, pageHeight - bottomMargin);
 
-                    if (i === pageCount) {
-                        const footerTextY = pageHeight - bottomMargin - 20;
-                        doc.setFontSize(8).setTextColor(100);
-                        doc.text(
-                            "This certificate is electronically generated and does not require a physical signature.",
-                            leftMargin,
-                            footerTextY
-                        );
-                        doc.text(
-                            `Generated on: ${new Date().toLocaleString()}`,
-                            leftMargin,
-                            footerTextY + 10
-                        );
-                    }
-                }
-            };
-
-            addFooterToAllPages();
             doc.save("calibration-certificate.pdf");
-            resetForm();
-        }).catch(err => {
-            console.error(err);
-            alert("Error loading images. Please check your image paths.");
-        });
+        };
+
+        logo.onerror = () => {
+            console.error("Failed to load logo image.");
+            alert("Logo image not found. Please check the path.");
+        };
     };
 
+    const filteredCompanies = companies.filter(company =>
+        company.company_name.toLowerCase().includes(companySearchTerm.toLowerCase())
+    );
+
     if (loading && certificateId) {
-        return (
-            <div className="flex justify-center items-center h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
-                <span className="ml-4">Loading certificate data...</span>
-            </div>
-        );
+        return <CertificateFormLoading />;
     }
 
     return (
         <SidebarProvider>
-            <AppSidebar />
+            <AdminSidebar />
             <SidebarInset>
                 <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
+
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
                                 <BreadcrumbItem>
-                                    <BreadcrumbLink href="/user/dashboard">
+                                    <BreadcrumbLink href="/admin/dashboard">
                                         Dashboard
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block" />
                                 <BreadcrumbItem>
-                                    <BreadcrumbLink href="/user/certificaterecord">
+                                    <BreadcrumbLink href="/admin/certificaterecord">
                                         Certificate Record
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
@@ -739,7 +604,7 @@ function CertificateFormLoading() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-6">
+                            <form onSubmit={handleSubmit} className="space-y-6">
                                 {error && (
                                     <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
                                         <span className="block sm:inline">{error}</span>
@@ -766,12 +631,13 @@ function CertificateFormLoading() {
                                             onBlur={() => setTimeout(() => setShowCompanyDropdown(false), 150)}
                                             className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md w-full text-sm"
                                         />
+
                                         {showCompanyDropdown && (
                                             <ul className="absolute left-0 top-full mt-1 z-20 w-full rounded-md border bg-white text-sm shadow-lg max-h-60 overflow-y-auto">
                                                 {filteredCompanies.length > 0 ? (
                                                     filteredCompanies.map((company) => (
                                                         <li
-                                                            key={company.id}
+                                                            key={company._id}
                                                             className={`px-4 py-2 cursor-pointer transition-colors ${selectedCompanyName === company.company_name ? " font-medium" : ""
                                                                 }`}
                                                             onMouseDown={(e) => e.preventDefault()}
@@ -790,12 +656,13 @@ function CertificateFormLoading() {
                                                     ))
                                                 ) : (
                                                     <li className="px-4 py-2 text-gray-500">
-                                                        {companySearchTerm ? "Go to create company and add data" : "Start typing to search company"}
+                                                        {companySearchTerm ? "No companies found" : "Start typing to search companies"}
                                                     </li>
                                                 )}
                                             </ul>
                                         )}
                                     </div>
+
                                     <input
                                         type="text"
                                         name="siteLocation"
@@ -818,10 +685,11 @@ function CertificateFormLoading() {
                                             </option>
                                         ))}
                                     </select>
+
                                     <input
                                         value={formData.range}
                                         readOnly
-                                        className="bg-gray-100 text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md w-full sm:w-1/2"
+                                        className="w-full sm:w-1/2 bg-gray-100 border px-3 py-2 rounded-md text-black"
                                         placeholder="Model Range"
                                     />
                                 </div>
@@ -859,10 +727,11 @@ function CertificateFormLoading() {
                                         name="dateOfCalibration"
                                         value={startDate}
                                         onChange={handleStartDateChange}
-                                        className="p-2 rounded-md border bg-gray-300"
+                                        className="p-2 rounded-md border bg-white"
                                         min="2000-01-01"
                                         max="2100-12-31"
                                     />
+
                                     <select
                                         onChange={handleTimePeriodChange}
                                         className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
@@ -887,7 +756,7 @@ function CertificateFormLoading() {
                                                 calibrationDueDate: e.target.value
                                             }));
                                         }}
-                                        className="p-2 rounded-md border bg-gray-300"
+                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         disabled={timePeriod !== null}
                                         data-date-format="DD-MM-YYYY"
                                         min="2000-01-01"
@@ -915,7 +784,7 @@ function CertificateFormLoading() {
                                         value={formData.certificateNo}
                                         onChange={handleChange}
                                         readOnly
-                                        className="bg-gray-100 text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                     />
                                     <select
                                         name="status"
@@ -928,12 +797,13 @@ function CertificateFormLoading() {
                                         <option value="Unchecked">Unchecked</option>
                                     </select>
                                 </div>
+
                                 <h2 className="text-lg font-bold mt-4 text-center">Observation Table</h2>
                                 <div className="flex justify-end mb-4">
                                     <button
                                         type="button"
                                         onClick={addObservation}
-                                        className="bg-purple-950 text-white px-4 py-2 border rounded hover:bg-purple-900"
+                                        className="bg-purple-950 text-white px-4 py-2 border rounded hover:bg-gray-900"
                                         disabled={formData.observations.length >= 5}
                                     >
                                         Create Observation
@@ -959,7 +829,7 @@ function CertificateFormLoading() {
                                                         name="gas"
                                                         value={observation.gas}
                                                         onChange={(e) => handleObservationChange(index, 'gas', e.target.value)}
-                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md w-full"
+                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
                                                     />
                                                 </td>
                                                 <td className="border p-2">
@@ -968,7 +838,7 @@ function CertificateFormLoading() {
                                                         name="before"
                                                         value={observation.before}
                                                         onChange={(e) => handleObservationChange(index, 'before', e.target.value)}
-                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md w-full"
+                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
                                                     />
                                                 </td>
                                                 <td className="border p-2">
@@ -977,7 +847,7 @@ function CertificateFormLoading() {
                                                         name="after"
                                                         value={observation.after}
                                                         onChange={(e) => handleObservationChange(index, 'after', e.target.value)}
-                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md w-full"
+                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
                                                     />
                                                 </td>
                                                 <td className="border p-2">
@@ -993,7 +863,7 @@ function CertificateFormLoading() {
                                         {formData.observations.length === 0 && (
                                             <tr>
                                                 <td colSpan={5} className="border p-2 text-center text-gray-500">
-                                                    Click "Create Observation" to add one
+                                                    Click Create Observation to add one
                                                 </td>
                                             </tr>
                                         )}
@@ -1006,20 +876,19 @@ function CertificateFormLoading() {
                                         )}
                                     </tbody>
                                 </table>
-                                 <button
+
+                                <button
                                     type="submit"
-                                    className={`bg-purple-950 text-white p-2 rounded-md w-full ${loading ? "opacity-75" : isSubmitted ? "bg-purple-950950" : "hover:bg-purple-900"
-                                        }`}
-                                    disabled={loading || isSubmitted}
+                                    className="bg-blue-950 hover:bg-blue-900 text-white p-2 rounded-md w-full"
+                                    disabled={loading}
                                 >
                                     {loading ? "Generating..." : "Generate Certificate"}
                                 </button>
                             </form>
 
-
                             {certificate && (
                                 <div className="mt-4 text-center">
-                                    <p className="text-green-600 mb-2">Certificate Generated Successfully</p>
+                                    <p className="text-green-600 mb-2">{certificate.id}</p>
                                     <button
                                         onClick={handleDownload}
                                         className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"

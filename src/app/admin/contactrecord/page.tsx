@@ -86,7 +86,8 @@ export default function ContactRecordTable() {
 
   const handleDelete = useCallback((contactId: string) => {
     if (!contactId) return;
-    fetch(`/api/contactpersons?id=${contactId}`, { method: "DELETE" })
+    fetch(`/api/contactPersons?id=${contactId}`, { method: "DELETE" })
+
       .then((response) => response.json())
       .then((data) => {
         if (data.message === "Contact deleted successfully") {

@@ -229,6 +229,7 @@ export default function CertificateTable() {
             const contentWidth = pageWidth - leftMargin - rightMargin;
             const contentStartY = 40;
             let y = contentStartY;
+            let x = leftMargin;
 
             const addLogo = () => {
                 doc.addImage(logo, "PNG", 2, 10, 60, 20);
@@ -305,16 +306,19 @@ export default function CertificateTable() {
             const colWidths = [20, 70, 40, 40];
             const headers = ["Sr. No.", "Concentration of Gas", "Reading Before", "Reading After"];
 
+            // --- TABLE HEADER ---
             checkPageBreak(10);
-            let x = leftMargin;
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+            x = leftMargin;
+
             headers.forEach((header, i) => {
-                doc.rect(x, y - 5, colWidths[i], 8);
-                doc.text(header, x + 2, y);
+                doc.rect(x, y, colWidths[i], 8); // Draw header cell border
+                doc.text(header, x + 2, y + 6);  // Left-aligned header text
                 x += colWidths[i];
             });
-            y += 2;
+            y += 8;
 
+            // --- TABLE BODY ---
             doc.setFont("times", "normal").setFontSize(10);
             certificateToDownload.observations.forEach((obs, index) => {
                 const rowData = [
@@ -324,41 +328,36 @@ export default function CertificateTable() {
                     obs.after || ""
                 ];
 
-                const cellPadding = 2;
-
                 const cellLines = rowData.map((text, i) =>
-                    doc.splitTextToSize(text, colWidths[i] - 2 * cellPadding)
+                    doc.splitTextToSize(text, colWidths[i] - 4)
                 );
+
                 const rowHeight = Math.max(...cellLines.map(lines => lines.length)) * 6;
                 checkPageBreak(rowHeight);
                 x = leftMargin;
 
-                 cellLines.forEach((lines, colIndex) => {
+                cellLines.forEach((lines, colIndex) => {
                     const colX = x;
                     const colW = colWidths[colIndex];
 
-                    // Draw cell border
-                    doc.rect(colX, y, colW, rowHeight);
-
-                    const totalTextHeight = lines.length * 6;
-                    const verticalOffset = (rowHeight - totalTextHeight) / 2;
+                    doc.rect(colX, y, colW, rowHeight); // border
 
                     lines.forEach((line: string, lineIndex: number) => {
-                        const lineY = y + verticalOffset + lineIndex * 6 + 4; 
-                        const centerX = colX + colW / 2;
+                        const textY = y + lineIndex * 6 + 5;
+                        const align: "left" | "center" = colIndex === 0 ? "center" : "left";
+                        const textX = colIndex === 0
+                            ? colX + colW / 2
+                            : colX + 2;
 
-                        doc.text(line, centerX, lineY, {
-                            align: "center",
-                            maxWidth: colW - 6, 
-                        });
+                        doc.text(line, textX, textY, { align });
                     });
+
 
                     x += colW;
                 });
 
                 y += rowHeight;
             });
-
 
             y += 15;
 
@@ -381,11 +380,26 @@ export default function CertificateTable() {
                 for (let i = 1; i <= pageCount; i++) {
                     doc.setPage(i);
                     addFooter();
-                    doc.setFontSize(8).setTextColor(100);
-                    doc.text("This certificate is electronically generated and does not require a physical signature.", leftMargin, pageHeight - bottomMargin - 5);
-                    doc.text(`Generated on: ${new Date().toLocaleString()}`, leftMargin, pageHeight - bottomMargin);
+
+                    if (i === pageCount) {  // <-- Only on the last page
+                        const footerTextY = pageHeight - bottomMargin - 20;
+                        const generatedOnY = footerTextY + 10;
+
+                        doc.setFontSize(8).setTextColor(100);
+                        doc.text(
+                            "This certificate is electronically generated and does not require a physical signature.",
+                            leftMargin,
+                            footerTextY
+                        );
+                        doc.text(
+                            `Generated on: ${new Date().toLocaleString()}`,
+                            leftMargin,
+                            generatedOnY
+                        );
+                    }
                 }
             };
+
 
             addFooterToAllPages();
 
@@ -400,6 +414,7 @@ export default function CertificateTable() {
             setIsDownloading(null);
         }
     };
+
 
 
     const topContent = React.useMemo(() => {

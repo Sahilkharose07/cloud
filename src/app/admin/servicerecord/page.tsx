@@ -331,7 +331,7 @@ export default function AdminServiceTable() {
                         const cellLines = rowData.map((text, i) =>
                             doc.splitTextToSize(text, colWidths[i] - 4)
                         );
-                        const rowHeight = Math.max(...cellLines.map(lines => lines.length)) * 5;
+                        const rowHeight = Math.max(...cellLines.map(lines => lines.length)) * 7;
                         checkPageBreak(rowHeight);
 
                         x = leftMargin;

@@ -28,7 +28,7 @@ export default function RootLayout({
   return (
     <html suppressHydrationWarning={true} lang="en">
       <head>
-        <link rel="icon" href="/img/rps.png" type="image/png" sizes="64x64"/>
+        <link rel="icon" href="/img/rps.png" type="image/png" sizes="auto"/>
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
