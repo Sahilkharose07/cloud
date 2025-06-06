@@ -1,10 +1,7 @@
 import type { NextConfig } from 'next';
 
-type CustomExperimentalConfig = NextConfig['experimental'] & {
-  missingSuspenseWithCSRBailout?: boolean;
-};
-
 const nextConfig: NextConfig = {
+  output: 'standalone',
   images: {
     domains: ['example.com'],
     unoptimized: true,
@@ -12,12 +9,11 @@ const nextConfig: NextConfig = {
     disableStaticImages: false,
   },
   productionBrowserSourceMaps: false,
-  optimizeFonts: true,
   compress: true,
   experimental: {
     externalDir: true,
     fallbackNodePolyfills: false,
-  } as CustomExperimentalConfig,
+  },
   async headers() {
     return [
       {
