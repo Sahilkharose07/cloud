@@ -38,6 +38,7 @@ interface Certificate {
     engineer_name: string;
     status: string;
     createdAt?: string;
+    [key: string]: string | Observation[] | undefined;
 }
 
 
