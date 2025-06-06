@@ -14,9 +14,6 @@ const nextConfig: NextConfig = {
     externalDir: true,
     fallbackNodePolyfills: false,
   },
-  typescript: {
-    ignoreBuildErrors: true, 
-  },
   async headers() {
     return [
       {
