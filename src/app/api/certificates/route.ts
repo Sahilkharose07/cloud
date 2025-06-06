@@ -152,8 +152,8 @@ export async function PUT(request: Request) {
     }
 
     // Prepare update fields dynamically
-    const fieldsToUpdate = [];
-    const values = [];
+    const fieldsToUpdate: string[] = [];
+    const values: any[] = [];
     const validFields = [
       'certificateNo', 'customerName', 'siteLocation', 'makeModel',
       'range', 'serialNo', 'calibrationGas', 'gasCanisterDetails',
