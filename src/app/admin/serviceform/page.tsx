@@ -215,7 +215,8 @@ function GenerateService() {
             const response = await axios.get(`/api/services?id=${serviceId}`);
             const serviceData = response.data;
 
-            let engineerRemarks = [];
+            let engineerRemarks: EngineerRemark[] = [];
+
             try {
                 if (typeof serviceData.engineer_remarks === 'string') {
                     engineerRemarks = JSON.parse(serviceData.engineer_remarks);
