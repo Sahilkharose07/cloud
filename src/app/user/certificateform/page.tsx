@@ -45,36 +45,36 @@ interface Engineer {
     name: string;
 }
 
-const generateCertificateNumber = async () => {
-  try {
-    const response = await fetch('/api/certificate_report', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+const generateCertificateNumber = async (increment: boolean = false) => {
+    try {
+        const response = await fetch('/api/certificate_report', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ increment }), // Pass the increment parameter
+        });
 
-    if (!response.ok) {
-      throw new Error('Failed to generate certificate number');
+        if (!response.ok) {
+            throw new Error('Failed to generate certificate number');
+        }
+
+        const data = await response.json();
+        return data.certificateNumber;
+    } catch (error) {
+        console.error('Error generating certificate number:', error);
+        // Fallback logic remains the same
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const shortStartYear = String(currentYear).slice(-2);
+        const shortEndYear = String(currentYear + 1).slice(-2);
+        const yearRange = `${shortStartYear}-${shortEndYear}`;
+
+        const randomNum = Math.floor(Math.random() * 9999) + 1;
+        const padded = String(randomNum).padStart(4, "0");
+
+        return `RPS/CER/${yearRange}/${padded}`;
     }
-
-    const data = await response.json();
-    return data.certificateNumber;
-  } catch (error) {
-    console.error('Error generating certificate number:', error);
-
-
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const shortStartYear = String(currentYear).slice(-2);
-    const shortEndYear = String(currentYear + 1).slice(-2);
-    const yearRange = `${shortStartYear}-${shortEndYear}`;
-
-    const randomNum = Math.floor(Math.random() * 9999) + 1; // 1 to 9999
-    const padded = String(randomNum).padStart(4, "0");
-
-    return `RPS/CER/${yearRange}/${padded}`;
-  }
 };
 
 export default function CertificateFormWrapper() {
@@ -114,15 +114,17 @@ function CertificateFormLoading() {
     });
 
     useEffect(() => {
-        if (!certificateId) {
-            generateCertificateNumber().then((number) => {
-                setFormData(prev => ({
-                    ...prev,
-                    certificateNo: number
-                }));
-            });
-        }
-    }, [certificateId]);
+            if (!certificateId) {
+                generateCertificateNumber(false).then((number) => {
+                    setFormData(prev => ({
+                        ...prev,
+                        certificateNo: number
+                    }));
+                });
+            }
+        }, [certificateId]);
+
+        
     const [certificate, setCertificate] = useState<Certificate | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);

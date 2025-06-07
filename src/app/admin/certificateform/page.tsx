@@ -45,37 +45,38 @@ interface Engineer {
     name: string;
 }
 
-const generateCertificateNumber = async () => {
-  try {
-    const response = await fetch('/api/certificate_report', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+const generateCertificateNumber = async (increment: boolean = false) => {
+    try {
+        const response = await fetch('/api/certificate_report', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ increment }), // Pass the increment parameter
+        });
 
-    if (!response.ok) {
-      throw new Error('Failed to generate certificate number');
+        if (!response.ok) {
+            throw new Error('Failed to generate certificate number');
+        }
+
+        const data = await response.json();
+        return data.certificateNumber;
+    } catch (error) {
+        console.error('Error generating certificate number:', error);
+        // Fallback logic remains the same
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const shortStartYear = String(currentYear).slice(-2);
+        const shortEndYear = String(currentYear + 1).slice(-2);
+        const yearRange = `${shortStartYear}-${shortEndYear}`;
+
+        const randomNum = Math.floor(Math.random() * 9999) + 1;
+        const padded = String(randomNum).padStart(4, "0");
+
+        return `RPS/CER/${yearRange}/${padded}`;
     }
-
-    const data = await response.json();
-    return data.certificateNumber;
-  } catch (error) {
-    console.error('Error generating certificate number:', error);
-
-
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const shortStartYear = String(currentYear).slice(-2);
-    const shortEndYear = String(currentYear + 1).slice(-2);
-    const yearRange = `${shortStartYear}-${shortEndYear}`;
-
-    const randomNum = Math.floor(Math.random() * 9999) + 1; // 1 to 9999
-    const padded = String(randomNum).padStart(4, "0");
-
-    return `RPS/CER/${yearRange}/${padded}`;
-  }
 };
+
 
 export default function CertificateFormWrapper() {
     return (
@@ -112,10 +113,9 @@ function CertificateForm() {
         engineerName: "",
         status: ""
     });
-
     useEffect(() => {
         if (!certificateId) {
-            generateCertificateNumber().then((number) => {
+            generateCertificateNumber(false).then((number) => {
                 setFormData(prev => ({
                     ...prev,
                     certificateNo: number
@@ -123,6 +123,7 @@ function CertificateForm() {
             });
         }
     }, [certificateId]);
+
     const [certificate, setCertificate] = useState<Certificate | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -335,6 +336,7 @@ function CertificateForm() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
         if (isSubmitted) {
             toast({
                 title: "Already Submitted",
@@ -343,9 +345,17 @@ function CertificateForm() {
             });
             return;
         }
+
         setLoading(true);
         setError(null);
+
         try {
+            const isEditMode = !!certificateId;
+
+            // Use existing certificateNo from formData; no increment here
+            let certificateNo = formData.certificateNo;
+
+            // Validate required fields
             const requiredFields: Record<string, string> = {
                 customerName: "Customer Name",
                 siteLocation: "Site Location",
@@ -362,6 +372,7 @@ function CertificateForm() {
                 .map(([_, label]) => label);
             if (!startDate) missingFields.push("Date of Calibration");
             if (!endDate) missingFields.push("Calibration Due Date");
+
             const invalidObservations = formData.observations
                 .map((obs, index) => {
                     const missing: string[] = [];
@@ -371,14 +382,18 @@ function CertificateForm() {
                     return missing;
                 })
                 .flat();
+
             const validationErrors = [...missingFields, ...invalidObservations];
+
             if (validationErrors.length > 0) {
                 setError(`Please fill in: ${validationErrors.join(", ")}`);
                 setLoading(false);
                 return;
             }
+
             const submissionData = {
                 ...formData,
+                certificateNo,
                 id: certificateId || undefined,
                 dateOfCalibration: startDate,
                 calibrationDueDate: endDate,
@@ -388,9 +403,10 @@ function CertificateForm() {
                     after: obs.after.trim()
                 }))
             };
-            const isEditMode = !!certificateId;
+
             const method = isEditMode ? 'put' : 'post';
             const url = `/api/certificates${isEditMode ? `?id=${certificateId}` : ''}`;
+
             const response = await axios({
                 method,
                 url,
@@ -400,16 +416,17 @@ function CertificateForm() {
                     "Content-Type": "application/json"
                 }
             });
+
             setCertificate(response.data);
             setIsSubmitted(true);
+            setFormData(prev => ({ ...prev, certificateNo }));
+
             toast({
                 title: isEditMode
                     ? "Certificate updated successfully"
                     : "Certificate created successfully",
                 variant: "default",
             });
-            if (!isEditMode) {
-            }
         } catch (err: unknown) {
             let errorMessage = "An unexpected error occurred";
             if (axios.isAxiosError(err)) {
@@ -430,6 +447,8 @@ function CertificateForm() {
             setLoading(false);
         }
     };
+
+
 
     const filteredCompanies = companies.filter(company =>
         company.company_name.toLowerCase().includes(companySearchTerm.toLowerCase())
@@ -477,34 +496,41 @@ function CertificateForm() {
     };
 
 
-    const handleDownload = () => {
-        const logo = new Image();
-        logo.src = "/img/rps.png";
+    const handleDownload = async () => {
+        try {
+            // Use the current certificate number for printing
+            const currentCertNo = formData.certificateNo;
 
-        const footerImg = new Image();
-        footerImg.src = "/img/handf.png";
+            // Load logo and footer images
+            const logo = new Image();
+            logo.src = "/img/rps.png";
 
-        const loadImages = new Promise<void>((resolve, reject) => {
-            let loaded = 0;
-            const checkLoaded = () => {
-                loaded++;
-                if (loaded === 2) resolve();
-            };
-            logo.onload = checkLoaded;
-            footerImg.onload = checkLoaded;
-            logo.onerror = footerImg.onerror = () => reject("Failed to load images");
-        });
+            const footerImg = new Image();
+            footerImg.src = "/img/handf.png";
 
-        loadImages.then(() => {
+            await new Promise<void>((resolve, reject) => {
+                let loaded = 0;
+                const checkLoaded = () => {
+                    loaded++;
+                    if (loaded === 2) resolve();
+                };
+                logo.onload = checkLoaded;
+                footerImg.onload = checkLoaded;
+                logo.onerror = footerImg.onerror = () => reject("Failed to load images");
+            });
+
+            // Initialize jsPDF document
             const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
 
-            const leftMargin = 15, rightMargin = 15, topMargin = 20, bottomMargin = 20;
+            const leftMargin = 15,
+                rightMargin = 15,
+                topMargin = 20,
+                bottomMargin = 20;
             const contentWidth = pageWidth - leftMargin - rightMargin;
             const contentStartY = 40;
             const lineGap = 8;
-
             let y = contentStartY;
 
             const addLogo = () => {
@@ -549,8 +575,8 @@ function CertificateForm() {
             doc.text("CALIBRATION CERTIFICATE", pageWidth / 2, y, { align: "center" });
             y += 12;
 
-            // Fields
-            addRow("Certificate No.", formData.certificateNo);
+            // Add rows with current certificate number and other data
+            addRow("Certificate No.", currentCertNo);
             addRow("Customer Name", formData.customerName);
             addRow("Site Location", formData.siteLocation);
             addRow("Make & Model", formData.makeModel);
@@ -564,41 +590,39 @@ function CertificateForm() {
             addRow("Status", formData.status);
             y += 5;
 
-            // Divider
+            // Divider line
             checkPageBreak(10);
             doc.setDrawColor(180);
             doc.setLineWidth(0.3);
             doc.line(leftMargin, y, pageWidth - rightMargin, y);
             y += 10;
 
-            // Table
+            // Observations Table
             doc.setFont("times", "bold").setFontSize(12).setTextColor(0, 51, 102);
             doc.text("OBSERVATIONS", leftMargin, y);
             y += 10;
 
-            // Table Setup
-            // Table Setup
+            // Table columns and headers
             const colWidths = [20, 70, 40, 40];
             const headers = ["Sr. No.", "Concentration of Gas", "Reading Before", "Reading After"];
 
-            // Header Styling
+            // Header Row
             checkPageBreak(10);
             let x = leftMargin;
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-
-            // Draw Header Row with thicker border and vertical center
             const headerHeight = 10;
+
             headers.forEach((header, i) => {
-                doc.setLineWidth(0.5); // Thicker border
+                doc.setLineWidth(0.5); // thicker border
                 doc.rect(x, y, colWidths[i], headerHeight);
-                doc.text(header, x + 2, y + headerHeight / 2 + 2.5); // vertically center
+                doc.text(header, x + 2, y + headerHeight / 2 + 2.5); // vertically center text
                 x += colWidths[i];
             });
             y += headerHeight;
 
-            // Table Body Styling
+            // Table Body
             doc.setFont("times", "normal").setFontSize(10);
-            doc.setLineWidth(0.2); // Normal border
+            doc.setLineWidth(0.2); // normal border
 
             formData.observations.forEach((obs, index) => {
                 const rowData = [
@@ -621,7 +645,7 @@ function CertificateForm() {
                     const colX = x;
                     const colW = colWidths[colIndex];
 
-                    // Cell border
+                    // Draw cell border
                     doc.rect(colX, y, colW, rowHeight);
 
                     const totalTextHeight = lines.length * 6;
@@ -642,10 +666,9 @@ function CertificateForm() {
                 y += rowHeight;
             });
 
-
-
             y += 15;
 
+            // Conclusion text
             const conclusion = "The above-mentioned Gas Detector was calibrated successfully, and the result confirms that the performance of the instrument is within acceptable limits.";
             const conclusionLines = doc.splitTextToSize(conclusion, contentWidth);
             checkPageBreak(conclusionLines.length * 6 + 10);
@@ -661,7 +684,7 @@ function CertificateForm() {
             doc.text(formData.engineerName || "________________", pageWidth - rightMargin, y + 10, { align: "right" });
             y += 20;
 
-            // Footer text only on last page
+            // Footer text on all pages
             const addFooterToAllPages = () => {
                 const footerWidth = 180;
                 const footerHeight = 15;
@@ -690,13 +713,24 @@ function CertificateForm() {
             };
 
             addFooterToAllPages();
+
+            // Save PDF
             doc.save("calibration-certificate.pdf");
+
+            // Now increment the certificate number **after** saving the PDF
+            const newCertNo = await generateCertificateNumber(true);
+            setFormData(prev => ({ ...prev, certificateNo: newCertNo }));
+
+            // Reset form if needed
             resetForm();
-        }).catch(err => {
+
+        } catch (err) {
             console.error(err);
-            alert("Error loading images. Please check your image paths.");
-        });
+            alert("Error loading images or generating PDF. Please check your image paths and try again.");
+        }
     };
+
+
 
 
 

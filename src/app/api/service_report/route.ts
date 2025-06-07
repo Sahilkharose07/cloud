@@ -6,8 +6,10 @@ const client = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    const { increment = true } = await request.json(); 
+
     const now = new Date();
     const yearStart = String(now.getFullYear()).slice(-2);
     const yearEnd = String(now.getFullYear() + 1).slice(-2);
@@ -31,13 +33,15 @@ export async function POST() {
       });
     } else {
       const last = result.rows[0].last_number as number;
-      newNumber = last + 1;
+      newNumber = increment ? last + 1 : last; // Only increment if `increment` is true
       serviceReportNo = `RPS/SER/${yearRange}/${String(newNumber).padStart(4, "0")}`;
 
-      await client.execute({
-        sql: `UPDATE service_report SET last_number = ?, genrate_num = ? WHERE id = ?`,
-        args: [newNumber, serviceReportNo, "service"],
-      });
+      if (increment) {
+        await client.execute({
+          sql: `UPDATE service_report SET last_number = ?, genrate_num = ? WHERE id = ?`,
+          args: [newNumber, serviceReportNo, "service"],
+        });
+      }
     }
 
     return NextResponse.json({ serviceReportNo }, { status: 200 });
