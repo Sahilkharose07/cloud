@@ -707,7 +707,7 @@ function GenerateService() {
 
             y += 10;
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-            doc.text("Engineer Remarks:", leftMargin, y);
+            doc.text("Customer Remarks:", leftMargin, y);
             y += 5;
 
             const customerReportLines = doc.splitTextToSize(formData.customerReport || "No report provided", contentWidth - 5);
