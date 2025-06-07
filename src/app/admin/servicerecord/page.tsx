@@ -247,7 +247,7 @@ export default function AdminServiceTable() {
                 doc.addImage(logo, "PNG", 5, 5, 50, 15);
                 y = 40;
                 doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
-                doc.text("SERVICE / CALIBRATION / INSTALLATION JOBREPORT", pageWidth / 2, y, { align: "center" });
+                doc.text("SERVICE / CALIBRATION / INSTALLATION JOB REPORT", pageWidth / 2, y, { align: "center" });
                 y += 10;
 
                 // Report Info
@@ -286,6 +286,8 @@ export default function AdminServiceTable() {
                 // Engineer Remarks Table
                 doc.addPage();
                 y = topMargin;
+                doc.addImage(logo, "PNG", 5, 5, 50, 15);
+                y = 40;
 
                 doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
                 doc.text("ENGINEER REMARKS", leftMargin, y);
@@ -353,7 +355,7 @@ export default function AdminServiceTable() {
 
                 // Customer Report
                 doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-                doc.text("Customer Report:", leftMargin, y);
+                doc.text("Engineer Remarks:", leftMargin, y);
                 y += 5;
 
                 const customerReportLines = doc.splitTextToSize(service.customer_report || "No report provided", contentWidth - 5);

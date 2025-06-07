@@ -193,209 +193,211 @@ export default function AdminServiceTable() {
     }, [sortDescriptor, items]);
 
     const handleDownload = (service: Service) => {
-        const logo = new Image();
-        logo.src = "/img/rps.png";
-        logo.onload = () => {
-            const infoImage = new Image();
-            infoImage.src = "/img/handf.png";
-            infoImage.onload = () => {
-                const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-                const pageWidth = doc.internal.pageSize.getWidth();
-                const pageHeight = doc.internal.pageSize.getHeight();
-
-                const leftMargin = 15;
-                const rightMargin = 15;
-                const topMargin = 20;
-                const contentWidth = pageWidth - leftMargin - rightMargin;
-                let y = topMargin;
-
-                const pad = (n: number) => n.toString().padStart(2, "0");
-                const formatDate = (inputDateString: string | undefined): string => {
-                    if (!inputDateString) return "N/A";
-                    const inputDate = new Date(inputDateString);
-                    if (isNaN(inputDate.getTime())) return "N/A";
-                    return `${pad(inputDate.getDate())}-${pad(inputDate.getMonth() + 1)}-${inputDate.getFullYear()}`;
-                };
-
-                const checkPageBreak = (blockHeight = 10) => {
-                    if (y + blockHeight > pageHeight - 30) {
-                        doc.addPage();
-                        y = topMargin;
-                        doc.addImage(logo, "PNG", 5, 5, 50, 15);
-                        y = 40;
-                    }
-                };
-
-                const addRow = (label: string, value: string) => {
-                    const labelOffset = 65;
-                    const lines = doc.splitTextToSize(value || "N/A", contentWidth - labelOffset);
-                    const blockHeight = lines.length * 6;
-                    checkPageBreak(blockHeight);
-
-                    doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-                    doc.text(label + ":", leftMargin, y);
-                    doc.setFont("times", "normal").setTextColor(50);
-                    lines.forEach((line: string, i: number) => {
-                        doc.text(line, leftMargin + labelOffset, y + i * 6);
-                    });
-
-                    y += blockHeight;
-                };
-
-                // Header
-                doc.addImage(logo, "PNG", 5, 5, 50, 15);
-                y = 40;
-                doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
-                doc.text("SERVICE / CALIBRATION / INSTALLATION JOBREPORT", pageWidth / 2, y, { align: "center" });
-                y += 10;
-
-                // Report Info
-                addRow("Report No.", service.report_no);
-                addRow("Customer Name", service.customer_name);
-                addRow("Customer Location", service.customer_location);
-                addRow("Contact Person", service.contact_person);
-                addRow("Status", service.status);
-                addRow("Contact Number", service.contact_number);
-                addRow("Service Engineer", service.service_engineer);
-                addRow("Date", formatDate(service.date));
-                addRow("Place", service.place);
-                addRow("Place Options", service.place_options);
-                addRow("Nature of Job", service.nature_of_job);
-                addRow("Make & Model Number", service.make_model_number_of_the_instrument_quantity);
-                y += 5;
-                addRow("Calibrated & Tested OK", service.serial_number_of_the_instrument_calibrated_ok);
-                addRow("Sr.No Faulty/Non-Working", service.serial_number_of_the_faulty_non_working_instruments);
-                y += 10;
-
-                // Engineer Report
-                doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-                doc.text("Engineer Report:", leftMargin, y);
-                y += 5;
-
-                const engineerReportLines = doc.splitTextToSize(service.engineer_report || "No report provided", contentWidth - 5);
-                const engineerReportHeight = engineerReportLines.length * 6 + 5;
-                checkPageBreak(engineerReportHeight);
-
-                doc.setDrawColor(0).setLineWidth(0.2);
-                doc.rect(leftMargin, y, contentWidth, engineerReportHeight);
-                doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
-                doc.text(engineerReportLines, leftMargin + 2, y + 5);
-                y += engineerReportHeight + 5;
-
-                // Engineer Remarks Table
-                doc.addPage();
-                y = topMargin;
-
-                doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-                doc.text("ENGINEER REMARKS", leftMargin, y);
-                y += 8;
-
-                const tableHeaders = ["Sr. No.", "Service/Spares", "Part No.", "Rate", "Quantity", "Total", "PO No."];
-                const colWidths = [15, 50, 25, 20, 20, 25, 25];
-                let x = leftMargin;
-
-                doc.setFont("times", "bold").setFontSize(9);
-                tableHeaders.forEach((header, i) => {
-                    doc.rect(x, y, colWidths[i], 8);
-                    doc.text(header, x + 2, y + 6);
-                    x += colWidths[i];
-                });
-                y += 8;
-
-                let engineer_remarks: engineer_remarks[] = [];
-                try {
-                    if (typeof service.engineer_remarks === "string") {
-                        engineer_remarks = JSON.parse(service.engineer_remarks);
-                    } else if (Array.isArray(service.engineer_remarks)) {
-                        engineer_remarks = service.engineer_remarks;
-                    }
-                } catch (err) {
-                    console.error("Failed to parse engineer_remarks:", err);
-                }
-
-                doc.setFont("times", "normal").setFontSize(9);
-
-                if (engineer_remarks.length > 0) {
-                    engineer_remarks.forEach((remark, index) => {
-                        const rowData = [
-                            String(index + 1),
-                            remark.serviceSpares || "",
-                            remark.partNo || "",
-                            remark.rate || "",
-                            remark.quantity || "",
-                            remark.total || "",
-                            remark.poNo || ""
-                        ];
-
-                        const cellLines = rowData.map((text, i) =>
-                            doc.splitTextToSize(text, colWidths[i] - 4)
-                        );
-                        const rowHeight = Math.max(...cellLines.map(lines => lines.length)) * 7;
-                        checkPageBreak(rowHeight);
-
-                        x = leftMargin;
-                        cellLines.forEach((lines, colIndex) => {
-                            doc.rect(x, y, colWidths[colIndex], rowHeight);
-                            doc.text(lines, x + 2, y + 5);
-                            x += colWidths[colIndex];
+            const logo = new Image();
+            logo.src = "/img/rps.png";
+            logo.onload = () => {
+                const infoImage = new Image();
+                infoImage.src = "/img/handf.png";
+                infoImage.onload = () => {
+                    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+                    const pageWidth = doc.internal.pageSize.getWidth();
+                    const pageHeight = doc.internal.pageSize.getHeight();
+    
+                    const leftMargin = 15;
+                    const rightMargin = 15;
+                    const topMargin = 20;
+                    const contentWidth = pageWidth - leftMargin - rightMargin;
+                    let y = topMargin;
+    
+                    const pad = (n: number) => n.toString().padStart(2, "0");
+                    const formatDate = (inputDateString: string | undefined): string => {
+                        if (!inputDateString) return "N/A";
+                        const inputDate = new Date(inputDateString);
+                        if (isNaN(inputDate.getTime())) return "N/A";
+                        return `${pad(inputDate.getDate())}-${pad(inputDate.getMonth() + 1)}-${inputDate.getFullYear()}`;
+                    };
+    
+                    const checkPageBreak = (blockHeight = 10) => {
+                        if (y + blockHeight > pageHeight - 30) {
+                            doc.addPage();
+                            y = topMargin;
+                            doc.addImage(logo, "PNG", 5, 5, 50, 15);
+                            y = 40;
+                        }
+                    };
+    
+                    const addRow = (label: string, value: string) => {
+                        const labelOffset = 65;
+                        const lines = doc.splitTextToSize(value || "N/A", contentWidth - labelOffset);
+                        const blockHeight = lines.length * 6;
+                        checkPageBreak(blockHeight);
+    
+                        doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+                        doc.text(label + ":", leftMargin, y);
+                        doc.setFont("times", "normal").setTextColor(50);
+                        lines.forEach((line: string, i: number) => {
+                            doc.text(line, leftMargin + labelOffset, y + i * 6);
                         });
-
-                        y += rowHeight;
-                    });
-                } else {
-                    doc.setFont("times", "italic").setFontSize(9).setTextColor(150);
-                    doc.text("No engineer remarks available", leftMargin, y);
+    
+                        y += blockHeight;
+                    };
+    
+                    // Header
+                    doc.addImage(logo, "PNG", 5, 5, 50, 15);
+                    y = 40;
+                    doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
+                    doc.text("SERVICE / CALIBRATION / INSTALLATION JOB REPORT", pageWidth / 2, y, { align: "center" });
+                    y += 10;
+    
+                    // Report Info
+                    addRow("Report No.", service.report_no);
+                    addRow("Customer Name", service.customer_name);
+                    addRow("Customer Location", service.customer_location);
+                    addRow("Contact Person", service.contact_person);
+                    addRow("Status", service.status);
+                    addRow("Contact Number", service.contact_number);
+                    addRow("Service Engineer", service.service_engineer);
+                    addRow("Date", formatDate(service.date));
+                    addRow("Place", service.place);
+                    addRow("Place Options", service.place_options);
+                    addRow("Nature of Job", service.nature_of_job);
+                    addRow("Make & Model Number", service.make_model_number_of_the_instrument_quantity);
+                    y += 5;
+                    addRow("Calibrated & Tested OK", service.serial_number_of_the_instrument_calibrated_ok);
+                    addRow("Sr.No Faulty/Non-Working", service.serial_number_of_the_faulty_non_working_instruments);
+                    y += 10;
+    
+                    // Engineer Report
+                    doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+                    doc.text("Engineer Report:", leftMargin, y);
+                    y += 5;
+    
+                    const engineerReportLines = doc.splitTextToSize(service.engineer_report || "No report provided", contentWidth - 5);
+                    const engineerReportHeight = engineerReportLines.length * 6 + 5;
+                    checkPageBreak(engineerReportHeight);
+    
+                    doc.setDrawColor(0).setLineWidth(0.2);
+                    doc.rect(leftMargin, y, contentWidth, engineerReportHeight);
+                    doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
+                    doc.text(engineerReportLines, leftMargin + 2, y + 5);
+                    y += engineerReportHeight + 5;
+    
+                    // Engineer Remarks Table
+                    doc.addPage();
+                    y = topMargin;
+                    doc.addImage(logo, "PNG", 5, 5, 50, 15);
+                    y = 40;
+    
+                    doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+                    doc.text("ENGINEER REMARKS", leftMargin, y);
                     y += 8;
-                }
-
-                y += 10;
-
-                // Customer Report
-                doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-                doc.text("Customer Report:", leftMargin, y);
-                y += 5;
-
-                const customerReportLines = doc.splitTextToSize(service.customer_report || "No report provided", contentWidth - 5);
-                const customerReportHeight = customerReportLines.length * 6 + 5;
-                checkPageBreak(customerReportHeight);
-
-                doc.setDrawColor(0).setLineWidth(0.2);
-                doc.rect(leftMargin, y, contentWidth, customerReportHeight);
-                doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
-                doc.text(customerReportLines, leftMargin + 2, y + 5);
-                y += customerReportHeight + 35;
-
-                // Signatures
-                doc.text("Customer Name,Seal & Sign", leftMargin, y);
-                doc.text("Service Engineer,Seal & Sign", pageWidth - rightMargin - 40, y);
-                doc.text(service.service_engineer || "", pageWidth - rightMargin - 40, y + 5);
-
-                // Timestamp
-                const now = new Date();
-                const date = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}`;
-                const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-                doc.setFontSize(9).setTextColor(100);
-                doc.text(`Report Generated On: ${date} ${time}`, leftMargin, pageHeight - 30);
-
-                // Footer Image on All Pages
-                const footerY = pageHeight - 20;
-                const footerWidth = 180;
-                const footerHeight = 15;
-                const footerX = (pageWidth - footerWidth) / 2;
-                const pageCount = doc.getNumberOfPages();
-                for (let i = 1; i <= pageCount; i++) {
-                    doc.setPage(i);
-                    doc.addImage(infoImage, "PNG", footerX, footerY, footerWidth, footerHeight);
-                }
-
-                const sanitizedCustomerName = service.customer_name?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'unknown_customer';
-                const reportNumber = service.report_no || service.id;
-                doc.save(`service-${sanitizedCustomerName}-${reportNumber}.pdf`);
+    
+                    const tableHeaders = ["Sr. No.", "Service/Spares", "Part No.", "Rate", "Quantity", "Total", "PO No."];
+                    const colWidths = [15, 50, 25, 20, 20, 25, 25];
+                    let x = leftMargin;
+    
+                    doc.setFont("times", "bold").setFontSize(9);
+                    tableHeaders.forEach((header, i) => {
+                        doc.rect(x, y, colWidths[i], 8);
+                        doc.text(header, x + 2, y + 6);
+                        x += colWidths[i];
+                    });
+                    y += 8;
+    
+                    let engineer_remarks: engineer_remarks[] = [];
+                    try {
+                        if (typeof service.engineer_remarks === "string") {
+                            engineer_remarks = JSON.parse(service.engineer_remarks);
+                        } else if (Array.isArray(service.engineer_remarks)) {
+                            engineer_remarks = service.engineer_remarks;
+                        }
+                    } catch (err) {
+                        console.error("Failed to parse engineer_remarks:", err);
+                    }
+    
+                    doc.setFont("times", "normal").setFontSize(9);
+    
+                    if (engineer_remarks.length > 0) {
+                        engineer_remarks.forEach((remark, index) => {
+                            const rowData = [
+                                String(index + 1),
+                                remark.serviceSpares || "",
+                                remark.partNo || "",
+                                remark.rate || "",
+                                remark.quantity || "",
+                                remark.total || "",
+                                remark.poNo || ""
+                            ];
+    
+                            const cellLines = rowData.map((text, i) =>
+                                doc.splitTextToSize(text, colWidths[i] - 4)
+                            );
+                            const rowHeight = Math.max(...cellLines.map(lines => lines.length)) * 7;
+                            checkPageBreak(rowHeight);
+    
+                            x = leftMargin;
+                            cellLines.forEach((lines, colIndex) => {
+                                doc.rect(x, y, colWidths[colIndex], rowHeight);
+                                doc.text(lines, x + 2, y + 5);
+                                x += colWidths[colIndex];
+                            });
+    
+                            y += rowHeight;
+                        });
+                    } else {
+                        doc.setFont("times", "italic").setFontSize(9).setTextColor(150);
+                        doc.text("No engineer remarks available", leftMargin, y);
+                        y += 8;
+                    }
+    
+                    y += 10;
+    
+                    // Customer Report
+                    doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+                    doc.text("Engineer Remarks:", leftMargin, y);
+                    y += 5;
+    
+                    const customerReportLines = doc.splitTextToSize(service.customer_report || "No report provided", contentWidth - 5);
+                    const customerReportHeight = customerReportLines.length * 6 + 5;
+                    checkPageBreak(customerReportHeight);
+    
+                    doc.setDrawColor(0).setLineWidth(0.2);
+                    doc.rect(leftMargin, y, contentWidth, customerReportHeight);
+                    doc.setFont("times", "normal").setFontSize(9).setTextColor(0);
+                    doc.text(customerReportLines, leftMargin + 2, y + 5);
+                    y += customerReportHeight + 35;
+    
+                    // Signatures
+                    doc.text("Customer Name,Seal & Sign", leftMargin, y);
+                    doc.text("Service Engineer,Seal & Sign", pageWidth - rightMargin - 40, y);
+                    doc.text(service.service_engineer || "", pageWidth - rightMargin - 40, y + 5);
+    
+                    // Timestamp
+                    const now = new Date();
+                    const date = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}`;
+                    const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+                    doc.setFontSize(9).setTextColor(100);
+                    doc.text(`Report Generated On: ${date} ${time}`, leftMargin, pageHeight - 30);
+    
+                    // Footer Image on All Pages
+                    const footerY = pageHeight - 20;
+                    const footerWidth = 180;
+                    const footerHeight = 15;
+                    const footerX = (pageWidth - footerWidth) / 2;
+                    const pageCount = doc.getNumberOfPages();
+                    for (let i = 1; i <= pageCount; i++) {
+                        doc.setPage(i);
+                        doc.addImage(infoImage, "PNG", footerX, footerY, footerWidth, footerHeight);
+                    }
+    
+                    const sanitizedCustomerName = service.customer_name?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'unknown_customer';
+                    const reportNumber = service.report_no || service.id;
+                    doc.save(`service-${sanitizedCustomerName}-${reportNumber}.pdf`);
+                };
+                infoImage.onerror = () => alert("Footer image not found. Please check the path.");
             };
-            infoImage.onerror = () => alert("Footer image not found. Please check the path.");
+            logo.onerror = () => alert("Logo image not found. Please check the path.");
         };
-        logo.onerror = () => alert("Logo image not found. Please check the path.");
-    };
 
     const topContent = React.useMemo(() => {
         return (

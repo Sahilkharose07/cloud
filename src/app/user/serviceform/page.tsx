@@ -634,7 +634,7 @@ function GenerateService() {
             doc.addImage(logo, "PNG", 5, 5, 50, 15);
             y = 40;
             doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
-            doc.text("SERVICE / CALIBRATION / INSTALLATION JOBREPORT", pageWidth / 2, y, { align: "center" });
+            doc.text("SERVICE / CALIBRATION / INSTALLATION JOB REPORT", pageWidth / 2, y, { align: "center" });
             y += 10;
 
             // Use current reportNo, DO NOT generate new one here
@@ -656,7 +656,7 @@ function GenerateService() {
             y += 10;
 
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
-            doc.text("Engineer Report:", leftMargin, y);
+            doc.text("Engineer Remarks:", leftMargin, y);
             y += 5;
 
             const engLines = doc.splitTextToSize(formData.engineerReport || "No report provided", contentWidth - 5);
