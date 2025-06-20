@@ -1226,23 +1226,26 @@ function GenerateService() {
                             </form>
 
                             {/* Updated download button section */}
-                            {(service?.serviceId || formData.id) && (
-                                <div className="mt-4 text-center">
-                                    <p className="text-green-600 mb-2">Service report ready for download</p>
-                                    <button
-                                        onClick={() => handleDownload(service?.serviceId || formData.id)}
-                                        className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 flex items-center justify-center"
-                                        disabled={isGeneratingPDF}
-                                    >
-                                        {isGeneratingPDF ? (
-                                            <span className="flex items-center justify-center">
-                                                <span className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></span>
-                                                Generating PDF...
-                                            </span>
-                                        ) : "Download Service Report & Send Email"}
-                                    </button>
-                                </div>
-                            )}
+                            {/* Updated download button section */}
+{(service?.serviceId || formData.id) && (
+    <div className="mt-4 flex justify-center"> {/* Changed from text-center to flex justify-center */}
+        <div className="text-center"> {/* Added an inner div for text alignment */}
+            <p className="text-green-600 mb-2">Service report ready for download</p>
+            <button
+                onClick={() => handleDownload(service?.serviceId || formData.id)}
+                className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 flex items-center justify-center"
+                disabled={isGeneratingPDF}
+            >
+                {isGeneratingPDF ? (
+                    <span className="flex items-center justify-center">
+                        <span className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></span>
+                        Generating PDF...
+                    </span>
+                ) : "Download Service Report & Send Email"}
+            </button>
+        </div>
+    </div>
+)}
                         </CardContent>
                     </Card>
                 </div>

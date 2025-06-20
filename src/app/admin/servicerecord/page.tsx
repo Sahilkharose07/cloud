@@ -69,6 +69,7 @@ const columns = [
     { name: "Contact Person", uid: "contact_person", sortable: true, width: "120px" },
     { name: "Contact Number", uid: "contact_number", sortable: true, width: "120px" },
     { name: "Service Engineer", uid: "service_engineer", sortable: true, width: "120px" },
+    { name: "Date of Service", uid: "date", sortable: true, width: "120px" },
     { name: "Action", uid: "actions", sortable: true, width: "100px" },
 ];
 
@@ -513,52 +514,45 @@ export default function AdminServiceTable() {
         const cellValue = service[columnKey as keyof Service];
 
         // Handle date columns
-        if ((columnKey === "dateOfCalibration" || columnKey === "calibrationDueDate")) {
+        if (columnKey === "date") {
             if (typeof cellValue === "string") {
                 return formatDate(cellValue);
             }
-            return null; // or some fallback for invalid dates
         }
 
         // Handle actions column
         if (columnKey === "actions") {
             return (
                 <div className="relative flex items-center gap-2">
-                    <Tooltip content="Download">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-lg text-danger cursor-pointer active:opacity-50"
-                            onClick={() => handleDownload(service)}
-                            disabled={isDownloading === service.id}
-                        >
-                            {isDownloading === service.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <Download className="h-6 w-6" />
-                            )}
-                        </Button>
-                    </Tooltip>
-                    <Tooltip content="Edit">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-lg text-info cursor-pointer active:opacity-50"
-                            onClick={() => router.push(`serviceform?id=${service.id}`)}
-                        >
-                            <Edit className="h-6 w-6" />
-                        </Button>
-                    </Tooltip>
-                    <Tooltip content="Delete">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-lg text-danger cursor-pointer active:opacity-50"
-                            onClick={() => handleDelete(service.id)}
-                        >
-                            <Trash2 className="h-6 w-6" />
-                        </Button>
-                    </Tooltip>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-lg text-danger cursor-pointer active:opacity-50"
+                        onClick={() => handleDownload(service)}
+                        disabled={isDownloading === service.id}
+                    >
+                        {isDownloading === service.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Download className="h-6 w-6" />
+                        )}
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-lg text-info cursor-pointer active:opacity-50"
+                        onClick={() => router.push(`serviceform?id=${service.id}`)}
+                    >
+                        <Edit className="h-6 w-6" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-lg text-danger cursor-pointer active:opacity-50"
+                        onClick={() => handleDelete(service.id)}
+                    >
+                        <Trash2 className="h-6 w-6" />
+                    </Button>
                 </div>
             );
         }

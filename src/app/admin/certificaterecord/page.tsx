@@ -49,7 +49,11 @@ const generateUniqueId = () => {
 };
 const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
-    return date.toISOString().split("T")[0];
+    if (isNaN(date.getTime())) return "Invalid Date";
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
 };
 
 const columns = [
@@ -59,6 +63,7 @@ const columns = [
     { name: "Model", uid: "make_model", sortable: true, width: "120px" },
     { name: "Serial Number", uid: "serial_no", sortable: true, width: "120px" },
     { name: "Engineer Name", uid: "engineer_name", sortable: true, width: "120px" },
+    { name: "Date of Calibration", uid: "date_of_calibration", sortable: true, width: "120px" },
     { name: "Actions", uid: "actions", sortable: true, width: "100px" },
 ];
 const INITIAL_VISIBLE_COLUMNS = ["certificate_no", "customer_name", "site_location", "make_model", "serial_no", "engineer_name", "actions"];
