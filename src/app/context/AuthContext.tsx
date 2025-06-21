@@ -21,17 +21,20 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true); // <-- prevents hydration mismatch
 
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
+    // Only run on client
+    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
     setIsAuthenticated(!!token);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
     const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === 'authToken' && event.newValue === null) {
-        setIsAuthenticated(false);
+      if (event.key === 'authToken') {
+        setIsAuthenticated(!!event.newValue);
       }
     };
 
@@ -48,6 +51,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem('authToken');
     setIsAuthenticated(false);
   };
+
+  if (loading) return null; // or a loading screen/spinner
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, login, logout }}>

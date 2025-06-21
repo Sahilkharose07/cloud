@@ -4,7 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { HeroUIProvider } from "@heroui/react";
-import { AuthProvider } from "@/app/context/AuthContext"; // 👈 Import Auth Context
+import { Providers } from "./Provider"; // ✅ Correct: this is client-wrapped AuthProvider
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,7 +13,7 @@ const geistSans = Geist({
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
-  subsets: ["latin"],     
+  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
@@ -27,28 +27,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html suppressHydrationWarning={true} lang="en">
+    <html suppressHydrationWarning lang="en">
       <head>
-        <link rel="icon" href="/img/rps.png" type="image/png" sizes="auto" />
+        <link rel="icon" href="/img/rps.png" type="image/png" />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <div className="hidden md:block"></div>
-        
-        {/* ✅ Wrap everything with AuthProvider */}
-        <AuthProvider>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <Providers>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
             disableTransitionOnChange
           >
-            <HeroUIProvider>
-              {children}
-            </HeroUIProvider>
+            <HeroUIProvider>{children}</HeroUIProvider>
           </ThemeProvider>
-        </AuthProvider>
+        </Providers>
 
         <Toaster />
       </body>
