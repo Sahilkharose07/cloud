@@ -12,7 +12,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbS
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
 import { Tooltip } from "@heroui/react";
 import { AdminSidebar } from "@/components/admin-sidebar";
-import PrivateRoute from "@/components/PrivateRoute";
+
 interface ContactPerson {
   id: string;
   first_name: string;
@@ -86,8 +86,7 @@ export default function ContactRecordTable() {
 
   const handleDelete = useCallback((contactId: string) => {
     if (!contactId) return;
-    fetch(`/api/contactPersons?id=${contactId}`, { method: "DELETE" })
-
+    fetch(`/api/contactpersons?id=${contactId}`, { method: "DELETE" })
       .then((response) => response.json())
       .then((data) => {
         if (data.message === "Contact deleted successfully") {
@@ -188,8 +187,7 @@ export default function ContactRecordTable() {
   }, [router, handleDelete, companies]);
 
   return (
-    <PrivateRoute>
-      <SidebarProvider>
+    <SidebarProvider>
       <AdminSidebar />
       <SidebarInset>
         <header className="flex h-16 items-center gap-2 transition-[width,height] ease-linear">
@@ -278,6 +276,5 @@ export default function ContactRecordTable() {
         </div>
       </SidebarInset>
     </SidebarProvider>
-    </PrivateRoute>
   );
 }

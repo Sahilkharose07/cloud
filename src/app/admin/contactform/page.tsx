@@ -15,7 +15,6 @@ import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import axios from "axios";
-import PrivateRoute from "@/components/PrivateRoute";
 
 interface companies {
   id: string;
@@ -167,8 +166,7 @@ function ContactFormLoading() {
   };
 
   return (
-    <PrivateRoute>
-      <SidebarProvider>
+    <SidebarProvider>
       <AdminSidebar />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2">
@@ -344,6 +342,5 @@ function ContactFormLoading() {
         </div>
       </SidebarInset>
     </SidebarProvider>
-    </PrivateRoute>
   );
 }

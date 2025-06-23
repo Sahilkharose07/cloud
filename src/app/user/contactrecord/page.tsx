@@ -11,7 +11,6 @@ import { Separator } from "@/components/ui/separator";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
 import { AppSidebar } from "@/components/app-sidebar";
-import PrivateRoute from "@/components/PrivateRoute";
 
 interface ContactPerson {
   id: string;
@@ -155,8 +154,7 @@ export default function ContactRecordTable() {
   }, [router, handleDelete, companies]);
 
   return (
-   <PrivateRoute>
-     <SidebarProvider>
+    <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
         <header className="flex h-16 items-center gap-2 transition-[width,height] ease-linear">
@@ -246,6 +244,5 @@ export default function ContactRecordTable() {
         </div>
       </SidebarInset>
     </SidebarProvider>
-   </PrivateRoute>
   );
 }

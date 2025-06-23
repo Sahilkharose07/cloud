@@ -15,7 +15,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import axios from "axios";
 import { AppSidebar } from "@/components/app-sidebar";
-import PrivateRoute from "@/components/PrivateRoute";
 
 interface companies {
   id: string;
@@ -166,8 +165,7 @@ function ContactForm() {
   };
 
   return (
-    <PrivateRoute>
-      <SidebarProvider>
+    <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2">
@@ -343,6 +341,5 @@ function ContactForm() {
         </div>
       </SidebarInset>
     </SidebarProvider>
-    </PrivateRoute>
   );
 }
