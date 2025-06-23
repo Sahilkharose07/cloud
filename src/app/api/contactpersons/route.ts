@@ -142,7 +142,7 @@ export async function PUT(request: Request) {
   }
 }
 
-
+// DELETE - Delete contact person by id
 export async function DELETE(request: Request) {
   try {
     const url = new URL(request.url);
