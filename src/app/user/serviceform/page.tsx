@@ -428,14 +428,19 @@ function GenerateService() {
         }
 
         try {
-            // Determine edit mode
             const isEditMode = !!formData.id;
-
-            // Generate report number if not in edit mode and empty
             let reportNo = formData.reportNo;
-            if (!isEditMode && !reportNo) {
+
+            if (!isEditMode) {
+                if (!reportNo) {
+                    reportNo = await generateReportNo(false);
+                    setFormData(prev => ({ ...prev, reportNo }));
+                }
                 reportNo = await generateReportNo(true);
             }
+
+            // Use the date exactly as it comes from the form
+            const serviceDate = formData.date || new Date().toISOString().split('T')[0];
 
             const payload = {
                 id: formData.id || uuidv4(),
@@ -446,7 +451,7 @@ function GenerateService() {
                 contactNumber: formData.contactNumber.trim(),
                 serviceEngineer: formData.serviceEngineer.trim(),
                 serviceEngineerId: formData.serviceEngineerId,
-                date: formData.date,
+                date: serviceDate, // Use the date from form
                 place: formData.place.trim(),
                 placeOptions: formData.placeOptions,
                 natureOfJob: formData.natureOfJob.trim(),
@@ -488,13 +493,14 @@ function GenerateService() {
                 downloadUrl: response.data.downloadUrl || ""
             });
 
-            // Update formData with saved data and reportNo
-            setFormData(prev => ({
-                ...prev,
-                id: response.data.id || prev.id,
-                serviceId: response.data.id || prev.id,
-                reportNo: reportNo.trim()
-            }));
+            if (!isEditMode) {
+                setFormData(prev => ({
+                    ...prev,
+                    id: response.data.id || prev.id,
+                    serviceId: response.data.id || prev.id,
+                    reportNo: reportNo.trim()
+                }));
+            }
 
             toast({
                 title: isEditMode ? "Service updated successfully" : "Service created successfully",
@@ -604,7 +610,7 @@ function GenerateService() {
                 if (y + blockHeight > pageHeight - 30) {
                     doc.addPage();
                     y = topMargin;
-                    doc.addImage(logo, "PNG", 5, 5, 50, 15);
+                    doc.addImage(logo, "PNG", 5, 5, 50, 15); // Add logo on new page
                     y = 40;
                 }
             };
@@ -638,7 +644,6 @@ function GenerateService() {
             doc.text("SERVICE / CALIBRATION / INSTALLATION JOB REPORT", pageWidth / 2, y, { align: "center" });
             y += 10;
 
-            // Use current reportNo, DO NOT generate new one here
             addRow("Report No.", formData.reportNo);
             addRow("Customer Name", formData.customerName);
             addRow("Customer Location", formData.customerLocation);
@@ -668,8 +673,12 @@ function GenerateService() {
             doc.text(engLines, leftMargin + 2, y + 5);
             y += engHeight + 5;
 
+            // Add new page for ENGINEER REMARKS
             doc.addPage();
             y = topMargin;
+            doc.addImage(logo, "PNG", 5, 5, 50, 15); // Add logo on new page
+            y = 40;
+
             doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
             doc.text("ENGINEER REMARKS", leftMargin, y);
             y += 8;
@@ -737,7 +746,6 @@ function GenerateService() {
                 doc.addImage(footerImg, "PNG", (pageWidth - 180) / 2, pageHeight - 20, 180, 15);
             }
 
-            // Convert to base64
             const pdfBlob = doc.output("blob");
             const base64data = await new Promise<string>((resolve, reject) => {
                 const reader = new FileReader();
@@ -750,17 +758,14 @@ function GenerateService() {
                 reader.readAsDataURL(pdfBlob);
             });
 
-            // Send to backend
             await axios.post("/api/send-service", {
                 serviceId: formData.id || formData.serviceId || uuidv4(),
                 pdfData: base64data,
                 customerName: formData.customerName,
             });
 
-            // Save the PDF locally
             doc.save(`service-${serviceId}.pdf`);
 
-            // Increment report number AFTER PDF save/send
             const updatedReportNo = await generateReportNo(true);
             setFormData(prev => ({
                 ...prev,
@@ -792,467 +797,464 @@ function GenerateService() {
 
 
 
-    function handleStartDateChange(event: ChangeEvent<HTMLInputElement>): void {
-        setStartDate(event.target.value);
-    }
+
+
 
     return (
         <PrivateRoute>
             <SidebarProvider>
-            <AppSidebar/>
-            <SidebarInset>
-                <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-                    <div className="flex items-center gap-2 px-4">
-                        <SidebarTrigger className="-ml-1" />
-                        <Separator orientation="vertical" className="mr-2 h-4" />
-                        <Breadcrumb>
-                            <BreadcrumbList>
-                                <BreadcrumbItem className="hidden md:block">
-                                    <BreadcrumbLink href="/user/dashboard">
-                                        Dashboard
-                                    </BreadcrumbLink>
-                                </BreadcrumbItem>
-                                <BreadcrumbSeparator className="hidden md:block" />
-                                <BreadcrumbItem>
-                                    <BreadcrumbLink href="/user/servicerecord">
-                                        Service Record
-                                    </BreadcrumbLink>
-                                </BreadcrumbItem>
-                            </BreadcrumbList>
-                        </Breadcrumb>
-                    </div>
-                </header>
+                <AppSidebar />
+                <SidebarInset>
+                    <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+                        <div className="flex items-center gap-2 px-4">
+                            <SidebarTrigger className="-ml-1" />
+                            <Separator orientation="vertical" className="mr-2 h-4" />
+                            <Breadcrumb>
+                                <BreadcrumbList>
+                                    <BreadcrumbItem className="hidden md:block">
+                                        <BreadcrumbLink href="/user/dashboard">
+                                            Dashboard
+                                        </BreadcrumbLink>
+                                    </BreadcrumbItem>
+                                    <BreadcrumbSeparator className="hidden md:block" />
+                                    <BreadcrumbItem>
+                                        <BreadcrumbLink href="/user/servicerecord">
+                                            Service Record
+                                        </BreadcrumbLink>
+                                    </BreadcrumbItem>
+                                </BreadcrumbList>
+                            </Breadcrumb>
+                        </div>
+                    </header>
 
-                <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15">
-                    <Card className="max-w-6xl mx-auto">
-                        <CardHeader>
-                            <CardTitle className="text-3xl font-bold text-center">
-                                {isEditMode ? "Update Service" : "Create Service"}
-                            </CardTitle>
-                            <CardDescription className="text-center">
-                                {isEditMode
-                                    ? "Modify the service details below"
-                                    : "Fill out the form below to create a new service"}
-                            </CardDescription>
-                        </CardHeader>
+                    <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15">
+                        <Card className="max-w-6xl mx-auto">
+                            <CardHeader>
+                                <CardTitle className="text-3xl font-bold text-center">
+                                    {isEditMode ? "Update Service" : "Create Service"}
+                                </CardTitle>
+                                <CardDescription className="text-center">
+                                    {isEditMode
+                                        ? "Modify the service details below"
+                                        : "Fill out the form below to create a new service"}
+                                </CardDescription>
+                            </CardHeader>
 
-                        <CardContent>
-                            <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-6">
-                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                    <div className="relative w-full">
+                            <CardContent>
+                                <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-6">
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <div className="relative w-full">
+                                            <input
+                                                type="text"
+                                                name="customerName"
+                                                placeholder="Customer Name"
+                                                value={formData.customerName}
+                                                onChange={e => (handleChange(e), setShowDropdown(true))}
+                                                onFocus={() => setShowDropdown(true)}
+                                                onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                                                className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                                required
+                                            />
+                                            {showDropdown && (
+                                                <ul className="absolute left-0 top-full mt-1 z-20 w-full rounded-md border bg-white shadow-lg max-h-60 overflow-y-auto">
+                                                    {isLoadingContacts ? (
+                                                        <li className="px-4 py-2 text-gray-500">Start typing to search company</li>
+                                                    ) : filteredContacts.length > 0 ? (
+                                                        filteredContacts.map((contact) => (
+                                                            <li
+                                                                key={contact.id}
+                                                                className="px-4 py-2 cursor-pointer hover:bg-gray-100"
+                                                                onClick={() => {
+                                                                    setFormData(prev => ({
+                                                                        ...prev,
+                                                                        customerName: contact.companyName || "",
+                                                                        contactPerson: contact.firstName || "",
+                                                                        contactNumber: contact.contactNo || "",
+                                                                    }));
+                                                                    setShowDropdown(false);
+                                                                }}
+                                                            >
+                                                                <div className="font-medium">{contact.companyName || "No company"}</div>
+                                                                <div className="text-sm text-gray-600">
+                                                                    {`Contact: ${contact.firstName} | Phone: ${contact.contactNo}`}
+                                                                </div>
+                                                            </li>
+                                                        ))
+                                                    ) : (
+                                                        <li className="px-4 py-2 text-gray-500">
+                                                            {contactPersons.length === 0
+                                                                ? "Create customer and add data"
+                                                                : "No matching contact found"}
+                                                        </li>
+                                                    )}
+                                                </ul>
+                                            )}
+                                        </div>
                                         <input
                                             type="text"
-                                            name="customerName"
-                                            placeholder="Customer Name"
-                                            value={formData.customerName}
-                                            onChange={e => (handleChange(e), setShowDropdown(true))}
-                                            onFocus={() => setShowDropdown(true)}
-                                            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                                            name="customerLocation"
+                                            placeholder="Site Location"
+                                            value={formData.customerLocation}
+                                            onChange={handleChange}
                                             className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                             required
                                         />
-                                        {showDropdown && (
-                                            <ul className="absolute left-0 top-full mt-1 z-20 w-full rounded-md border bg-white shadow-lg max-h-60 overflow-y-auto">
-                                                {isLoadingContacts ? (
-                                                    <li className="px-4 py-2 text-gray-500">Start typing to search company</li>
-                                                ) : filteredContacts.length > 0 ? (
-                                                    filteredContacts.map((contact) => (
-                                                        <li
-                                                            key={contact.id}
-                                                            className="px-4 py-2 cursor-pointer hover:bg-gray-100"
-                                                            onClick={() => {
-                                                                setFormData(prev => ({
-                                                                    ...prev,
-                                                                    customerName: contact.companyName || "",
-                                                                    contactPerson: contact.firstName || "",
-                                                                    contactNumber: contact.contactNo || "",
-                                                                }));
-                                                                setShowDropdown(false);
-                                                            }}
-                                                        >
-                                                            <div className="font-medium">{contact.companyName || "No company"}</div>
-                                                            <div className="text-sm text-gray-600">
-                                                                {`Contact: ${contact.firstName} | Phone: ${contact.contactNo}`}
-                                                            </div>
-                                                        </li>
-                                                    ))
-                                                ) : (
-                                                    <li className="px-4 py-2 text-gray-500">
-                                                        {contactPersons.length === 0
-                                                            ? "Create customer and add data"
-                                                            : "No matching contact found"}
-                                                    </li>
-                                                )}
-                                            </ul>
-                                        )}
                                     </div>
-                                    <input
-                                        type="text"
-                                        name="customerLocation"
-                                        placeholder="Site Location"
-                                        value={formData.customerLocation}
-                                        onChange={handleChange}
-                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        required
-                                    />
-                                </div>
 
-                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                    <input
-                                        type="text"
-                                        name="contactPerson"
-                                        placeholder="Contact Person"
-                                        value={formData.contactPerson}
-                                        onChange={handleChange}
-                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        required
-                                    />
-                                    <input
-                                        type="tel"
-                                        name="contactNumber"
-                                        placeholder="Contact Number"
-                                        value={formData.contactNumber}
-                                        onChange={handleChange}
-                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                    <select
-                                        name="status"
-                                        value={formData.status}
-                                        onChange={handleChange}
-                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        required
-                                    >
-                                        <option value="checked">Checked</option>
-                                        <option value="unchecked">Unchecked</option>
-                                    </select>
-                                    <select
-                                        name="serviceEngineerId"
-                                        value={formData.serviceEngineerId || ""}
-                                        onChange={handleServiceEngineerChange}
-                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        required
-                                        disabled={isLoadingEngineers}
-                                    >
-                                        <option value="">{isLoadingEngineers ? "Loading engineers..." : "Select Service Engineer"}</option>
-                                        {serviceEngineers.map((engineer) => (
-                                            <option key={engineer.id} value={engineer.id}>
-                                                {engineer.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                    <input
-                                        type="date"
-                                        name="dateOfCalibration"
-                                        value={startDate}
-                                        onChange={handleStartDateChange}
-                                        className="p-2 rounded-md border bg-gray-300"
-                                        min="2000-01-01"
-                                        max="2100-12-31"
-                                    />
-                                    <input
-                                        type="text"
-                                        name="place"
-                                        placeholder="Enter Place"
-                                        value={formData.place}
-                                        onChange={handleChange}
-                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                    <label className="font-medium text-black">Place :</label>
-                                    <div className="flex gap-4">
-                                        {["At Site", "In House"].map((option) => (
-                                            <label key={option} className="flex items-center cursor-pointer">
-                                                <input
-                                                    type="radio"
-                                                    name="placeOptions"
-                                                    value={option}
-                                                    checked={formData.placeOptions === option}
-                                                    onChange={handleChange}
-                                                    className={`
-                        appearance-none w-4 h-4 border border-gray-400 rounded-full mr-2
-                        checked:bg-blue-600 checked:border-blue-600
-                        transition-colors duration-200
-                    `}
-                                                    style={{
-                                                        backgroundColor:
-                                                            formData.placeOptions === option ? "#2563EB" : "#ffffff",
-                                                    }}
-                                                />
-                                                <span className="text-black">{option}</span>
-                                            </label>
-                                        ))}
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <input
+                                            type="text"
+                                            name="contactPerson"
+                                            placeholder="Contact Person"
+                                            value={formData.contactPerson}
+                                            onChange={handleChange}
+                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                            required
+                                        />
+                                        <input
+                                            type="tel"
+                                            name="contactNumber"
+                                            placeholder="Contact Number"
+                                            value={formData.contactNumber}
+                                            onChange={handleChange}
+                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                            required
+                                        />
                                     </div>
-                                </div>
 
-                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                    <label className="font-medium text-black">Nature of Job :</label>
-                                    <div className="flex gap-4 flex-wrap">
-                                        {["AMC", "Charged", "Warranty"].map((option) => (
-                                            <label key={option} className="flex items-center cursor-pointer">
-                                                <input
-                                                    type="radio"
-                                                    name="natureOfJob"
-                                                    value={option}
-                                                    checked={formData.natureOfJob === option}
-                                                    onChange={handleChange}
-                                                    className={`
-                        appearance-none w-4 h-4 border border-gray-400 rounded-full mr-2
-                        checked:bg-blue-600 checked:border-blue-600
-                        transition-colors duration-200
-                    `}
-                                                    style={{
-                                                        backgroundColor:
-                                                            formData.natureOfJob === option ? "#2563EB" : "#ffffff",
-                                                    }}
-                                                />
-                                                <span className="text-black">{option}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                    <input
-                                        type="text"
-                                        name="reportNo"
-                                        placeholder="Report Number"
-                                        value={formData.reportNo}
-                                        onChange={handleChange}
-                                        readOnly
-                                        className="bg-gray-100 text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                    />
-                                    <select
-                                        name="engineerName"
-                                        value={formData.engineerName}
-                                        onChange={handleChange}
-                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        required
-                                    >
-                                        <option value="">Created By</option>
-                                        {engineers.map((eng) => (
-                                            <option key={eng.id} value={eng.name}>
-                                                {eng.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="flex flex-col gap-4">
-                                    <input
-                                        name="makeModelNumberoftheInstrumentQuantity"
-                                        placeholder="Model Number of the Instrument Quantity"
-                                        value={formData.makeModelNumberoftheInstrumentQuantity}
-                                        onChange={handleChange}
-                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        required
-                                    />
-                                    <input
-                                        name="serialNumberoftheInstrumentCalibratedOK"
-                                        placeholder="Serial Number of the Instrument Calibrated & OK"
-                                        value={formData.serialNumberoftheInstrumentCalibratedOK}
-                                        onChange={handleChange}
-                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        required
-                                    />
-                                    <input
-                                        name="serialNumberoftheFaultyNonWorkingInstruments"
-                                        placeholder="Serial Number of Faulty / Non-Working Instruments"
-                                        value={formData.serialNumberoftheFaultyNonWorkingInstruments}
-                                        onChange={handleChange}
-                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        required
-                                    />
-                                    <input
-                                        name="engineerReport"
-                                        placeholder="Engineer Report"
-                                        value={formData.engineerReport}
-                                        onChange={handleChange}
-                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="flex justify-end mb-4">
-                                    <button
-                                        type="button"
-                                        onClick={addEngineerRemark}
-                                        className="bg-purple-950 text-white px-4 py-2 border rounded hover:bg-purple-900"
-                                        disabled={formData.engineerRemarks.length >= 10}
-                                    >
-                                        Add Engineer Remark
-                                    </button>
-                                </div>
-
-                                <div className="overflow-x-auto">
-                                    <table className="table-auto border-collapse border border-gray-500 rounded w-full">
-                                        <thead>
-                                            <tr>
-                                                <th className="border p-2">#</th>
-                                                <th className="border p-2">Service / Spares</th>
-                                                <th className="border p-2">Part Number</th>
-                                                <th className="border p-2">Rate</th>
-                                                <th className="border p-2">Quantity</th>
-                                                <th className="border p-2">Total</th>
-                                                <th className="border p-2">PO Number</th>
-                                                <th className="border p-2">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {formData.engineerRemarks.map((engineerRemark, index) => (
-                                                <tr key={index}>
-                                                    <td className="border p-2">{index + 1}</td>
-                                                    <td className="border p-2">
-                                                        <input
-                                                            type="text"
-                                                            value={engineerRemark.serviceSpares}
-                                                            onChange={(e) => handleEngineerRemarksChange(index, 'serviceSpares', e.target.value)}
-                                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
-                                                            required
-                                                        />
-                                                    </td>
-                                                    <td className="border p-2">
-                                                        <input
-                                                            type="text"
-                                                            value={engineerRemark.partNo}
-                                                            onChange={(e) => handleEngineerRemarksChange(index, 'partNo', e.target.value)}
-                                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
-                                                            required
-                                                        />
-                                                    </td>
-                                                    <td className="border p-2">
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            step="0.01"
-                                                            value={engineerRemark.rate}
-                                                            onChange={(e) => handleEngineerRemarksChange(index, 'rate', e.target.value)}
-                                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
-                                                            required
-                                                        />
-                                                    </td>
-                                                    <td className="border p-2">
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            value={engineerRemark.quantity}
-                                                            onChange={(e) => handleEngineerRemarksChange(index, 'quantity', e.target.value)}
-                                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
-                                                            required
-                                                        />
-                                                    </td>
-                                                    <td className="border p-2">
-                                                        <input
-                                                            type="text"
-                                                            value={engineerRemark.total || ""}
-                                                            readOnly
-                                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
-                                                        />
-                                                    </td>
-                                                    <td className="border p-2">
-                                                        <input
-                                                            type="text"
-                                                            value={engineerRemark.poNo}
-                                                            onChange={(e) => handleEngineerRemarksChange(index, 'poNo', e.target.value)}
-                                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
-                                                            required
-                                                        />
-                                                    </td>
-                                                    <td className="border p-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeEngineerRemark(index)}
-                                                            className="text-black-600 hover:text-black-800"
-                                                            aria-label="Remove remark"
-                                                        >
-                                                            <Trash2 className="h-5 w-5" />
-                                                        </button>
-                                                    </td>
-                                                </tr>
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <select
+                                            name="status"
+                                            value={formData.status}
+                                            onChange={handleChange}
+                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                            required
+                                        >
+                                            <option value="checked">Checked</option>
+                                            <option value="unchecked">Unchecked</option>
+                                        </select>
+                                        <select
+                                            name="serviceEngineerId"
+                                            value={formData.serviceEngineerId || ""}
+                                            onChange={handleServiceEngineerChange}
+                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                            required
+                                            disabled={isLoadingEngineers}
+                                        >
+                                            <option value="">{isLoadingEngineers ? "Loading engineers..." : "Select Service Engineer"}</option>
+                                            {serviceEngineers.map((engineer) => (
+                                                <option key={engineer.id} value={engineer.id}>
+                                                    {engineer.name}
+                                                </option>
                                             ))}
-                                            {formData.engineerRemarks.length === 0 && (
-                                                <tr>
-                                                    <td colSpan={8} className="border p-2 text-center text-gray-500">
-                                                        Click "Add Engineer Remark" to add one
-                                                    </td>
-                                                </tr>
-                                            )}
-                                            {formData.engineerRemarks.length >= 10 && (
-                                                <tr>
-                                                    <td colSpan={8} className="border p-2 text-center text-yellow-600">
-                                                        Maximum limit of 10 engineer remarks reached.
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                        </select>
+                                    </div>
 
-                                <div className="flex flex-col gap-4">
-                                    <input
-                                        name="customerReport"
-                                        placeholder="Customer Report"
-                                        value={formData.customerReport}
-                                        onChange={handleChange}
-                                        className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                    />
-                                </div>
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <input
+                                            type="date"
+                                            name="date"
+                                            value={formData.date}
+                                            onChange={handleChange}
+                                            className="p-2 rounded-md border bg-gray-300"
 
-                                {error && (
-                                    <div className="text-red-500 text-sm p-2 border border-red-300 rounded bg-red-50">
-                                        {error}
+                                        />
+                                        <input
+                                            type="text"
+                                            name="place"
+                                            placeholder="Enter Place"
+                                            value={formData.place}
+                                            onChange={handleChange}
+                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <label className="font-medium text-black">Place :</label>
+                                        <div className="flex gap-4">
+                                            {["At Site", "In House"].map((option) => (
+                                                <label key={option} className="flex items-center cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        name="placeOptions"
+                                                        value={option}
+                                                        checked={formData.placeOptions === option}
+                                                        onChange={handleChange}
+                                                        className={`
+                        appearance-none w-4 h-4 border border-gray-400 rounded-full mr-2
+                        checked:bg-blue-600 checked:border-blue-600
+                        transition-colors duration-200
+                    `}
+                                                        style={{
+                                                            backgroundColor:
+                                                                formData.placeOptions === option ? "#2563EB" : "#ffffff",
+                                                        }}
+                                                    />
+                                                    <span className="text-black">{option}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <label className="font-medium text-black">Nature of Job :</label>
+                                        <div className="flex gap-4 flex-wrap">
+                                            {["AMC", "Charged", "Warranty"].map((option) => (
+                                                <label key={option} className="flex items-center cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        name="natureOfJob"
+                                                        value={option}
+                                                        checked={formData.natureOfJob === option}
+                                                        onChange={handleChange}
+                                                        className={`
+                        appearance-none w-4 h-4 border border-gray-400 rounded-full mr-2
+                        checked:bg-blue-600 checked:border-blue-600
+                        transition-colors duration-200
+                    `}
+                                                        style={{
+                                                            backgroundColor:
+                                                                formData.natureOfJob === option ? "#2563EB" : "#ffffff",
+                                                        }}
+                                                    />
+                                                    <span className="text-black">{option}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <input
+                                            type="text"
+                                            name="reportNo"
+                                            placeholder="Report Number"
+                                            value={formData.reportNo}
+                                            onChange={handleChange}
+                                            readOnly
+                                            className="bg-gray-100 text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                        />
+                                        <select
+                                            name="engineerName"
+                                            value={formData.engineerName}
+                                            onChange={handleChange}
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                            required
+                                        >
+                                            <option value="">Created By</option>
+                                            {engineers.map((eng) => (
+                                                <option key={eng.id} value={eng.name}>
+                                                    {eng.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="flex flex-col gap-4">
+                                        <input
+                                            name="makeModelNumberoftheInstrumentQuantity"
+                                            placeholder="Model Number of the Instrument Quantity"
+                                            value={formData.makeModelNumberoftheInstrumentQuantity}
+                                            onChange={handleChange}
+                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                            required
+                                        />
+                                        <input
+                                            name="serialNumberoftheInstrumentCalibratedOK"
+                                            placeholder="Serial Number of the Instrument Calibrated & OK"
+                                            value={formData.serialNumberoftheInstrumentCalibratedOK}
+                                            onChange={handleChange}
+                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                            required
+                                        />
+                                        <input
+                                            name="serialNumberoftheFaultyNonWorkingInstruments"
+                                            placeholder="Serial Number of Faulty / Non-Working Instruments"
+                                            value={formData.serialNumberoftheFaultyNonWorkingInstruments}
+                                            onChange={handleChange}
+                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                            required
+                                        />
+                                        <input
+                                            name="engineerReport"
+                                            placeholder="Engineer Report"
+                                            value={formData.engineerReport}
+                                            onChange={handleChange}
+                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="flex justify-end mb-4">
+                                        <button
+                                            type="button"
+                                            onClick={addEngineerRemark}
+                                            className="bg-purple-950 text-white px-4 py-2 border rounded hover:bg-purple-900"
+                                            disabled={formData.engineerRemarks.length >= 10}
+                                        >
+                                            Add Engineer Remark
+                                        </button>
+                                    </div>
+
+                                    <div className="overflow-x-auto">
+                                        <table className="table-auto border-collapse border border-gray-500 rounded w-full">
+                                            <thead>
+                                                <tr>
+                                                    <th className="border p-2">#</th>
+                                                    <th className="border p-2">Service / Spares</th>
+                                                    <th className="border p-2">Part Number</th>
+                                                    <th className="border p-2">Rate</th>
+                                                    <th className="border p-2">Quantity</th>
+                                                    <th className="border p-2">Total</th>
+                                                    <th className="border p-2">PO Number</th>
+                                                    <th className="border p-2">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {formData.engineerRemarks.map((engineerRemark, index) => (
+                                                    <tr key={index}>
+                                                        <td className="border p-2">{index + 1}</td>
+                                                        <td className="border p-2">
+                                                            <input
+                                                                type="text"
+                                                                value={engineerRemark.serviceSpares}
+                                                                onChange={(e) => handleEngineerRemarksChange(index, 'serviceSpares', e.target.value)}
+                                                                className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
+                                                                required
+                                                            />
+                                                        </td>
+                                                        <td className="border p-2">
+                                                            <input
+                                                                type="text"
+                                                                value={engineerRemark.partNo}
+                                                                onChange={(e) => handleEngineerRemarksChange(index, 'partNo', e.target.value)}
+                                                                className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
+                                                                required
+                                                            />
+                                                        </td>
+                                                        <td className="border p-2">
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                step="0.01"
+                                                                value={engineerRemark.rate}
+                                                                onChange={(e) => handleEngineerRemarksChange(index, 'rate', e.target.value)}
+                                                                className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
+                                                                required
+                                                            />
+                                                        </td>
+                                                        <td className="border p-2">
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                value={engineerRemark.quantity}
+                                                                onChange={(e) => handleEngineerRemarksChange(index, 'quantity', e.target.value)}
+                                                                className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
+                                                                required
+                                                            />
+                                                        </td>
+                                                        <td className="border p-2">
+                                                            <input
+                                                                type="text"
+                                                                value={engineerRemark.total || ""}
+                                                                readOnly
+                                                                className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
+                                                            />
+                                                        </td>
+                                                        <td className="border p-2">
+                                                            <input
+                                                                type="text"
+                                                                value={engineerRemark.poNo}
+                                                                onChange={(e) => handleEngineerRemarksChange(index, 'poNo', e.target.value)}
+                                                                className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md"
+                                                                required
+                                                            />
+                                                        </td>
+                                                        <td className="border p-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeEngineerRemark(index)}
+                                                                className="text-black-600 hover:text-black-800"
+                                                                aria-label="Remove remark"
+                                                            >
+                                                                <Trash2 className="h-5 w-5" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {formData.engineerRemarks.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={8} className="border p-2 text-center text-gray-500">
+                                                            Click "Add Engineer Remark" to add one
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                                {formData.engineerRemarks.length >= 10 && (
+                                                    <tr>
+                                                        <td colSpan={8} className="border p-2 text-center text-yellow-600">
+                                                            Maximum limit of 10 engineer remarks reached.
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div className="flex flex-col gap-4">
+                                        <input
+                                            name="customerReport"
+                                            placeholder="Customer Report"
+                                            value={formData.customerReport}
+                                            onChange={handleChange}
+                                            className="w-full bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                        />
+                                    </div>
+
+                                    {error && (
+                                        <div className="text-red-500 text-sm p-2 border border-red-300 rounded bg-red-50">
+                                            {error}
+                                        </div>
+                                    )}
+                                    <button
+                                        type="submit"
+                                        className={`bg-purple-950 text-white p-2 rounded-md w-full ${loading ? "opacity-75" : isSubmitted ? "bg-purple-950950" : "hover:bg-purple-900"
+                                            }`}
+                                        disabled={loading || isSubmitted}
+                                    >
+                                        {loading ? (
+                                            <span className="flex items-center justify-center">
+                                                <span className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></span>
+                                                Generating...
+                                            </span>
+                                        ) : "Generate Certificate"}
+                                    </button>
+                                </form>
+
+                               
+                                {(service?.serviceId || formData.id) && (
+                                    <div className="mt-4 flex justify-center"> {/* Changed from text-center to flex justify-center */}
+                                        <div className="text-center"> {/* Added an inner div for text alignment */}
+                                            <p className="text-green-600 mb-2">Service report ready for download</p>
+                                            <button
+                                                onClick={() => handleDownload(service?.serviceId || formData.id)}
+                                                className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 flex items-center justify-center"
+                                                disabled={isGeneratingPDF}
+                                            >
+                                                {isGeneratingPDF ? (
+                                                    <span className="flex items-center justify-center">
+                                                        <span className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></span>
+                                                        Generating PDF...
+                                                    </span>
+                                                ) : "Download Service Report & Send Email"}
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
-                                <button
-                                    type="submit"
-                                    className={`bg-purple-950 text-white p-2 rounded-md w-full ${loading ? "opacity-75" : isSubmitted ? "bg-purple-950950" : "hover:bg-purple-900"
-                                        }`}
-                                    disabled={loading || isSubmitted}
-                                >
-                                    {loading ? (
-                                        <span className="flex items-center justify-center">
-                                            <span className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></span>
-                                            Generating...
-                                        </span>
-                                    ) : "Generate Certificate"}
-                                </button>
-                            </form>
-
-                            {/* Updated download button section */}
-                            {/* Updated download button section */}
-{(service?.serviceId || formData.id) && (
-    <div className="mt-4 flex justify-center"> {/* Changed from text-center to flex justify-center */}
-        <div className="text-center"> {/* Added an inner div for text alignment */}
-            <p className="text-green-600 mb-2">Service report ready for download</p>
-            <button
-                onClick={() => handleDownload(service?.serviceId || formData.id)}
-                className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 flex items-center justify-center"
-                disabled={isGeneratingPDF}
-            >
-                {isGeneratingPDF ? (
-                    <span className="flex items-center justify-center">
-                        <span className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></span>
-                        Generating PDF...
-                    </span>
-                ) : "Download Service Report & Send Email"}
-            </button>
-        </div>
-    </div>
-)}
-                        </CardContent>
-                    </Card>
-                </div>
-            </SidebarInset>
-        </SidebarProvider>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </SidebarInset>
+            </SidebarProvider>
         </PrivateRoute>
     );
 }

@@ -14,7 +14,7 @@ import PrivateRoute from "@/components/PrivateRoute";
 
 interface Company {
     id: string;
-    company_name: string;
+    company_name: string;   
 }
 interface Observation {
     gas: string;
@@ -53,7 +53,7 @@ const generateCertificateNumber = async (increment: boolean = false) => {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ increment }), // Pass the increment parameter
+            body: JSON.stringify({ increment }),
         });
 
         if (!response.ok) {
@@ -121,6 +121,7 @@ function CertificateForm() {
                     ...prev,
                     certificateNo: number
                 }));
+                setCurrentCertificateNo(number);
             });
         }
     }, [certificateId]);
@@ -140,6 +141,7 @@ function CertificateForm() {
     const [selectedModelId, setSelectedModelId] = useState<string>("");
     const [selectedRange, setSelectedRange] = useState<string>("");
     const [isSubmitted, setIsSubmitted] = useState(false);
+    const [currentCertificateNo, setCurrentCertificateNo] = useState("");
 
     const fetchCompanies = async () => {
         try {
@@ -201,7 +203,7 @@ function CertificateForm() {
                 }
                 const certificateData = response.data;
                 const transformedData = {
-                    certificateNo: certificateData.certificate_no || generateCertificateNumber(),
+                    certificateNo: certificateData.certificate_no || currentCertificateNo,
                     customerName: certificateData.customer_name || "",
                     siteLocation: certificateData.site_location || "",
                     makeModel: certificateData.make_model || "",
@@ -209,8 +211,12 @@ function CertificateForm() {
                     serialNo: certificateData.serial_no || "",
                     calibrationGas: certificateData.calibration_gas || "",
                     gasCanisterDetails: certificateData.gas_canister_details || "",
-                    dateOfCalibration: certificateData.date_of_calibration?.split('T')[0] || today,
-                    calibrationDueDate: certificateData.calibration_due_date?.split('T')[0] || today,
+                    dateOfCalibration: certificateData.date_of_calibration
+                        ? certificateData.date_of_calibration.split("T")[0]
+                        : formData.dateOfCalibration,
+                    calibrationDueDate: certificateData.calibration_due_date
+                        ? certificateData.calibration_due_date.split("T")[0]
+                        : formData.calibrationDueDate,
                     observations: Array.isArray(certificateData.observations)
                         ? certificateData.observations
                         : typeof certificateData.observations === 'string'
@@ -219,6 +225,7 @@ function CertificateForm() {
                     engineerName: certificateData.engineer_name || "",
                     status: certificateData.status || ""
                 };
+
                 setFormData(prev => ({
                     ...prev,
                     certificateNo: transformedData.certificateNo,
@@ -231,8 +238,11 @@ function CertificateForm() {
                     gasCanisterDetails: transformedData.gasCanisterDetails,
                     observations: transformedData.observations,
                     engineerName: transformedData.engineerName,
-                    status: transformedData.status
+                    status: transformedData.status,
+                    dateOfCalibration: transformedData.dateOfCalibration,
+                    calibrationDueDate: transformedData.calibrationDueDate
                 }));
+
                 setStartDate(transformedData.dateOfCalibration);
                 setEndDate(transformedData.calibrationDueDate);
                 setSelectedModelId(transformedData.makeModel);
@@ -352,8 +362,6 @@ function CertificateForm() {
 
         try {
             const isEditMode = !!certificateId;
-
-            // Use existing certificateNo from formData; no increment here
             let certificateNo = formData.certificateNo;
 
             // Validate required fields
@@ -368,9 +376,11 @@ function CertificateForm() {
                 status: "Status",
                 engineerName: "Engineer Name"
             };
+
             const missingFields = Object.entries(requiredFields)
                 .filter(([field]) => !formData[field as keyof typeof formData]?.toString().trim())
                 .map(([_, label]) => label);
+
             if (!startDate) missingFields.push("Date of Calibration");
             if (!endDate) missingFields.push("Calibration Due Date");
 
@@ -418,9 +428,15 @@ function CertificateForm() {
                 }
             });
 
+            setCurrentCertificateNo(formData.certificateNo);
+
+            if (!isEditMode) {
+                const newCertNo = await generateCertificateNumber(true);
+                setFormData(prev => ({ ...prev, certificateNo: newCertNo }));
+            }
+
             setCertificate(response.data);
             setIsSubmitted(true);
-            setFormData(prev => ({ ...prev, certificateNo }));
 
             toast({
                 title: isEditMode
@@ -428,6 +444,7 @@ function CertificateForm() {
                     : "Certificate created successfully",
                 variant: "default",
             });
+
         } catch (err: unknown) {
             let errorMessage = "An unexpected error occurred";
             if (axios.isAxiosError(err)) {
@@ -499,10 +516,9 @@ function CertificateForm() {
 
     const handleDownload = async () => {
         try {
-            // Use the current certificate number for printing
-            const currentCertNo = formData.certificateNo;
+            
+            const currentCertNo = currentCertificateNo || formData.certificateNo;
 
-            // Load logo and footer images
             const logo = new Image();
             logo.src = "/img/rps.png";
 
@@ -548,11 +564,13 @@ function CertificateForm() {
 
             const formatDate = (inputDateString: string | undefined) => {
                 if (!inputDateString) return "N/A";
-                const inputDate = new Date(inputDateString);
-                if (isNaN(inputDate.getTime())) return "N/A";
-                const pad = (n: number) => n.toString().padStart(2, "0");
-                return `${pad(inputDate.getDate())} - ${pad(inputDate.getMonth() + 1)} - ${inputDate.getFullYear()}`;
+                const parts = inputDateString.split("-");
+                if (parts.length !== 3) return "N/A";
+                const [year, month, day] = parts;
+                return `${day}-${month}-${year}`;
             };
+
+
 
             const addRow = (labelText: string, value: string) => {
                 const labelWidth = 55;
@@ -576,7 +594,6 @@ function CertificateForm() {
             doc.text("CALIBRATION CERTIFICATE", pageWidth / 2, y, { align: "center" });
             y += 12;
 
-            // Add rows with current certificate number and other data
             addRow("Certificate No.", currentCertNo);
             addRow("Customer Name", formData.customerName);
             addRow("Site Location", formData.siteLocation);
@@ -705,7 +722,7 @@ function CertificateForm() {
                             footerTextY
                         );
                         doc.text(
-                            `Generated on: ${new Date().toLocaleString()}`,
+                            `Calibration Date: ${formatDate(formData.dateOfCalibration)}`,
                             leftMargin,
                             footerTextY + 10
                         );
@@ -718,9 +735,6 @@ function CertificateForm() {
             // Save PDF
             doc.save("calibration-certificate.pdf");
 
-            // Now increment the certificate number **after** saving the PDF
-            const newCertNo = await generateCertificateNumber(true);
-            setFormData(prev => ({ ...prev, certificateNo: newCertNo }));
 
             // Reset form if needed
             resetForm();
@@ -745,336 +759,336 @@ function CertificateForm() {
     }
 
     return (
-     <PrivateRoute>
-           <SidebarProvider>
-            <AdminSidebar />
-            <SidebarInset>
-                <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-                    <div className="flex items-center gap-2 px-4">
-                        <SidebarTrigger className="-ml-1" />
-                        <Separator orientation="vertical" className="mr-2 h-4" />
-                        <Breadcrumb>
-                            <BreadcrumbList>
-                                <BreadcrumbItem>
-                                    <BreadcrumbLink href="/admin/dashboard">
-                                        Dashboard
-                                    </BreadcrumbLink>
-                                </BreadcrumbItem>
-                                <BreadcrumbSeparator className="hidden md:block" />
-                                <BreadcrumbItem>
-                                    <BreadcrumbLink href="/admin/certificaterecord">
-                                        Certificate Record
-                                    </BreadcrumbLink>
-                                </BreadcrumbItem>
-                            </BreadcrumbList>
-                        </Breadcrumb>
-                    </div>
-                </header>
-                <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15">
-                    <Card className="max-w-6xl mx-auto">
-                        <CardHeader>
-                            <CardTitle className="text-3xl font-bold text-center">
-                                {certificateId ? "Update Certificate" : "Create Certificate"}
-                            </CardTitle>
-                            <CardDescription className="text-center">
-                                {certificateId
-                                    ? "Modify the certificate details below"
-                                    : "Fill out the form below to create a new certificate"}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-6">
-                                {error && (
-                                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-                                        <span className="block sm:inline">{error}</span>
-                                    </div>
-                                )}
-                                {loading && (
-                                    <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded relative" role="alert">
-                                        <span className="block sm:inline">{certificateId ? "Updating..." : "Generating..."}</span>
-                                    </div>
-                                )}
-                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                    <div className="relative w-full">
+        <PrivateRoute>
+            <SidebarProvider>
+                <AdminSidebar />
+                <SidebarInset>
+                    <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+                        <div className="flex items-center gap-2 px-4">
+                            <SidebarTrigger className="-ml-1" />
+                            <Separator orientation="vertical" className="mr-2 h-4" />
+                            <Breadcrumb>
+                                <BreadcrumbList>
+                                    <BreadcrumbItem>
+                                        <BreadcrumbLink href="/admin/dashboard">
+                                            Dashboard
+                                        </BreadcrumbLink>
+                                    </BreadcrumbItem>
+                                    <BreadcrumbSeparator className="hidden md:block" />
+                                    <BreadcrumbItem>
+                                        <BreadcrumbLink href="/admin/certificaterecord">
+                                            Certificate Record
+                                        </BreadcrumbLink>
+                                    </BreadcrumbItem>
+                                </BreadcrumbList>
+                            </Breadcrumb>
+                        </div>
+                    </header>
+                    <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15">
+                        <Card className="max-w-6xl mx-auto">
+                            <CardHeader>
+                                <CardTitle className="text-3xl font-bold text-center">
+                                    {certificateId ? "Update Certificate" : "Create Certificate"}
+                                </CardTitle>
+                                <CardDescription className="text-center">
+                                    {certificateId
+                                        ? "Modify the certificate details below"
+                                        : "Fill out the form below to create a new certificate"}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-6">
+                                    {error && (
+                                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                                            <span className="block sm:inline">{error}</span>
+                                        </div>
+                                    )}
+                                    {loading && (
+                                        <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded relative" role="alert">
+                                            <span className="block sm:inline">{certificateId ? "Updating..." : "Generating..."}</span>
+                                        </div>
+                                    )}
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <div className="relative w-full">
+                                            <input
+                                                type="text"
+                                                name="customerName"
+                                                placeholder="Customer Name"
+                                                value={formData.customerName}
+                                                onChange={(e) => {
+                                                    setFormData(prev => ({ ...prev, customerName: e.target.value }));
+                                                    setCompanySearchTerm(e.target.value);
+                                                    setShowCompanyDropdown(true);
+                                                }}
+                                                onFocus={() => setShowCompanyDropdown(true)}
+                                                onBlur={() => setTimeout(() => setShowCompanyDropdown(false), 150)}
+                                                className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md w-full text-sm"
+                                            />
+                                            {showCompanyDropdown && (
+                                                <ul className="absolute left-0 top-full mt-1 z-20 w-full rounded-md border bg-white text-sm shadow-lg max-h-60 overflow-y-auto">
+                                                    {filteredCompanies.length > 0 ? (
+                                                        filteredCompanies.map((company) => (
+                                                            <li
+                                                                key={company.id}
+                                                                className={`px-4 py-2 cursor-pointer transition-colors ${selectedCompanyName === company.company_name ? " font-medium" : ""
+                                                                    }`}
+                                                                onMouseDown={(e) => e.preventDefault()}
+                                                                onClick={() => {
+                                                                    setFormData(prev => ({
+                                                                        ...prev,
+                                                                        customerName: company.company_name
+                                                                    }));
+                                                                    setCompanySearchTerm(company.company_name);
+                                                                    setSelectedCompanyName(company.company_name);
+                                                                    setShowCompanyDropdown(false);
+                                                                }}
+                                                            >
+                                                                {company.company_name}
+                                                            </li>
+                                                        ))
+                                                    ) : (
+                                                        <li className="px-4 py-2 text-gray-500">
+                                                            {companySearchTerm ? "Go to create company and add data" : "Start typing to search company"}
+                                                        </li>
+                                                    )}
+                                                </ul>
+                                            )}
+                                        </div>
                                         <input
                                             type="text"
-                                            name="customerName"
-                                            placeholder="Customer Name"
-                                            value={formData.customerName}
-                                            onChange={(e) => {
-                                                setFormData(prev => ({ ...prev, customerName: e.target.value }));
-                                                setCompanySearchTerm(e.target.value);
-                                                setShowCompanyDropdown(true);
-                                            }}
-                                            onFocus={() => setShowCompanyDropdown(true)}
-                                            onBlur={() => setTimeout(() => setShowCompanyDropdown(false), 150)}
-                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md w-full text-sm"
+                                            name="siteLocation"
+                                            placeholder="Site Location"
+                                            value={formData.siteLocation}
+                                            onChange={handleChange}
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
                                         />
-                                        {showCompanyDropdown && (
-                                            <ul className="absolute left-0 top-full mt-1 z-20 w-full rounded-md border bg-white text-sm shadow-lg max-h-60 overflow-y-auto">
-                                                {filteredCompanies.length > 0 ? (
-                                                    filteredCompanies.map((company) => (
-                                                        <li
-                                                            key={company.id}
-                                                            className={`px-4 py-2 cursor-pointer transition-colors ${selectedCompanyName === company.company_name ? " font-medium" : ""
-                                                                }`}
-                                                            onMouseDown={(e) => e.preventDefault()}
-                                                            onClick={() => {
-                                                                setFormData(prev => ({
-                                                                    ...prev,
-                                                                    customerName: company.company_name
-                                                                }));
-                                                                setCompanySearchTerm(company.company_name);
-                                                                setSelectedCompanyName(company.company_name);
-                                                                setShowCompanyDropdown(false);
-                                                            }}
-                                                        >
-                                                            {company.company_name}
-                                                        </li>
-                                                    ))
-                                                ) : (
-                                                    <li className="px-4 py-2 text-gray-500">
-                                                        {companySearchTerm ? "Go to create company and add data" : "Start typing to search company"}
-                                                    </li>
-                                                )}
-                                            </ul>
-                                        )}
                                     </div>
-                                    <input
-                                        type="text"
-                                        name="siteLocation"
-                                        placeholder="Site Location"
-                                        value={formData.siteLocation}
-                                        onChange={handleChange}
-                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                    />
-                                </div>
-                                <div className="flex gap-4 items-center">
-                                    <select
-                                        className="w-full sm:w-1/2 bg-white border px-3 py-2 rounded-md text-black"
-                                        value={selectedModelId}
-                                        onChange={handleModelChange}
-                                    >
-                                        <option value="">Select Model</option>
-                                        {models.map((model) => (
-                                            <option key={model.id} value={model.id}>
-                                                {model.model_name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <input
-                                        value={formData.range}
-                                        readOnly
-                                        className="bg-gray-100 text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md w-full sm:w-1/2"
-                                        placeholder="Model Range"
-                                    />
-                                </div>
-                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                    <input
-                                        type="text"
-                                        name="serialNo"
-                                        placeholder="Serial Number"
-                                        value={formData.serialNo}
-                                        onChange={handleChange}
-                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                    />
-                                    <input
-                                        type="text"
-                                        name="calibrationGas"
-                                        placeholder="Calibration Gas"
-                                        value={formData.calibrationGas}
-                                        onChange={handleChange}
-                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                    />
-                                </div>
-                                <div className="grid grid-cols-1 gap-6">
-                                    <textarea
-                                        name="gasCanisterDetails"
-                                        placeholder="Gas Canister Details"
-                                        value={formData.gasCanisterDetails}
-                                        onChange={handleChange}
-                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black w-full px-3 py-2 rounded-md resize-none"
-                                        rows={3}
-                                    />
-                                </div>
-                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                    <input
-                                        type="date"
-                                        name="dateOfCalibration"
-                                        value={startDate}
-                                        onChange={handleStartDateChange}
-                                        className="p-2 rounded-md border bg-gray-300"
-                                        min="2000-01-01"
-                                        max="2100-12-31"
-                                    />
-                                    <select
-                                        onChange={handleTimePeriodChange}
-                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                    >
-                                        <option value="">Select Period</option>
-                                        <option value="3">3 Months</option>
-                                        <option value="6">6 Months</option>
-                                        <option value="9">9 Months</option>
-                                        <option value="12">12 Months</option>
-                                    </select>
-                                </div>
-                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                    <input
-                                        type="date"
-                                        name="calibrationDueDate"
-                                        placeholder="Enter Calibration Due Date"
-                                        value={endDate}
-                                        onChange={(e) => {
-                                            setEndDate(e.target.value);
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                calibrationDueDate: e.target.value
-                                            }));
-                                        }}
-                                        className="p-2 rounded-md border bg-gray-300"
-                                        disabled={timePeriod !== null}
-                                        data-date-format="DD-MM-YYYY"
-                                        min="2000-01-01"
-                                        max="2100-12-31"
-                                    />
-                                    <select
-                                        name="engineerName"
-                                        value={formData.engineerName}
-                                        onChange={handleChange}
-                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                    >
-                                        <option value="">Select Engineer</option>
-                                        {engineers.map((eng) => (
-                                            <option key={eng.id} value={eng.name}>
-                                                {eng.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                    <input
-                                        type="text"
-                                        id="certificateNo"
-                                        name="certificateNo"
-                                        value={formData.certificateNo}
-                                        onChange={handleChange}
-                                        readOnly
-                                        className="bg-gray-100 text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                    />
-                                    <select
-                                        name="status"
-                                        value={formData.status}
-                                        onChange={handleChange}
-                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
-                                    >
-                                        <option value="">Select Status</option>
-                                        <option value="Checked">Checked</option>
-                                        <option value="Unchecked">Unchecked</option>
-                                    </select>
-                                </div>
-                                <h2 className="text-lg font-bold mt-4 text-center">Observation Table</h2>
-                                <div className="flex justify-end mb-4">
-                                    <button
-                                        type="button"
-                                        onClick={addObservation}
-                                        className="bg-purple-950 text-white px-4 py-2 border rounded hover:bg-purple-900"
-                                        disabled={formData.observations.length >= 5}
-                                    >
-                                        Create Observation
-                                    </button>
-                                </div>
-                                <table className="table-auto border-collapse border border-gray-500 rounded w-full">
-                                    <thead>
-                                        <tr>
-                                            <th className="border p-2">#</th>
-                                            <th className="border p-2">Gas</th>
-                                            <th className="border p-2">Before Calibration</th>
-                                            <th className="border p-2">After Calibration</th>
-                                            <th className="border p-2">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {formData.observations.map((observation, index) => (
-                                            <tr key={index}>
-                                                <td className="border p-2">{index + 1}</td>
-                                                <td className="border p-2">
-                                                    <input
-                                                        type="text"
-                                                        name="gas"
-                                                        value={observation.gas}
-                                                        onChange={(e) => handleObservationChange(index, 'gas', e.target.value)}
-                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md w-full"
-                                                    />
-                                                </td>
-                                                <td className="border p-2">
-                                                    <input
-                                                        type="text"
-                                                        name="before"
-                                                        value={observation.before}
-                                                        onChange={(e) => handleObservationChange(index, 'before', e.target.value)}
-                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md w-full"
-                                                    />
-                                                </td>
-                                                <td className="border p-2">
-                                                    <input
-                                                        type="text"
-                                                        name="after"
-                                                        value={observation.after}
-                                                        onChange={(e) => handleObservationChange(index, 'after', e.target.value)}
-                                                        className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md w-full"
-                                                    />
-                                                </td>
-                                                <td className="border p-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeObservation(index)}
-                                                    >
-                                                        <Trash2 className="h-6 w-6" />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {formData.observations.length === 0 && (
+                                    <div className="flex gap-4 items-center">
+                                        <select
+                                            className="w-full sm:w-1/2 bg-white border px-3 py-2 rounded-md text-black"
+                                            value={selectedModelId}
+                                            onChange={handleModelChange}
+                                        >
+                                            <option value="">Select Model</option>
+                                            {models.map((model) => (
+                                                <option key={model.id} value={model.id}>
+                                                    {model.model_name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <input
+                                            value={formData.range}
+                                            readOnly
+                                            className="bg-gray-100 text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md w-full sm:w-1/2"
+                                            placeholder="Model Range"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <input
+                                            type="text"
+                                            name="serialNo"
+                                            placeholder="Serial Number"
+                                            value={formData.serialNo}
+                                            onChange={handleChange}
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                        />
+                                        <input
+                                            type="text"
+                                            name="calibrationGas"
+                                            placeholder="Calibration Gas"
+                                            value={formData.calibrationGas}
+                                            onChange={handleChange}
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-6">
+                                        <textarea
+                                            name="gasCanisterDetails"
+                                            placeholder="Gas Canister Details"
+                                            value={formData.gasCanisterDetails}
+                                            onChange={handleChange}
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black w-full px-3 py-2 rounded-md resize-none"
+                                            rows={3}
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <input
+                                            type="date"
+                                            name="dateOfCalibration"
+                                            value={startDate}
+                                            onChange={handleStartDateChange}
+                                            className="p-2 rounded-md border bg-gray-300"
+                                            min="2000-01-01"
+                                            max="2100-12-31"
+                                        />
+                                        <select
+                                            onChange={handleTimePeriodChange}
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                        >
+                                            <option value="">Select Period</option>
+                                            <option value="3">3 Months</option>
+                                            <option value="6">6 Months</option>
+                                            <option value="9">9 Months</option>
+                                            <option value="12">12 Months</option>
+                                        </select>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <input
+                                            type="date"
+                                            name="calibrationDueDate"
+                                            placeholder="Enter Calibration Due Date"
+                                            value={endDate}
+                                            onChange={(e) => {
+                                                setEndDate(e.target.value);
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    calibrationDueDate: e.target.value
+                                                }));
+                                            }}
+                                            className="p-2 rounded-md border bg-gray-300"
+                                            disabled={timePeriod !== null}
+                                            data-date-format="DD-MM-YYYY"
+                                            min="2000-01-01"
+                                            max="2100-12-31"
+                                        />
+                                        <select
+                                            name="engineerName"
+                                            value={formData.engineerName}
+                                            onChange={handleChange}
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                        >
+                                            <option value="">Select Engineer</option>
+                                            {engineers.map((eng) => (
+                                                <option key={eng.id} value={eng.name}>
+                                                    {eng.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <input
+                                            type="text"
+                                            id="certificateNo"
+                                            name="certificateNo"
+                                            value={formData.certificateNo}
+                                            onChange={handleChange}
+                                            readOnly
+                                            className="bg-gray-100 text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                        />
+                                        <select
+                                            name="status"
+                                            value={formData.status}
+                                            onChange={handleChange}
+                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-2 rounded-md"
+                                        >
+                                            <option value="">Select Status</option>
+                                            <option value="Checked">Checked</option>
+                                            <option value="Unchecked">Unchecked</option>
+                                        </select>
+                                    </div>
+                                    <h2 className="text-lg font-bold mt-4 text-center">Observation Table</h2>
+                                    <div className="flex justify-end mb-4">
+                                        <button
+                                            type="button"
+                                            onClick={addObservation}
+                                            className="bg-purple-950 text-white px-4 py-2 border rounded hover:bg-purple-900"
+                                            disabled={formData.observations.length >= 5}
+                                        >
+                                            Create Observation
+                                        </button>
+                                    </div>
+                                    <table className="table-auto border-collapse border border-gray-500 rounded w-full">
+                                        <thead>
                                             <tr>
-                                                <td colSpan={5} className="border p-2 text-center text-gray-500">
-                                                    Click "Create Observation" to add one
-                                                </td>
+                                                <th className="border p-2">#</th>
+                                                <th className="border p-2">Gas</th>
+                                                <th className="border p-2">Before Calibration</th>
+                                                <th className="border p-2">After Calibration</th>
+                                                <th className="border p-2">Action</th>
                                             </tr>
-                                        )}
-                                        {formData.observations.length >= 5 && (
-                                            <tr>
-                                                <td colSpan={5} className="border p-2 text-center text-yellow-600">
-                                                    Maximum limit of 5 observations reached.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                                <button
-                                    type="submit"
-                                    className={`bg-purple-950 text-white p-2 rounded-md w-full ${loading ? "opacity-75" : isSubmitted ? "bg-purple-950950" : "hover:bg-purple-900"
-                                        }`}
-                                    disabled={loading || isSubmitted}
-                                >
-                                    {loading ? "Generating..." : "Generate Certificate"}
-                                </button>
-                            </form>
-                            {certificate && (
-                                <div className="mt-4 text-center">
-                                    <p className="text-green-600 mb-2">Certificate Generated Successfully</p>
+                                        </thead>
+                                        <tbody>
+                                            {formData.observations.map((observation, index) => (
+                                                <tr key={index}>
+                                                    <td className="border p-2">{index + 1}</td>
+                                                    <td className="border p-2">
+                                                        <input
+                                                            type="text"
+                                                            name="gas"
+                                                            value={observation.gas}
+                                                            onChange={(e) => handleObservationChange(index, 'gas', e.target.value)}
+                                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md w-full"
+                                                        />
+                                                    </td>
+                                                    <td className="border p-2">
+                                                        <input
+                                                            type="text"
+                                                            name="before"
+                                                            value={observation.before}
+                                                            onChange={(e) => handleObservationChange(index, 'before', e.target.value)}
+                                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md w-full"
+                                                        />
+                                                    </td>
+                                                    <td className="border p-2">
+                                                        <input
+                                                            type="text"
+                                                            name="after"
+                                                            value={observation.after}
+                                                            onChange={(e) => handleObservationChange(index, 'after', e.target.value)}
+                                                            className="bg-white text-black border border-gray-300 focus:border-black focus:ring-1 focus:ring-black p-1 rounded-md w-full"
+                                                        />
+                                                    </td>
+                                                    <td className="border p-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeObservation(index)}
+                                                        >
+                                                            <Trash2 className="h-6 w-6" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {formData.observations.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={5} className="border p-2 text-center text-gray-500">
+                                                        Click "Create Observation" to add one
+                                                    </td>
+                                                </tr>
+                                            )}
+                                            {formData.observations.length >= 5 && (
+                                                <tr>
+                                                    <td colSpan={5} className="border p-2 text-center text-yellow-600">
+                                                        Maximum limit of 5 observations reached.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                     <button
-                                        onClick={handleDownload}
-                                        className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
+                                        type="submit"
+                                        className={`bg-purple-950 text-white p-2 rounded-md w-full ${loading ? "opacity-75" : isSubmitted ? "bg-purple-950950" : "hover:bg-purple-900"
+                                            }`}
+                                        disabled={loading || isSubmitted}
                                     >
-                                        Download Certificate
+                                        {loading ? "Generating..." : "Generate Certificate"}
                                     </button>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-            </SidebarInset>
-        </SidebarProvider>
-     </PrivateRoute>
+                                </form>
+                                {certificate && (
+                                    <div className="mt-4 text-center">
+                                        <p className="text-green-600 mb-2">Certificate Generated Successfully</p>
+                                        <button
+                                            onClick={handleDownload}
+                                            className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600"
+                                        >
+                                            Download Certificate
+                                        </button>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+                </SidebarInset>
+            </SidebarProvider>
+        </PrivateRoute>
     );
 }

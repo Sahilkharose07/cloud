@@ -53,7 +53,7 @@ const generateCertificateNumber = async (increment: boolean = false) => {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ increment }), // Pass the increment parameter
+            body: JSON.stringify({ increment }),
         });
 
         if (!response.ok) {
@@ -121,6 +121,7 @@ function CertificateForm() {
                     ...prev,
                     certificateNo: number
                 }));
+                setCurrentCertificateNo(number);
             });
         }
     }, [certificateId]);
@@ -140,6 +141,7 @@ function CertificateForm() {
     const [selectedModelId, setSelectedModelId] = useState<string>("");
     const [selectedRange, setSelectedRange] = useState<string>("");
     const [isSubmitted, setIsSubmitted] = useState(false);
+    const [currentCertificateNo, setCurrentCertificateNo] = useState("");
 
     const fetchCompanies = async () => {
         try {
@@ -201,7 +203,7 @@ function CertificateForm() {
                 }
                 const certificateData = response.data;
                 const transformedData = {
-                    certificateNo: certificateData.certificate_no || generateCertificateNumber(),
+                    certificateNo: certificateData.certificate_no || currentCertificateNo,
                     customerName: certificateData.customer_name || "",
                     siteLocation: certificateData.site_location || "",
                     makeModel: certificateData.make_model || "",
@@ -209,8 +211,12 @@ function CertificateForm() {
                     serialNo: certificateData.serial_no || "",
                     calibrationGas: certificateData.calibration_gas || "",
                     gasCanisterDetails: certificateData.gas_canister_details || "",
-                    dateOfCalibration: certificateData.date_of_calibration?.split('T')[0] || today,
-                    calibrationDueDate: certificateData.calibration_due_date?.split('T')[0] || today,
+                    dateOfCalibration: certificateData.date_of_calibration
+                        ? certificateData.date_of_calibration.split("T")[0]
+                        : formData.dateOfCalibration,
+                    calibrationDueDate: certificateData.calibration_due_date
+                        ? certificateData.calibration_due_date.split("T")[0]
+                        : formData.calibrationDueDate,
                     observations: Array.isArray(certificateData.observations)
                         ? certificateData.observations
                         : typeof certificateData.observations === 'string'
@@ -219,6 +225,7 @@ function CertificateForm() {
                     engineerName: certificateData.engineer_name || "",
                     status: certificateData.status || ""
                 };
+
                 setFormData(prev => ({
                     ...prev,
                     certificateNo: transformedData.certificateNo,
@@ -231,8 +238,11 @@ function CertificateForm() {
                     gasCanisterDetails: transformedData.gasCanisterDetails,
                     observations: transformedData.observations,
                     engineerName: transformedData.engineerName,
-                    status: transformedData.status
+                    status: transformedData.status,
+                    dateOfCalibration: transformedData.dateOfCalibration,
+                    calibrationDueDate: transformedData.calibrationDueDate
                 }));
+
                 setStartDate(transformedData.dateOfCalibration);
                 setEndDate(transformedData.calibrationDueDate);
                 setSelectedModelId(transformedData.makeModel);
@@ -352,8 +362,6 @@ function CertificateForm() {
 
         try {
             const isEditMode = !!certificateId;
-
-            // Use existing certificateNo from formData; no increment here
             let certificateNo = formData.certificateNo;
 
             // Validate required fields
@@ -368,9 +376,11 @@ function CertificateForm() {
                 status: "Status",
                 engineerName: "Engineer Name"
             };
+
             const missingFields = Object.entries(requiredFields)
                 .filter(([field]) => !formData[field as keyof typeof formData]?.toString().trim())
                 .map(([_, label]) => label);
+
             if (!startDate) missingFields.push("Date of Calibration");
             if (!endDate) missingFields.push("Calibration Due Date");
 
@@ -418,9 +428,15 @@ function CertificateForm() {
                 }
             });
 
+            setCurrentCertificateNo(formData.certificateNo);
+
+            if (!isEditMode) {
+                const newCertNo = await generateCertificateNumber(true);
+                setFormData(prev => ({ ...prev, certificateNo: newCertNo }));
+            }
+
             setCertificate(response.data);
             setIsSubmitted(true);
-            setFormData(prev => ({ ...prev, certificateNo }));
 
             toast({
                 title: isEditMode
@@ -428,6 +444,7 @@ function CertificateForm() {
                     : "Certificate created successfully",
                 variant: "default",
             });
+
         } catch (err: unknown) {
             let errorMessage = "An unexpected error occurred";
             if (axios.isAxiosError(err)) {
@@ -499,10 +516,9 @@ function CertificateForm() {
 
     const handleDownload = async () => {
         try {
-            // Use the current certificate number for printing
-            const currentCertNo = formData.certificateNo;
+            
+            const currentCertNo = currentCertificateNo || formData.certificateNo;
 
-            // Load logo and footer images
             const logo = new Image();
             logo.src = "/img/rps.png";
 
@@ -548,11 +564,13 @@ function CertificateForm() {
 
             const formatDate = (inputDateString: string | undefined) => {
                 if (!inputDateString) return "N/A";
-                const inputDate = new Date(inputDateString);
-                if (isNaN(inputDate.getTime())) return "N/A";
-                const pad = (n: number) => n.toString().padStart(2, "0");
-                return `${pad(inputDate.getDate())} - ${pad(inputDate.getMonth() + 1)} - ${inputDate.getFullYear()}`;
+                const parts = inputDateString.split("-");
+                if (parts.length !== 3) return "N/A";
+                const [year, month, day] = parts;
+                return `${day}-${month}-${year}`;
             };
+
+
 
             const addRow = (labelText: string, value: string) => {
                 const labelWidth = 55;
@@ -576,7 +594,6 @@ function CertificateForm() {
             doc.text("CALIBRATION CERTIFICATE", pageWidth / 2, y, { align: "center" });
             y += 12;
 
-            // Add rows with current certificate number and other data
             addRow("Certificate No.", currentCertNo);
             addRow("Customer Name", formData.customerName);
             addRow("Site Location", formData.siteLocation);
@@ -705,7 +722,7 @@ function CertificateForm() {
                             footerTextY
                         );
                         doc.text(
-                            `Generated on: ${new Date().toLocaleString()}`,
+                            `Calibration Date: ${formatDate(formData.dateOfCalibration)}`,
                             leftMargin,
                             footerTextY + 10
                         );
@@ -718,9 +735,6 @@ function CertificateForm() {
             // Save PDF
             doc.save("calibration-certificate.pdf");
 
-            // Now increment the certificate number **after** saving the PDF
-            const newCertNo = await generateCertificateNumber(true);
-            setFormData(prev => ({ ...prev, certificateNo: newCertNo }));
 
             // Reset form if needed
             resetForm();
